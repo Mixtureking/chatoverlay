@@ -71,6 +71,11 @@ const SAMPLE_MESSAGES_TEMPLATES = [
 export default function App() {
   // 1. DYNAMIC ROUTING CHECK - OBS Browser Source Detection
   const [isOverlayRoute, setIsOverlayRoute] = useState(false);
+  const [isDesktopOverlay, setIsDesktopOverlay] = useState(false);
+  const [isOverlayLocked, setIsOverlayLocked] = useState(false);
+  const [isElectronEnv, setIsElectronEnv] = useState(false);
+  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+
   const [obsSettings, setObsSettings] = useState<OverlaySettings>(DEFAULT_SETTINGS);
   const [obsChatId, setObsChatId] = useState<string>("");
   const [obsApiKey, setObsApiKey] = useState<string>("");
@@ -79,9 +84,13 @@ export default function App() {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
     const hasOverlayParam = searchParams.get("mode") === "overlay";
+    const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay";
     
-    if (path === "/overlay" || hasOverlayParam) {
+    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam) {
       setIsOverlayRoute(true);
+      if (hasDesktopOverlayParam) {
+        setIsDesktopOverlay(true);
+      }
       
       // Parse settings from URL for OBS source configuration
       const pFontSize = parseInt(searchParams.get("fontSize") || "15", 10);
@@ -132,6 +141,71 @@ export default function App() {
         .catch((err) => console.error("Error fetching initial synced settings:", err));
     }
   }, []);
+
+  // Expose global callback for Electron main process hotkey events to trigger locked state in React window
+  useEffect(() => {
+    if (isDesktopOverlay) {
+      (window as any).setDesktopOverlayLocked = (locked: boolean) => {
+        setIsOverlayLocked(locked);
+      };
+      return () => {
+        delete (window as any).setDesktopOverlayLocked;
+      };
+    }
+  }, [isDesktopOverlay]);
+
+  // Check desktop overlay window status periodically if in main panel
+  useEffect(() => {
+    if (!isOverlayRoute) {
+      const checkStatus = async () => {
+        try {
+          const res = await fetch("/api/desktop-overlay/status");
+          if (res.ok) {
+            const data = await res.json();
+            setIsElectronEnv(data.isElectron);
+            setIsOverlayOpen(data.isOpen);
+          }
+        } catch (err) {
+          console.error("Failed to check desktop overlay status:", err);
+        }
+      };
+      
+      checkStatus();
+      const interval = setInterval(checkStatus, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [isOverlayRoute]);
+
+  const handleToggleOverlay = async () => {
+    try {
+      const res = await fetch("/api/desktop-overlay/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ show: !isOverlayOpen }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsOverlayOpen(data.isOpen);
+        showToast(data.isOpen ? "🖥️ Đã mở Cửa sổ Game Overlay!" : "🖥️ Đã đóng Cửa sổ Game Overlay!");
+      }
+    } catch {
+      showToast("❌ Không thể kết nối tới Electron API");
+    }
+  };
+
+  const handleLockOverlay = async () => {
+    try {
+      await fetch("/api/desktop-overlay/set-locked", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locked: true }),
+      });
+      setIsOverlayLocked(true);
+      showToast("🔒 Đã khóa Game Overlay! Nhấn Ctrl + Alt + O để mở khóa di chuyển.");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // 2. MAIN STATE (For Dashboard & Live simulation tracking)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -465,6 +539,19 @@ export default function App() {
       messagesSetRef.current.clear();
       setMessages([]); // flush previous chat lists
 
+      // Sync connected state and keys to other overlays
+      const updatedSettings = { 
+        ...settings, 
+        isOffline: false, 
+        activeLiveChatId: data.activeLiveChatId, 
+        apiKey: apiKey 
+      };
+      fetch("/api/youtube/settings-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: updatedSettings }),
+      }).catch((err) => console.log(err));
+
       // Boot message fetch polling loop (pollingInterval specified by YouTube Data API, usually 4-5s)
       startPollingMessages(data.activeLiveChatId, apiKey);
 
@@ -487,6 +574,7 @@ export default function App() {
     pollingTimer.current = null;
     nextPageTokenRef.current = null;
     messagesSetRef.current.clear();
+    setMessages([]); // Tự động xóa sạch nội dung tin nhắn trước đó khi ngắt kết nối
 
     setStreamStatus((prev) => ({
       ...prev,
@@ -494,7 +582,16 @@ export default function App() {
       activeLiveChatId: "",
       error: null,
     }));
-    showToast("🔴 Đã ngắt kết nối YouTube API");
+
+    // Đồng bộ trạng thái ngắt kết nối tới các OBS overlay để xoá tin nhắn ngay lập tức
+    const updatedSettings = { ...settings, isOffline: true, activeLiveChatId: "", apiKey: "" };
+    fetch("/api/youtube/settings-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: updatedSettings }),
+    }).catch((err) => console.error(err));
+
+    showToast("🔴 Đã ngắt kết nối YouTube API & xóa hết tin nhắn cũ");
   };
 
   // Poll loop runner
@@ -566,12 +663,22 @@ export default function App() {
     }
   };
 
-  // OBS SUITE CONNECTED POLLER (For absolute OBS frame renderer)
+  // OBS SUITE CONNECTED POLLER (For absolute OBS frame renderer and desktop overlay)
   useEffect(() => {
-    if (isOverlayRoute && obsChatId && obsApiKey) {
+    const effectiveChatId = obsChatId || (obsSettings as any).activeLiveChatId;
+    const effectiveApiKey = obsApiKey || (obsSettings as any).apiKey;
+
+    if (isOverlayRoute && effectiveChatId && effectiveApiKey) {
       const fetchLoop = async () => {
+        // If the stream is offline, clear messages and do not fetch
+        if ((obsSettings as any).isOffline) {
+          setMessages([]);
+          messagesSetRef.current.clear();
+          return;
+        }
+
         try {
-          let u = `/api/youtube/messages?liveChatId=${obsChatId}&apiKey=${obsApiKey}`;
+          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}`;
           if (nextPageTokenRef.current) {
             u += `&pageToken=${nextPageTokenRef.current}`;
           }
@@ -601,7 +708,7 @@ export default function App() {
       const interval = setInterval(fetchLoop, 4500);
       return () => clearInterval(interval);
     }
-  }, [isOverlayRoute, obsChatId, obsApiKey]);
+  }, [isOverlayRoute, obsChatId, obsApiKey, (obsSettings as any).activeLiveChatId, (obsSettings as any).apiKey, (obsSettings as any).isOffline]);
 
   // OBS SUITE SETTINGS SYNC POLLER (Enables immediate UI hot-reloads without link updates)
   useEffect(() => {
@@ -613,6 +720,11 @@ export default function App() {
             const data = await res.json();
             if (data && data.settings) {
               setObsSettings(data.settings);
+              // Auto delete previous message contents if they went offline
+              if (data.settings.isOffline) {
+                setMessages([]);
+                messagesSetRef.current.clear();
+              }
             }
           }
         } catch (err) {
@@ -847,8 +959,119 @@ export default function App() {
     }
   };
 
-  // 7. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO
+  // 7. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
   if (isOverlayRoute) {
+    if (isDesktopOverlay) {
+      return (
+        <div className="w-full h-screen bg-transparent overflow-hidden text-slate-100 flex flex-col relative font-sans select-none antialiased">
+          {/* Subtle dash outline when overlay is unlocked to show window borders */}
+          {!isOverlayLocked && (
+            <div className="absolute inset-0 border-2 border-dashed border-indigo-500/60 pointer-events-none rounded-lg z-50 animate-pulse" />
+          )}
+
+          {/* Locked Overlay Hint */}
+          {isOverlayLocked && (
+            <div className="absolute right-2 top-2 z-50 bg-slate-900/90 text-[10px] text-slate-400 font-bold px-2 py-1 rounded border border-slate-800 opacity-20 hover:opacity-100 transition-opacity pointer-events-none font-mono">
+              Nhấn Ctrl+Alt+O để cài đặt
+            </div>
+          )}
+
+          {/* Title Handlebar: Allows window dragging via CSS in Unlocked mode */}
+          {!isOverlayLocked && (
+            <div 
+              style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+              className="bg-slate-950/95 border-b border-indigo-500/30 px-3 py-2 flex items-center justify-between text-xs shrink-0 cursor-move rounded-t-lg select-none shadow-md z-40"
+            >
+              <div className="flex items-center gap-1.5 font-bold text-indigo-400">
+                <Layout className="w-3.5 h-3.5 animate-bounce" />
+                <span>📍 Nhấn Giữ & Kéo Ở Đây Để Di Chuyển</span>
+              </div>
+              <button 
+                onClick={handleLockOverlay}
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded font-bold cursor-pointer transition-colors shadow-inner"
+                title="Khóa chuột để bấm xuyên qua khi chơi game hoặc live full màn hình"
+              >
+                Khóa Click-Through
+              </button>
+            </div>
+          )}
+
+          {/* Adjustment Sliders Card: Rendered only when overlay is Unlocked */}
+          {!isOverlayLocked && (
+            <div className="mx-2 mt-2 p-3 bg-slate-900/95 border border-slate-800/80 rounded-xl space-y-2.5 shadow-xl z-40 shrink-0 select-none backdrop-blur-md">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-200">🛠️ Căn Chỉnh Game Chat Overlay</span>
+                <span className="text-[9px] bg-indigo-500/10 text-indigo-400 uppercase font-bold px-1.5 py-0.5 rounded tracking-wider">Desktop Mode</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
+                {/* Font Size slider */}
+                <div className="space-y-1">
+                  <span className="text-slate-400 flex justify-between">
+                    <span>Cỡ chữ:</span>
+                    <span className="font-bold text-indigo-400 font-mono">{obsSettings.fontSize}px</span>
+                  </span>
+                  <input 
+                    type="range" 
+                    min="12" 
+                    max="26" 
+                    value={obsSettings.fontSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      const updated = { ...obsSettings, fontSize: val };
+                      setObsSettings(updated);
+                      fetch("/api/youtube/settings-sync", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ settings: updated }),
+                      }).catch(() => {});
+                    }}
+                    className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  />
+                </div>
+
+                {/* Bg Opacity slider */}
+                <div className="space-y-1">
+                  <span className="text-slate-400 flex justify-between">
+                    <span>Độ mờ nền:</span>
+                    <span className="font-bold text-indigo-400 font-mono">{Math.round(obsSettings.bgOpacity * 100)}%</span>
+                  </span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    value={obsSettings.bgOpacity * 100}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) / 100;
+                      const updated = { ...obsSettings, bgOpacity: val };
+                      setObsSettings(updated);
+                      fetch("/api/youtube/settings-sync", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ settings: updated }),
+                      }).catch(() => {});
+                    }}
+                    className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="text-[10px] text-amber-300 font-medium leading-tight bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>Khi vào game, bấm <b>Khóa Click-Through</b> bên trên. Muốn di chuyển lại chỉ cần dùng phím <b>Ctrl + Alt + O</b>.</span>
+              </div>
+            </div>
+          )}
+
+          {/* The Chat message scroll frame */}
+          <div className="flex-1 overflow-hidden">
+            <OverlayWidget messages={messages} settings={obsSettings} />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-screen bg-transparent overflow-hidden">
         <OverlayWidget messages={messages} settings={obsSettings} />
@@ -1061,6 +1284,60 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* 🎮 DISCORD-STYLE ACTIVE GAME OVERLAY CONTROL */}
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-indigo-400 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Layout className="w-4 h-4 shrink-0 text-indigo-500" />
+                      <span>Cửa Sổ Game Overlay (Discord Style)</span>
+                    </h4>
+                    {isElectronEnv ? (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        isOverlayOpen ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25" : "bg-slate-850 text-slate-500 border border-slate-800"
+                      }`}>
+                        {isOverlayOpen ? "Đang mở" : "Đã tắt"}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded font-bold uppercase">
+                        Trình duyệt
+                      </span>
+                    )}
+                  </div>
+                  
+                  <p className="text-[11px] text-slate-400 leading-normal">
+                    Hiển thị một khung chat trong suốt, luôn nổi (Always-on-Top) tại một vị trí cố định trên màn hình đè lên game hoặc ứng dụng của bạn, tự động bỏ qua nhấp chuột khi chơi game.
+                  </p>
+
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleOverlay}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        isOverlayOpen 
+                          ? "bg-red-600 hover:bg-red-500 text-white" 
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/15"
+                      }`}
+                    >
+                      <Layout className="w-3.5 h-3.5" />
+                      <span>{isOverlayOpen ? "Tắt Game Overlay Nổi" : "Bật Game Overlay Nổi"}</span>
+                    </button>
+
+                    {isElectronEnv ? (
+                      <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-850 text-[10px] text-slate-400 space-y-1">
+                        <div className="font-semibold text-slate-300">💡 Hướng dẫn phím tắt & Điểu chỉnh:</div>
+                        <ul className="list-disc pl-3.5 space-y-1 leading-normal">
+                          <li>Sử dụng tổ hợp phím <kbd className="bg-slate-800 text-indigo-300 px-1 py-0.5 rounded border border-slate-700 font-mono font-bold text-[9px]">Ctrl + Alt + O</kbd> ở bất cứ lúc nào ngoài màn hình nền để <b>Khóa / Mở Khóa</b> di chuyển.</li>
+                          <li>Sau khi <b>Mở khóa</b>: Di chuột vào thanh tiêu đề đứt nét của khung chat rồi <b>Nhấn giữ & Kéo</b> để thay đổi vị trí, hoặc chỉnh kích cỡ chữ/nền trực tiếp ngay trên khung chat nổi.</li>
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 text-[10px] text-amber-500/90 leading-normal">
+                        ⚠️ <b>Lưu ý:</b> Tính năng Discord-style Game Overlay yêu cầu bạn khởi động ứng dụng qua phần mềm <b>Desktop Client (Electron)</b> đi kèm để bật được tính năng vẽ đè Always-On-Top và điều khiển click-through toàn hệ thống.
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <hr className="border-slate-800" />
 

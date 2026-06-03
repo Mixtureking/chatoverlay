@@ -1,8 +1,42 @@
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, globalShortcut } = require("electron");
 const path = require("path");
 
 // Set NODE_ENV to production to make sure the server serves build files from 'dist'
 process.env.NODE_ENV = "production";
+
+let mainWindow = null;
+let overlayWindow = null;
+let overlayIsClickThrough = false;
+
+// Expose a global controller so the Express backend can trigger window states
+global.electronOverlayControl = {
+  isElectron: true,
+  isOverlayOpen: () => !!overlayWindow,
+  toggleOverlay: (show) => {
+    if (show) {
+      if (!overlayWindow) {
+        createOverlayWindow();
+      }
+    } else {
+      if (overlayWindow) {
+        overlayWindow.close();
+        overlayWindow = null;
+      }
+    }
+  },
+  setLocked: (locked) => {
+    if (overlayWindow) {
+      overlayIsClickThrough = locked;
+      overlayWindow.setIgnoreMouseEvents(locked, { forward: true });
+      // Notify the renderer of the lock change
+      overlayWindow.webContents.executeJavaScript(`
+        if (typeof window.setDesktopOverlayLocked === 'function') {
+          window.setDesktopOverlayLocked(${locked});
+        }
+      `).catch((err) => console.log("JS executing error:", err));
+    }
+  }
+};
 
 // Start the backend Express server
 try {
@@ -11,8 +45,6 @@ try {
 } catch (error) {
   console.error("Failed to start Express server:", error);
 }
-
-let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -37,15 +69,88 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    // When the controller window closes, close any active overlay window as well
+    if (overlayWindow) {
+      overlayWindow.close();
+      overlayWindow = null;
+    }
   });
+}
+
+function createOverlayWindow() {
+  if (overlayWindow) {
+    overlayWindow.focus();
+    return;
+  }
+
+  overlayWindow = new BrowserWindow({
+    width: 380,
+    height: 550,
+    x: 100,
+    y: 100,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    skipTaskbar: true, // Keep it out of taskbar for immersive look
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Load standard overlay address but with dynamic query mode
+  overlayWindow.loadURL("http://localhost:3000/overlay?mode=desktop-overlay");
+
+  // Handle links
+  overlayWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
+}
+
+// Register secure hotkeys for locking/unlocking the screen overlay
+function registerGlobalHotkeys() {
+  // Ctrl+Alt+O toggles lock/click-through status on the overlay window
+  const registered = globalShortcut.register("CommandOrControl+Alt+O", () => {
+    if (overlayWindow) {
+      overlayIsClickThrough = !overlayIsClickThrough;
+      overlayWindow.setIgnoreMouseEvents(overlayIsClickThrough, { forward: true });
+      
+      console.log(`[Hotkey] Toggle Click-through mode to: ${overlayIsClickThrough}`);
+      
+      // Update React state
+      overlayWindow.webContents.executeJavaScript(`
+        if (typeof window.setDesktopOverlayLocked === 'function') {
+          window.setDesktopOverlayLocked(${overlayIsClickThrough});
+        }
+      `).catch(() => {});
+    }
+  });
+
+  if (!registered) {
+    console.warn("Failed to register CommandOrControl+Alt+O hotkey");
+  } else {
+    console.log("Registered global hotkey for overlay: Ctrl+Alt+O");
+  }
 }
 
 app.whenReady().then(() => {
   createWindow();
+  registerGlobalHotkeys();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("will-quit", () => {
+  // Clear all hotkeys securely when application shuts down
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {

@@ -244,6 +244,38 @@ app.get("/api/youtube/settings-sync", (req, res) => {
   res.json({ settings: cachedOverlaySettings });
 });
 
+// APIs bridging requests to Electron Main Process for Discord-style always on top overlay
+app.get("/api/desktop-overlay/status", (req, res) => {
+  const control = (global as any).electronOverlayControl;
+  if (control) {
+    return res.json({
+      isElectron: true,
+      isOpen: control.isOverlayOpen(),
+    });
+  }
+  res.json({ isElectron: false, isOpen: false });
+});
+
+app.post("/api/desktop-overlay/toggle", (req, res) => {
+  const { show } = req.body;
+  const control = (global as any).electronOverlayControl;
+  if (control) {
+    control.toggleOverlay(!!show);
+    return res.json({ success: true, isOpen: control.isOverlayOpen() });
+  }
+  res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
+});
+
+app.post("/api/desktop-overlay/set-locked", (req, res) => {
+  const { locked } = req.body;
+  const control = (global as any).electronOverlayControl;
+  if (control) {
+    control.setLocked(!!locked);
+    return res.json({ success: true });
+  }
+  res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
+});
+
 // Vite & Static file handler initialization
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
