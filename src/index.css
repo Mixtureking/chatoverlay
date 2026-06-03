@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Montserrat:wght@400;600;800&family=Nunito:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-grotesk: "Space Grotesk", sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+  --font-nunito: "Nunito", sans-serif;
+}
+
+/* Custom overlay specific styles */
+
+.transparent-bg-panel {
+  background-color: var(--overlay-bg, rgba(15, 23, 42, 0.85));
+  backdrop-filter: blur(8px);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.6);
+}
+
+/* Stream overlay backdrop options */
+.game-backdrop-csgo {
+  background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80');
+  background-size: cover;
+  background-position: center;
+}
+
+.game-backdrop-valo {
+  background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=1200&q=80');
+  background-size: cover;
+  background-position: center;
+}
+
+.game-backdrop-desk {
+  background-image: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80');
+  background-size: cover;
+  background-position: center;
+}
+
+/* Chrome keyframes for messages entering */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Card highlight effect */
+.superchat-glow-2 {
+  box-shadow: 0 0 15px rgba(0, 176, 255, 0.4);
+}
+.superchat-glow-3 {
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+}
+.superchat-glow-4 {
+  box-shadow: 0 0 18px rgba(253, 216, 53, 0.5);
+}
+.superchat-glow-5 {
+  box-shadow: 0 0 20px rgba(230, 81, 0, 0.6);
+}
+.superchat-glow-6 {
+  box-shadow: 0 0 25px rgba(233, 30, 99, 0.7);
+  animation: pulse-glow 2s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 15px rgba(233, 30, 99, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(233, 30, 99, 0.9);
+  }
+}

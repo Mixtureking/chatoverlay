@@ -1,0 +1,6 @@
+{
+  "name": "YouTube Chat Overlay",
+  "description": "Giao diện overlay hiển thị chat trực tiếp YouTube trên màn hình Studio cho Streamer, hỗ trợ tùy chỉnh phông chữ, màu sắc, lọc spam và Super Chat",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
