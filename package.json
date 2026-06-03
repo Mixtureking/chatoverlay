@@ -51,7 +51,9 @@
       "package.json"
     ],
     "win": {
-      "target": "portable"
-    }
+      "target": "portable",
+      "forceCodeSigning": false
+    },
+    "forceCodeSigning": false
   }
 }

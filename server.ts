@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import dns from "dns";
+import fs from "fs";
 
 // Ensure DNS resolution works correctly in sandboxed environments
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
@@ -253,7 +254,17 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    let distPath = path.join(process.cwd(), "dist");
+    
+    // Fall back to locations relative to __dirname for Electron and standalone builds
+    if (typeof __dirname !== "undefined") {
+      if (fs.existsSync(path.join(__dirname, "index.html"))) {
+        distPath = __dirname;
+      } else if (fs.existsSync(path.join(__dirname, "dist", "index.html"))) {
+        distPath = path.join(__dirname, "dist");
+      }
+    }
+
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
