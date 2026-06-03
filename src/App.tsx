@@ -207,7 +207,7 @@ export default function App() {
             setIsOverlayOpen(data.isOpen);
           }
         } catch (err) {
-          console.error("Failed to check desktop overlay status:", err);
+          // Quietly fallback online/offline state to avoid console error logs during app initialization
         }
       };
       
