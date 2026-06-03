@@ -80,6 +80,47 @@ export default function App() {
   const [obsChatId, setObsChatId] = useState<string>("");
   const [obsApiKey, setObsApiKey] = useState<string>("");
 
+  // New states for interactive dragging & fullscreen launcher overlays
+  const [isMouseDownOnHandle, setIsMouseDownOnHandle] = useState(false);
+  const [isDetectedFullscreen, setIsDetectedFullscreen] = useState(false);
+  const [isEmbeddedDashboardOpen, setIsEmbeddedDashboardOpen] = useState(false);
+
+  // Set up global mouseup event listener to clear mouse down states smoothly
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsMouseDownOnHandle(false);
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, []);
+
+  // Set up fullscreen detection for immersive overlays
+  useEffect(() => {
+    if (isDesktopOverlay) {
+      const checkFullscreenSecured = () => {
+        // Detects: HTML5 elements fullscreen (F11/Game), viewport width matching screen parameters, or height constraints
+        const isFS = 
+          !!document.fullscreenElement || 
+          window.innerHeight >= window.screen.height - 15 ||
+          (Math.abs(window.screen.width - window.innerWidth) < 25 && Math.abs(window.screen.height - window.innerHeight) < 25);
+        setIsDetectedFullscreen(isFS);
+      };
+
+      window.addEventListener("resize", checkFullscreenSecured);
+      document.addEventListener("fullscreenchange", checkFullscreenSecured);
+      
+      // Initial checks
+      checkFullscreenSecured();
+      const intervalSecured = setInterval(checkFullscreenSecured, 1500);
+
+      return () => {
+        window.removeEventListener("resize", checkFullscreenSecured);
+        document.removeEventListener("fullscreenchange", checkFullscreenSecured);
+        clearInterval(intervalSecured);
+      };
+    }
+  }, [isDesktopOverlay]);
+
   useEffect(() => {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
@@ -962,17 +1003,242 @@ export default function App() {
   // 7. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
   if (isOverlayRoute) {
     if (isDesktopOverlay) {
+      const shouldHideControls = isMouseDownOnHandle;
+
       return (
         <div className="w-full h-screen bg-transparent overflow-hidden text-slate-100 flex flex-col relative font-sans select-none antialiased">
           {/* Subtle dash outline when overlay is unlocked to show window borders */}
-          {!isOverlayLocked && (
+          {!isOverlayLocked && !shouldHideControls && (
             <div className="absolute inset-0 border-2 border-dashed border-indigo-500/60 pointer-events-none rounded-lg z-50 animate-pulse" />
           )}
 
-          {/* Locked Overlay Hint */}
-          {isOverlayLocked && (
-            <div className="absolute right-2 top-2 z-50 bg-slate-900/90 text-[10px] text-slate-400 font-bold px-2 py-1 rounded border border-slate-800 opacity-20 hover:opacity-100 transition-opacity pointer-events-none font-mono">
-              Nhấn Ctrl+Alt+O để cài đặt
+          {/* Locked / Sync Status Hint */}
+          {isOverlayLocked && !isEmbeddedDashboardOpen && (
+            <div className="absolute right-2 top-2 z-55 bg-slate-900/90 text-[10px] text-slate-400 font-bold px-2 py-1 rounded border border-slate-800 opacity-20 hover:opacity-100 transition-opacity pointer-events-none font-mono">
+              Nhấn Ctrl+Alt+O để mở khóa
+            </div>
+          )}
+
+          {/* Active Status Badge shown when dragging/moving to indicate system is live */}
+          {shouldHideControls && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-55 bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 animate-pulse border border-indigo-400/35">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+              <span>Đang di chuyển - Sync hoạt động</span>
+            </div>
+          )}
+
+          {/* Fullscreen Detected Mini Launch Icon */}
+          {isDetectedFullscreen && (
+            <button
+              onClick={() => setIsEmbeddedDashboardOpen(!isEmbeddedDashboardOpen)}
+              className="absolute top-2 left-2 z-55 bg-indigo-600/95 hover:bg-indigo-500 hover:scale-105 active:scale-95 text-white p-2 rounded-lg shadow-xl cursor-pointer transition-all flex items-center justify-center border border-indigo-400/35"
+              title="Mở Bảng Điều Khiển Nấu Trình Không Viền"
+            >
+              <Layout className="w-4 h-4 animate-bounce" />
+            </button>
+          )}
+
+          {/* Beautiful Slide-Over Frameless Interactive Controller Panel */}
+          {isEmbeddedDashboardOpen && (
+            <div className="absolute inset-x-2 top-11 max-h-[85vh] overflow-y-auto bg-slate-950/98 border border-indigo-500/40 rounded-xl p-4 shadow-2xl z-55 flex flex-col space-y-4 backdrop-blur-xl animate-in fade-in-50 slide-in-from-top-4 duration-200">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-indigo-400 uppercase tracking-wide">
+                  <Sliders className="w-4 h-4 text-indigo-500 animate-pulse" />
+                  <span>⚙️ BẢNG ĐIỀU KHIỂN KHÔNG VIỀN</span>
+                </div>
+                <button
+                  onClick={() => setIsEmbeddedDashboardOpen(false)}
+                  className="text-slate-400 hover:text-white font-bold text-[10px] bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+
+              {/* YouTube Synchronization Module inside the Frameless Floating App */}
+              <div className="space-y-3 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
+                <div className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                  <Video className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Youtube Livestream</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block font-medium">YouTube API Key:</label>
+                    <input
+                      type="password"
+                      placeholder="Nhập API Key ở đây..."
+                      value={apiKey}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setApiKey(val);
+                        localStorage.setItem("yt_overlay_api_key", val);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block font-medium">Link video hoặc ID:</label>
+                    <input
+                      type="text"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={videoUrlOrId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setVideoUrlOrId(val);
+                        localStorage.setItem("yt_overlay_video_url", val);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {streamStatus.isConnected ? (
+                    <div className="space-y-2">
+                      <div className="bg-emerald-500/10 border border-emerald-500/25 p-2 rounded text-[10px] text-emerald-400 space-y-0.5 leading-normal">
+                        <div className="font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                          <span>Đã Đồng Bộ Livestream</span>
+                        </div>
+                        <div><b>Kênh:</b> {streamStatus.channelTitle || "N/A"}</div>
+                        <div className="truncate"><b>Tiêu đề:</b> {streamStatus.title}</div>
+                      </div>
+                      <button
+                        onClick={handleDisconnectStream}
+                        className="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded transition-colors cursor-pointer"
+                      >
+                        Ngắt kết nối & Xóa Chat
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {streamStatus.error && (
+                        <div className="bg-red-500/10 border border-red-500/20 p-2 rounded text-[10px] text-red-400 whitespace-pre-wrap">
+                          {streamStatus.error}
+                        </div>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          handleConnectStream(e);
+                        }}
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded transition-colors cursor-pointer"
+                      >
+                        Bắt đầu đồng bộ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Chat View Layout Ajustment inside Frameless App */}
+              <div className="space-y-3 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
+                <div className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Cấu Hình Giao Diện</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="space-y-1">
+                    <span className="text-slate-400 flex justify-between">
+                      <span>Cỡ chữ:</span>
+                      <span className="font-bold text-indigo-400">{obsSettings.fontSize}px</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="12"
+                      max="26"
+                      value={obsSettings.fontSize}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        const updated = { ...obsSettings, fontSize: val };
+                        setObsSettings(updated);
+                        setSettings(updated); // Sync main component setting
+                        localStorage.setItem("yt_overlay_settings", JSON.stringify(updated));
+                        fetch("/api/youtube/settings-sync", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ settings: updated }),
+                        }).catch(() => {});
+                      }}
+                      className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-slate-400 flex justify-between">
+                      <span>Độ mờ nền:</span>
+                      <span className="font-bold text-indigo-400">{Math.round(obsSettings.bgOpacity * 100)}%</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={obsSettings.bgOpacity * 100}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) / 100;
+                        const updated = { ...obsSettings, bgOpacity: val };
+                        setObsSettings(updated);
+                        setSettings(updated);
+                        localStorage.setItem("yt_overlay_settings", JSON.stringify(updated));
+                        fetch("/api/youtube/settings-sync", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ settings: updated }),
+                        }).catch(() => {});
+                      }}
+                      className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat Simulation Panel Inside Frameless App */}
+              <div className="space-y-3 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
+                <div className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Giả Lập Tương Tác</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      const list = SAMPLE_MESSAGES_TEMPLATES.filter(x => x.role !== "superchat");
+                      const rand = list[Math.floor(Math.random() * list.length)];
+                      handleInjectMessage(rand);
+                    }}
+                    className="py-1 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold rounded text-slate-200 cursor-pointer"
+                  >
+                    💬 Chat Thường
+                  </button>
+                  <button
+                    onClick={() => {
+                      const list = SAMPLE_MESSAGES_TEMPLATES.filter(x => x.role === "superchat");
+                      const rand = list[Math.floor(Math.random() * list.length)];
+                      handleInjectMessage(rand);
+                    }}
+                    className="py-1 bg-amber-500/20 hover:bg-amber-500/30 text-[10px] font-bold rounded text-amber-300 cursor-pointer"
+                  >
+                    ⭐ Super Chat
+                  </button>
+                  <button
+                    onClick={toggleSimulation}
+                    className={`col-span-2 py-1.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                      isSimulationActive ? "bg-red-600 hover:bg-red-500 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    }`}
+                  >
+                    {isSimulationActive ? "⏹️ Dừng Giả Lập" : "▶️ Bật Giả Lập Tự Động"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMessages([]);
+                      messagesSetRef.current.clear();
+                      showToast("🗑️ Đã xóa sạch tin nhắn!");
+                    }}
+                    className="col-span-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-[10px] font-bold rounded cursor-pointer transition-colors"
+                  >
+                    🗑️ Xóa Lịch Sử Chat
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -980,7 +1246,10 @@ export default function App() {
           {!isOverlayLocked && (
             <div 
               style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-              className="bg-slate-950/95 border-b border-indigo-500/30 px-3 py-2 flex items-center justify-between text-xs shrink-0 cursor-move rounded-t-lg select-none shadow-md z-40"
+              onMouseDown={() => setIsMouseDownOnHandle(true)}
+              className={`bg-slate-950/95 border-b border-indigo-500/30 px-3 py-2 flex items-center justify-between text-xs shrink-0 cursor-move rounded-t-lg select-none shadow-md z-40 transition-opacity duration-300 ${
+                shouldHideControls ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
             >
               <div className="flex items-center gap-1.5 font-bold text-indigo-400">
                 <Layout className="w-3.5 h-3.5 animate-bounce" />
@@ -999,7 +1268,9 @@ export default function App() {
 
           {/* Adjustment Sliders Card: Rendered only when overlay is Unlocked */}
           {!isOverlayLocked && (
-            <div className="mx-2 mt-2 p-3 bg-slate-900/95 border border-slate-800/80 rounded-xl space-y-2.5 shadow-xl z-40 shrink-0 select-none backdrop-blur-md">
+            <div className={`mx-2 mt-2 p-3 bg-slate-900/95 border border-slate-800/80 rounded-xl space-y-2.5 shadow-xl z-40 shrink-0 select-none backdrop-blur-md transition-opacity duration-300 ${
+              shouldHideControls ? "opacity-0 pointer-events-none" : "opacity-100"
+            }`}>
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-200">🛠️ Căn Chỉnh Game Chat Overlay</span>
                 <span className="text-[9px] bg-indigo-500/10 text-indigo-400 uppercase font-bold px-1.5 py-0.5 rounded tracking-wider">Desktop Mode</span>
