@@ -30,7 +30,10 @@ function sanitizeHtml(text: string): string {
 
 // Extract Video ID from popular Youtube URL formats
 function extractVideoId(input: string): string {
-  const trimmed = input.trim();
+  if (!input) return "";
+  // Strip any common copy-paste invisible characters, zero-width spaces, and trim whitespace
+  let trimmed = input.replace(/[\u200B-\u200C\u200D\uFEFF\s]/g, "").trim();
+
   // If it's already a 11-char ID
   if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
     return trimmed;
@@ -48,11 +51,15 @@ function extractVideoId(input: string): string {
   const embedMatch = trimmed.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
   if (embedMatch) return embedMatch[1];
 
+  // Fallback match to extract any consecutive 11-character sequence of letters/digits/hyphens/underscores which might be a video ID
+  const looseMatch = trimmed.match(/([a-zA-Z0-9_-]{11})/);
+  if (looseMatch) return looseMatch[0];
+
   return trimmed;
 }
 
 // API Route 1: Get Active Live Chat ID & Broadcast Info from Video ID
-app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res): Promise<any> => {
+app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id", "/live-chat-id", "*/live-chat-id"], async (req, res): Promise<any> => {
   const { videoUrlOrId, apiKey } = req.body;
 
   logToFile(`Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "${videoUrlOrId}", API Key ẩn: "${apiKey ? apiKey.substring(0, 6) + '...' : 'Không có'}"`);
@@ -126,7 +133,7 @@ app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res
 });
 
 // API Route 2: Fetch Live Chat Messages and Stream Details
-app.get(["/api/youtube/messages", "/youtube/messages"], async (req, res): Promise<any> => {
+app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res): Promise<any> => {
   const { liveChatId, apiKey, pageToken } = req.query;
 
   if (!liveChatId || !apiKey) {
@@ -223,7 +230,7 @@ app.get(["/api/youtube/messages", "/youtube/messages"], async (req, res): Promis
 });
 
 // API Route 3: Fetch view count / info in parallel
-app.get(["/api/youtube/viewers", "/youtube/viewers"], async (req, res): Promise<any> => {
+app.get(["/api/youtube/viewers", "/youtube/viewers", "/viewers", "*/viewers"], async (req, res): Promise<any> => {
   const { videoId, apiKey } = req.query;
 
   if (!videoId || !apiKey) {
@@ -251,7 +258,7 @@ app.get(["/api/youtube/viewers", "/youtube/viewers"], async (req, res): Promise<
 // Server-side settings cache to allow OBS and popouts to stay automatically in sync with the streamer control panel
 let cachedOverlaySettings: any = null;
 
-app.post(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
+app.post(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync", "*/settings-sync"], (req, res) => {
   const { settings } = req.body;
   if (settings) {
     cachedOverlaySettings = settings;
@@ -260,7 +267,7 @@ app.post(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) =>
   res.status(400).json({ error: "Missing settings payload" });
 });
 
-app.get(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
+app.get(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync", "*/settings-sync"], (req, res) => {
   res.json({ settings: cachedOverlaySettings });
 });
 
