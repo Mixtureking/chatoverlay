@@ -437,6 +437,7 @@ export default function App() {
   const pollingTimer = useRef<NodeJS.Timeout | null>(null);
   const nextPageTokenRef = useRef<string | null>(null);
   const messagesSetRef = useRef<Set<string>>(new Set());
+  const lastFetchedChatIdRef = useRef<string | null>(null);
 
   // Drag & Resize mouse tracker state for interactive frame (Sprint 2 UX)
   const [overlayPos, setOverlayPos] = useState({ x: 40, y: 50 });
@@ -847,6 +848,14 @@ export default function App() {
     const effectiveApiKey = obsApiKey || (obsSettings as any).apiKey;
 
     if (isOverlayRoute && effectiveChatId && effectiveApiKey) {
+      // Whenever the active connection transitions to another Chat ID, reset the page indices and buffer securely
+      if (lastFetchedChatIdRef.current !== effectiveChatId) {
+        lastFetchedChatIdRef.current = effectiveChatId;
+        nextPageTokenRef.current = null;
+        messagesSetRef.current.clear();
+        setMessages([]);
+      }
+
       if (effectiveChatId === "SIMULATED" || effectiveApiKey === "SANDBOX_MOCK_DRIVEN") {
         // Run a gorgeous client-side mock simulation loop immediately so OBS overlays never start blank during tests!
         const simulationLoop = () => {
@@ -905,7 +914,9 @@ export default function App() {
 
       const fetchLoop = async () => {
         // If the stream is offline, clear messages and do not fetch
-        if ((obsSettings as any).isOffline) {
+        // Exception: If the user passed direct explicit parameters via URL (obsChatId), bypass global offline checks
+        const reallyOffline = !obsChatId && (obsSettings as any).isOffline;
+        if (reallyOffline) {
           setMessages([]);
           messagesSetRef.current.clear();
           return;
@@ -939,7 +950,8 @@ export default function App() {
       };
 
       fetchLoop();
-      const interval = setInterval(fetchLoop, 4500);
+      // Fast polling interval for OBS widgets (4 seconds matches YouTube stream pacing)
+      const interval = setInterval(fetchLoop, 4000);
       return () => clearInterval(interval);
     }
   }, [isOverlayRoute, obsChatId, obsApiKey, (obsSettings as any).activeLiveChatId, (obsSettings as any).apiKey, (obsSettings as any).isOffline]);
@@ -972,6 +984,28 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [isOverlayRoute]);
+
+  // PROACTIVE REAL-TIME BACKGROUND SETTINGS AUTO-SYNCER
+  // Automatically syncs slider, checkbox or color adjustments to the server cache so OBS re-renders with zero latency
+  useEffect(() => {
+    if (isOverlayRoute) return; // Only process on the main Streamer Dashboard / Control Panel context
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        await fetch("/api/youtube/settings-sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ settings }),
+        });
+      } catch (err) {
+        console.warn("Silent background settings sync timed out:", err);
+      }
+    }, 500); // 500ms debounce ensures zero server spam when users drag sliders continuously
+
+    return () => clearTimeout(delayDebounce);
+  }, [settings, isOverlayRoute]);
 
   // 5. DRAG & RESIZE MANIPULATORS (Sprint 2 UI/UX features, AC-12, AC-13, AC-14)
   const handleMouseDownDrag = (e: React.MouseEvent) => {
