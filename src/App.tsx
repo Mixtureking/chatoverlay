@@ -662,7 +662,16 @@ export default function App() {
         body: JSON.stringify({ videoUrlOrId, apiKey }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error(
+          `Phản hồi từ Máy chủ không hợp lệ (Mã HTTP: ${res.status}). Vui lòng đảm bảo backend đang hoạt động ổn định và đường dẫn API khả dụng.`
+        );
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Gặp lỗi khi truy xuất thông tin Livestream");
       }
