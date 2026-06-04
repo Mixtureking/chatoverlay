@@ -1,0 +1,5 @@
+[LOGGER][2026-06-04T02:11:17.098Z] Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "https://www.youtube.com/live/someid", API Key ẩn: "invali..."
+[LOGGER][2026-06-04T02:11:17.099Z] Trích xuất thành công Video ID: "https://www.youtube.com/live/someid"
+[LOGGER][2026-06-04T02:11:17.099Z] Bắt đầu fetch Google API: https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,snippet&id=https://www.youtube.com/live/someid&key=HIDDEN
+[LOGGER][2026-06-04T02:11:17.135Z] Google API trả về mã phản hồi: 400 (Bad Request)
+[LOGGER][2026-06-04T02:11:17.140Z] Lỗi kết nối hoặc API phản hồi không thành công: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","errors":[{"message":"API key not valid. Please pass a valid API key.","domain":"global","reason":"badRequest"}],"status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"youtube.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]}}

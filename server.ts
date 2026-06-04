@@ -21,6 +21,27 @@ dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
 const app = express();
 const PORT = 3000;
 
+// Enable CORS for external overlay display integrations (e.g., OBS Browser Source, desktop apps)
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,Content-Type,Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Guard body-parser for serverless environments (like Vercel) where req.body might already be pre-parsed.
+// If req.body is already populated, we skip parsing to prevent the body-parser from hanging on a consumed stream.
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === "object" && Object.keys(req.body).length > 0) {
+    (req as any)._body = true;
+  }
+  next();
+});
+
 app.use(express.json());
 
 // Helper to clean up HTML strings to prevent XSS (Security Review SC-02)
@@ -296,7 +317,7 @@ app.get(["/api/desktop-overlay/status", "/desktop-overlay/status"], (req, res) =
 });
 
 app.post(["/api/desktop-overlay/toggle", "/desktop-overlay/toggle"], (req, res) => {
-  const { show } = req.body;
+  const { show } = req.body || {};
   const control = (global as any).electronOverlayControl;
   if (control) {
     control.toggleOverlay(!!show);
@@ -306,7 +327,7 @@ app.post(["/api/desktop-overlay/toggle", "/desktop-overlay/toggle"], (req, res) 
 });
 
 app.post(["/api/desktop-overlay/set-locked", "/desktop-overlay/set-locked"], (req, res) => {
-  const { locked } = req.body;
+  const { locked } = req.body || {};
   const control = (global as any).electronOverlayControl;
   if (control) {
     control.setLocked(!!locked);
@@ -316,7 +337,7 @@ app.post(["/api/desktop-overlay/set-locked", "/desktop-overlay/set-locked"], (re
 });
 
 app.post(["/api/desktop-overlay/set-ignore-mouse", "/desktop-overlay/set-ignore-mouse"], (req, res) => {
-  const { ignore } = req.body;
+  const { ignore } = req.body || {};
   const control = (global as any).electronOverlayControl;
   if (control) {
     if (typeof control.setIgnoreMouse === "function") {
