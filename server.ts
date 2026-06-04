@@ -3,16 +3,10 @@ import path from "path";
 import dns from "dns";
 import fs from "fs";
 
-// Helper to log errors & transactions to a file for runtime inspection
+// Helper to log errors & transactions to console for runtime inspection
 function logToFile(message: string) {
-  try {
-    const logPath = path.join(process.cwd(), "server.log");
-    const timestamp = new Date().toISOString();
-    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
-    console.log(`[LOGGER] ${message}`);
-  } catch (err) {
-    // Suppress logging failures
-  }
+  const timestamp = new Date().toISOString();
+  console.log(`[LOGGER][${timestamp}] ${message}`);
 }
 
 // Ensure DNS resolution works correctly in sandboxed environments
