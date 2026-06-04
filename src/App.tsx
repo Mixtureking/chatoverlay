@@ -230,31 +230,53 @@ export default function App() {
   useEffect(() => {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
-    const hasOverlayParam = searchParams.get("mode") === "overlay";
-    const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay";
+    const obParam = searchParams.get("ob");
     
-    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam) {
+    let decodedParams: any = {};
+    if (obParam) {
+      try {
+        // Safe base64 url-decode and UTF-8 conversion
+        let base64 = obParam.replace(/-/g, "+").replace(/_/g, "/");
+        while (base64.length % 4) {
+          base64 += "=";
+        }
+        const decodedJsonStr = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        decodedParams = JSON.parse(decodedJsonStr);
+      } catch (err) {
+        console.error("Lỗi giải mã liên kết OBS bảo mật:", err);
+      }
+    }
+
+    const hasOverlayParam = searchParams.get("mode") === "overlay" || decodedParams.liveChatId !== undefined;
+    const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay" || decodedParams.mode === "desktop-overlay";
+    
+    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || !!obParam) {
       setIsOverlayRoute(true);
       if (hasDesktopOverlayParam) {
         setIsDesktopOverlay(true);
       }
       
-      // Parse settings from URL for OBS source configuration
-      const pFontSize = parseInt(searchParams.get("fontSize") || "15", 10);
-      const pFontFamily = searchParams.get("fontFamily") || "Inter";
-      const pTextColor = searchParams.get("textColor") || "#ffffff";
-      const pBgColor = searchParams.get("bgColor") || "#0f172a";
-      const pBgOpacity = parseFloat(searchParams.get("bgOpacity") || "0.85");
-      const pAuthorColor = searchParams.get("authorColor") || "#bae6fd";
-      const pModeratorColor = searchParams.get("moderatorColor") || "#34d399";
-      const pSponsorColor = searchParams.get("sponsorColor") || "#fbbf24";
-      const pScDuration = parseInt(searchParams.get("superChatDuration") || "45", 10);
-      const pChatDuration = parseInt(searchParams.get("chatDuration") || "0", 10);
-      const pIsTransparent = searchParams.get("isTransparent") === "true";
-      const pScale = parseFloat(searchParams.get("scale") || "1.0");
-      const pShowAvatar = searchParams.get("showAvatar") !== "false";
-      const pShowBadges = searchParams.get("showBadges") !== "false";
-      const pAnimType = (searchParams.get("animationType") || "fade") as "fade" | "slide" | "bounce";
+      // Parse settings from URL or decoded params with logical fallbacks
+      const pFontSize = parseInt(decodedParams.fontSize?.toString() || searchParams.get("fontSize") || "15", 10);
+      const pFontFamily = decodedParams.fontFamily || searchParams.get("fontFamily") || "Inter";
+      const pTextColor = decodedParams.textColor || searchParams.get("textColor") || "#ffffff";
+      const pBgColor = decodedParams.bgColor || searchParams.get("bgColor") || "#0f172a";
+      const pBgOpacity = parseFloat(decodedParams.bgOpacity?.toString() || searchParams.get("bgOpacity") || "0.85");
+      const pAuthorColor = decodedParams.authorColor || searchParams.get("authorColor") || "#bae6fd";
+      const pModeratorColor = decodedParams.moderatorColor || searchParams.get("moderatorColor") || "#34d399";
+      const pSponsorColor = decodedParams.sponsorColor || searchParams.get("sponsorColor") || "#fbbf24";
+      const pScDuration = parseInt(decodedParams.superChatDuration?.toString() || searchParams.get("superChatDuration") || "45", 10);
+      const pChatDuration = parseInt(decodedParams.chatDuration?.toString() || searchParams.get("chatDuration") || "0", 10);
+      const pIsTransparent = decodedParams.isTransparent !== undefined ? decodedParams.isTransparent : (searchParams.get("isTransparent") === "true");
+      const pScale = parseFloat(decodedParams.scale?.toString() || searchParams.get("scale") || "1.0");
+      const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
+      const pShowBadges = decodedParams.showBadges !== undefined ? decodedParams.showBadges : (searchParams.get("showBadges") !== "false");
+      const pAnimType = (decodedParams.animationType || searchParams.get("animationType") || "fade") as "fade" | "slide" | "bounce";
 
       setObsSettings({
         fontSize: pFontSize,
@@ -274,8 +296,8 @@ export default function App() {
         animationType: pAnimType,
       });
 
-      setObsChatId(searchParams.get("liveChatId") || "");
-      setObsApiKey(searchParams.get("apiKey") || "");
+      setObsChatId(decodedParams.liveChatId || searchParams.get("liveChatId") || "");
+      setObsApiKey(decodedParams.apiKey || searchParams.get("apiKey") || "");
 
       // Let's retrieve potential live-synced configurations from backend cache on mount
       fetch("/api/youtube/settings-sync")
@@ -1055,28 +1077,64 @@ export default function App() {
 
   // OBS URL BUILDER COMPILER (Fulfills OBS Browser Source Dynamic Customization)
   const compileObsLink = (): string => {
+    // Relying on root pathname '/' avoids path resolution errors and 404s on providers like Vercel
     const rootUrl = window.location.origin;
-    const query = new URLSearchParams();
-    query.set("mode", "overlay");
-    query.set("liveChatId", streamStatus.activeLiveChatId || localStorage.getItem("yt_last_connected_chat_id") || "SIMULATED");
-    query.set("apiKey", apiKey || "SANDBOX_MOCK_DRIVEN");
-    query.set("fontFamily", settings.fontFamily);
-    query.set("fontSize", settings.fontSize.toString());
-    query.set("textColor", settings.textColor);
-    query.set("bgColor", settings.bgColor);
-    query.set("bgOpacity", settings.bgOpacity.toString());
-    query.set("authorColor", settings.authorColor);
-    query.set("moderatorColor", settings.moderatorColor);
-    query.set("sponsorColor", settings.sponsorColor);
-    query.set("superChatDuration", settings.superChatDuration.toString());
-    query.set("chatDuration", settings.chatDuration.toString());
-    query.set("isTransparent", settings.isTransparent ? "true" : "false");
-    query.set("scale", settings.scale.toString());
-    query.set("showAvatar", settings.showAvatar ? "true" : "false");
-    query.set("showBadges", settings.showBadges ? "true" : "false");
-    query.set("animationType", settings.animationType);
     
-    return `${rootUrl}/overlay?${query.toString()}`;
+    const config = {
+      liveChatId: streamStatus.activeLiveChatId || localStorage.getItem("yt_last_connected_chat_id") || "SIMULATED",
+      apiKey: apiKey || "SANDBOX_MOCK_DRIVEN",
+      fontFamily: settings.fontFamily,
+      fontSize: settings.fontSize,
+      textColor: settings.textColor,
+      bgColor: settings.bgColor,
+      bgOpacity: settings.bgOpacity,
+      authorColor: settings.authorColor,
+      moderatorColor: settings.moderatorColor,
+      sponsorColor: settings.sponsorColor,
+      superChatDuration: settings.superChatDuration,
+      chatDuration: settings.chatDuration,
+      isTransparent: settings.isTransparent,
+      scale: settings.scale,
+      showAvatar: settings.showAvatar,
+      showBadges: settings.showBadges,
+      animationType: settings.animationType,
+    };
+
+    try {
+      // Safe Base64 encoding with full UTF-8 capabilities for Vietnamese/special font families
+      const jsonStr = JSON.stringify(config);
+      const utf8String = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      });
+      const base64 = btoa(utf8String);
+      // Clean URL-safe encoding (strip pluses, slashes and padding)
+      const urlSafeBase64 = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      
+      return `${rootUrl}/?ob=${urlSafeBase64}`;
+    } catch (e) {
+      console.error("Base64 representation compile error:", e);
+      // Clean fallback using query params on direct root
+      const query = new URLSearchParams();
+      query.set("mode", "overlay");
+      query.set("liveChatId", config.liveChatId);
+      query.set("apiKey", config.apiKey);
+      query.set("fontFamily", config.fontFamily);
+      query.set("fontSize", config.fontSize.toString());
+      query.set("textColor", config.textColor);
+      query.set("bgColor", config.bgColor);
+      query.set("bgOpacity", config.bgOpacity.toString());
+      query.set("authorColor", config.authorColor);
+      query.set("moderatorColor", config.moderatorColor);
+      query.set("sponsorColor", config.sponsorColor);
+      query.set("superChatDuration", config.superChatDuration.toString());
+      query.set("chatDuration", config.chatDuration.toString());
+      query.set("isTransparent", config.isTransparent ? "true" : "false");
+      query.set("scale", config.scale.toString());
+      query.set("showAvatar", config.showAvatar ? "true" : "false");
+      query.set("showBadges", config.showBadges ? "true" : "false");
+      query.set("animationType", config.animationType);
+      return `${rootUrl}/?${query.toString()}`;
+    }
   };
 
   const handleCopyObsLink = () => {
