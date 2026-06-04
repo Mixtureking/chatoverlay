@@ -78,6 +78,46 @@ export default function OverlayWidget({
     height: previewMode ? "100%" : `${100 / safeScale}%`,
   };
 
+  // Debounce state to avoid running customJs compiles on every single keystroke (avoid browser freezes/crashes when typing)
+  const [debouncedCustomJs, setDebouncedCustomJs] = useState(settings.customJs || "");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomJs(settings.customJs || "");
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [settings.customJs]);
+
+  // Target ID mapping based on context
+  const containerId = previewMode ? "youtube-chat-overlay-preview" : "youtube-chat-overlay";
+
+  // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage (e.g. body { overflow: hidden; })
+  // from hijacking the scrollbars/layout of the main website dashboard.
+  const getCleanedCss = () => {
+    if (!settings.customCss) return "";
+    if (!previewMode) return settings.customCss;
+
+    let css = settings.customCss;
+    const prefix = "#youtube-chat-overlay-preview";
+    
+    // Replace top-level selectors to target the scoped preview element
+    css = css.replace(/\bbody\b/g, prefix);
+    css = css.replace(/\bhtml\b/g, prefix);
+    css = css.replace(/\b:root\b/g, prefix);
+    
+    // Replace standalone asterisks that could leak
+    css = css.replace(/(^\s*|\s*,\s*)\*(?=\s*\{|\s*\,|\s+)/g, `$1${prefix} *`);
+
+    // Force preview container boundary & scrolling safety
+    css += `
+      ${prefix} {
+        max-height: 100% !important;
+        overflow: hidden !important;
+      }
+    `;
+    return css;
+  };
+
   // Helper to get font weights and colors
   const getUsernameColor = (msg: ChatMessage) => {
     if (msg.isOwner) return "#f43f5e"; // Rose-500 for streamer owner
@@ -98,27 +138,123 @@ export default function OverlayWidget({
     return () => clearTimeout(timeout);
   }, [visibleMessages, settings.useCustomCode]);
 
-  // 2. Load custom JS script safely when code changes or mounts
+  // 2. Load custom JS script safely inside a sandboxed tracker to prevent event listener and memory resource leakage across typing intervals
   useEffect(() => {
-    if (!settings.useCustomCode || !settings.customJs) return;
+    if (!settings.useCustomCode || !debouncedCustomJs) return;
+
+    // Track created event handlers and timers to clean them up on edits/unmounts
+    const registeredListeners: { target: EventTarget; type: string; listener: any; options?: any }[] = [];
+    const activeIntervals: number[] = [];
+    const activeTimeouts: number[] = [];
+
+    // Sandbox implementations to track and clean up automatically
+    const sandboxAddEventListener = (type: string, listener: any, options?: any) => {
+      try {
+        window.addEventListener(type, listener, options);
+        registeredListeners.push({ target: window, type, listener, options });
+      } catch (err) {
+        console.warn("Sandboxed addEventListener error:", err);
+      }
+    };
+
+    const sandboxSetInterval = (handler: any, timeout?: number, ...args: any[]) => {
+      const id = window.setInterval(handler, timeout, ...args);
+      activeIntervals.push(id);
+      return id;
+    };
+
+    const sandboxSetTimeout = (handler: any, timeout?: number, ...args: any[]) => {
+      const id = window.setTimeout(handler, timeout, ...args);
+      activeTimeouts.push(id);
+      return id;
+    };
+
+    const sandboxDocAddEventListener = (type: string, listener: any, options?: any) => {
+      try {
+        document.addEventListener(type, listener, options);
+        registeredListeners.push({ target: document, type, listener, options });
+      } catch (err) {
+        console.warn("Sandboxed document addEventListener error:", err);
+      }
+    };
+
+    // Proxy globals so both explicit (window.addEventListener) and implicit (addEventListener) calls are intercepted
+    const windowProxy = new Proxy(window, {
+      get(target, prop, receiver) {
+        if (prop === "addEventListener") return sandboxAddEventListener;
+        if (prop === "setInterval") return sandboxSetInterval;
+        if (prop === "setTimeout") return sandboxSetTimeout;
+        const val = (target as any)[prop];
+        if (typeof val === "function") {
+          return val.bind(target);
+        }
+        return val;
+      }
+    });
+
+    const documentProxy = new Proxy(document, {
+      get(target, prop, receiver) {
+        if (prop === "addEventListener") return sandboxDocAddEventListener;
+        const val = (target as any)[prop];
+        if (typeof val === "function") {
+          return val.bind(target);
+        }
+        return val;
+      }
+    });
+
     try {
-      const scriptExecutor = new Function(settings.customJs);
-      scriptExecutor();
+      // Pass the proxy sandboxes as parameters to capture local references in script execution scope
+      const wrapperFunc = new Function(
+        "window",
+        "document",
+        "addEventListener",
+        "setInterval",
+        "setTimeout",
+        debouncedCustomJs
+      );
+      
+      wrapperFunc(
+        windowProxy,
+        documentProxy,
+        sandboxAddEventListener,
+        sandboxSetInterval,
+        sandboxSetTimeout
+      );
     } catch (err) {
-      console.error("Custom JS execution error:", err);
+      console.error("Custom JS execution error inside Sandbox:", err);
     }
-  }, [settings.customJs, settings.useCustomCode]);
+
+    // Cleanup cycle executed immediately before launching updated custom JS runs or on unmount
+    return () => {
+      registeredListeners.forEach(({ target, type, listener, options }) => {
+        try {
+          target.removeEventListener(type, listener, options);
+        } catch {}
+      });
+      activeIntervals.forEach((id) => {
+        try {
+          window.clearInterval(id);
+        } catch {}
+      });
+      activeTimeouts.forEach((id) => {
+        try {
+          window.clearTimeout(id);
+        } catch {}
+      });
+    };
+  }, [debouncedCustomJs, settings.useCustomCode]);
 
   // Early return if custom code is active
   if (settings.useCustomCode) {
     return (
       <div
-        id="youtube-chat-overlay"
+        id={containerId}
         className="w-full h-full relative overflow-hidden select-text"
         style={overlayScaleStyle}
       >
         {settings.customCss && (
-          <style dangerouslySetInnerHTML={{ __html: settings.customCss }} />
+          <style dangerouslySetInnerHTML={{ __html: getCleanedCss() }} />
         )}
         <div
           className="w-full h-full"
@@ -130,7 +266,7 @@ export default function OverlayWidget({
 
   return (
     <div
-      id="youtube-chat-overlay"
+      id={containerId}
       className={`h-full flex flex-col p-4 select-none overflow-hidden transition-all duration-300 ${fontClass} ${
         settings.isTransparent ? "bg-transparent" : "transparent-bg-panel"
       }`}
