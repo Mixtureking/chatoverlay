@@ -3,7 +3,7 @@
   "private": true,
   "description": "YouTube Live Chat OBS Overlay Generator and Controller, facilitating real-time dynamic overlays for live streams.",
   "author": "Stream Tools Corp",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "type": "module",
   "main": "electron-main.cjs",
   "scripts": {

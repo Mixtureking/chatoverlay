@@ -4,6 +4,20 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.2] - 2026-06-03
+
+### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
+- **Cơ chế ghim màn hình Always-On-Top đỉnh cao**: Đưa mức độ ưu tiên ghim của cửa sổ lên cấp độ `"screen-saver"` của Electron kết hợp với việc hiển thị trên mọi Workspace ảo. Giờ đây, overlay sẽ luôn nổi lên trên tất cả ứng dụng khác, kể cả các tựa game đồ họa DirectX/OpenGL hạng nặng chạy ở chế độ toàn màn hình không viền (như *Genshin Impact*), loại bỏ hoàn toàn hiện tượng bị game ẩn hoặc đè lên khi đang chơi.
+- **Cơ chế chống mất focus**: Tích hợp sự kiện xử lý `blur` trên Electron Main process để lập tức khôi phục trạng thái ghim Always-on-Top kể cả khi game giành quyền kiểm soát thiết bị.
+- **Launcher Atom cố định và tối ưu click-through thích ứng**: Nút hình tròn biểu tượng nguyên tử xoay được cố định vĩnh viễn ở góc trên cùng bên trái màn hình bất kể chế độ locked hay unlocked. Khi locked, ứng dụng sử dụng cờ đặc biệt `{ forward: true }` để theo dõi hover. Khi người dùng di chuột vào hình tròn, overlay tạm thời ngắt click-through để bạn bấm được nút mở giao diện; khi di chuột rời đi, quyền click xuyên thấu được trả lại ngay tức khắc cho game.
+- **Bảng điều khiển toàn màn hình đắm chìm**: Thay đổi giao diện cửa sổ tùy chỉnh từ dạng hộp thoại kích thước cố định ở trung tâm sang thiết kế toàn màn hình hoàn chỉnh, mượt mà và trực quan vô song.
+
+## [1.0.1] - 2026-06-03
+
+### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
+- **Sửa lỗi cú pháp & biên dịch trong App.tsx**: Khắc phục hoàn toàn lỗi phân tách thẻ JSX và biến thể không hợp lệ (lỗi `rootDiv` không tồn tại, lỗi typo `roo if (isDesktopOverlay)`) xảy ra trong quá trình thiết lập Bảng điều khiển không viền.
+- **Tối ưu hóa mã nguồn & tương thích hệ thống**: Căn chỉnh chuẩn hóa dự án nhằm đáp ứng hoàn toàn quy chuẩn khắt khe từ trình biên dịch TypeScript (tsc), đảm bảo build hệ thống luôn xanh mượt và tối ưu tốc độ render.
+
 ## [1.0.0] - 2026-06-03
 
 Đây là phiên bản khởi đầu đánh dấu một bước chuyển mình lớn từ một ứng dụng điều khiển web đơn thuần sang một giải pháp phần mềm live stream hoàn thiện và có độ liên kết cao (Full-Stack + Desktop).

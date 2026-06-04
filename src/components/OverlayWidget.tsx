@@ -69,6 +69,48 @@ export default function OverlayWidget({
     return settings.authorColor;
   };
 
+  // 1. Trigger custom chat updates for custom JS templates
+  useEffect(() => {
+    if (!settings.useCustomCode) return;
+    const triggerUpdate = () => {
+      const event = new CustomEvent("onChatUpdate", { detail: visibleMessages });
+      window.dispatchEvent(event);
+    };
+
+    const timeout = setTimeout(triggerUpdate, 50);
+    return () => clearTimeout(timeout);
+  }, [visibleMessages, settings.useCustomCode]);
+
+  // 2. Load custom JS script safely when code changes or mounts
+  useEffect(() => {
+    if (!settings.useCustomCode || !settings.customJs) return;
+    try {
+      const scriptExecutor = new Function(settings.customJs);
+      scriptExecutor();
+    } catch (err) {
+      console.error("Custom JS execution error:", err);
+    }
+  }, [settings.customJs, settings.useCustomCode]);
+
+  // Early return if custom code is active
+  if (settings.useCustomCode) {
+    return (
+      <div
+        id="youtube-chat-overlay"
+        className="w-full h-full relative overflow-hidden select-text"
+        style={overlayScaleStyle}
+      >
+        {settings.customCss && (
+          <style dangerouslySetInnerHTML={{ __html: settings.customCss }} />
+        )}
+        <div
+          className="w-full h-full"
+          dangerouslySetInnerHTML={{ __html: settings.customHtml || "" }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       id="youtube-chat-overlay"

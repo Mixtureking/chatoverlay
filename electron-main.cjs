@@ -27,13 +27,26 @@ global.electronOverlayControl = {
   setLocked: (locked) => {
     if (overlayWindow) {
       overlayIsClickThrough = locked;
-      overlayWindow.setIgnoreMouseEvents(locked, { forward: true });
+      if (locked) {
+        overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        overlayWindow.setIgnoreMouseEvents(false);
+      }
       // Notify the renderer of the lock change
       overlayWindow.webContents.executeJavaScript(`
         if (typeof window.setDesktopOverlayLocked === 'function') {
           window.setDesktopOverlayLocked(${locked});
         }
       `).catch((err) => console.log("JS executing error:", err));
+    }
+  },
+  setIgnoreMouse: (ignore) => {
+    if (overlayWindow) {
+      if (ignore) {
+        overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        overlayWindow.setIgnoreMouseEvents(false);
+      }
     }
   }
 };
@@ -84,10 +97,9 @@ function createOverlayWindow() {
   }
 
   overlayWindow = new BrowserWindow({
-    width: 380,
-    height: 550,
-    x: 100,
-    y: 100,
+    width: 1400,
+    height: 850,
+    center: true,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -97,6 +109,15 @@ function createOverlayWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
+  });
+
+  overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  overlayWindow.on("blur", () => {
+    if (overlayWindow) {
+      overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
+    }
   });
 
   // Load standard overlay address but with dynamic query mode
@@ -119,7 +140,11 @@ function registerGlobalHotkeys() {
   const registered = globalShortcut.register("CommandOrControl+Alt+O", () => {
     if (overlayWindow) {
       overlayIsClickThrough = !overlayIsClickThrough;
-      overlayWindow.setIgnoreMouseEvents(overlayIsClickThrough, { forward: true });
+      if (overlayIsClickThrough) {
+        overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        overlayWindow.setIgnoreMouseEvents(false);
+      }
       
       console.log(`[Hotkey] Toggle Click-through mode to: ${overlayIsClickThrough}`);
       

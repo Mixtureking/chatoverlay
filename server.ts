@@ -276,6 +276,20 @@ app.post("/api/desktop-overlay/set-locked", (req, res) => {
   res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
 });
 
+app.post("/api/desktop-overlay/set-ignore-mouse", (req, res) => {
+  const { ignore } = req.body;
+  const control = (global as any).electronOverlayControl;
+  if (control) {
+    if (typeof control.setIgnoreMouse === "function") {
+      control.setIgnoreMouse(!!ignore);
+    } else {
+      control.setLocked(!!ignore);
+    }
+    return res.json({ success: true, ignore: !!ignore });
+  }
+  res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
+});
+
 // Vite & Static file handler initialization
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -303,9 +317,15 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server is running at http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
