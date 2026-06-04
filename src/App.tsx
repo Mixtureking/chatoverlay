@@ -34,7 +34,100 @@ import {
   ExternalLink,
   PictureInPicture,
   Save,
+  Volume2,
 } from "lucide-react";
+
+// Robust Web Audio context synth and URL player for new message notifications
+const playNotificationSound = (settings: OverlaySettings) => {
+  if (!settings.soundEnabled) return;
+  const volume = typeof settings.soundVolume === "number" ? settings.soundVolume : 0.5;
+
+  if (settings.soundType === "custom_url" && settings.soundUrl) {
+    try {
+      const audio = new Audio(settings.soundUrl);
+      audio.volume = volume;
+      audio.play().catch((e) => console.warn("Audio play failed:", e));
+    } catch (err) {
+      console.warn("Audio play error:", err);
+    }
+    return;
+  }
+
+  if (settings.soundType === "custom_file" && settings.soundFileBase64) {
+    try {
+      const audio = new Audio(settings.soundFileBase64);
+      audio.volume = volume;
+      audio.play().catch((e) => console.warn("Audio file play failed:", e));
+    } catch (err) {
+      console.warn("Audio file play error:", err);
+    }
+    return;
+  }
+
+  // Web Audio Synth for default/sweet presets (guaranteed offline play without network loading!)
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
+
+    if (settings.soundType === "bell") {
+      // Bell chime: high chime frequency with longer decay and overtones
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1100, now);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "triangle";
+      osc2.frequency.setValueAtTime(1430, now);
+      gain2.gain.setValueAtTime(0, now);
+      gain2.gain.linearRampToValueAtTime(volume * 0.35, now + 0.01);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now);
+      osc2.stop(now + 0.6);
+
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc.start(now);
+      osc.stop(now + 0.8);
+    } else if (settings.soundType === "pop") {
+      // Bubbly bubble pop sound: fast downward pitch sweep
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(900, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.06);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      osc.start(now);
+      osc.stop(now + 0.09);
+    } else if (settings.soundType === "synth") {
+      // Fast sci-fi synth bleep
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.18);
+    } else {
+      // "default": Sweet sine double chime blip: C5 then G5
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(783.99, now + 0.09); // G5
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    }
+  } catch (err) {
+    console.warn("Synth audio error:", err);
+  }
+};
 
 // Default configuration settings for the overlay
 const DEFAULT_SETTINGS: OverlaySettings = {
@@ -54,6 +147,12 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   showBadges: true,
   animationType: "fade",
   useCustomCode: false,
+  soundEnabled: false,
+  soundType: "default",
+  soundVolume: 0.5,
+  soundUrl: "",
+  soundFileBase64: "",
+  soundFileName: "",
   customHtml: `<div id="custom-chat-box" class="custom-scroll">
   <!-- Tin nhắn mới sẽ được biểu diễn tự động tại đây -->
 </div>`,
@@ -470,6 +569,19 @@ export default function App() {
       return updated;
     });
   };
+
+  const lastMsgLengthRef = useRef<number>(messages.length);
+
+  useEffect(() => {
+    if (messages.length > lastMsgLengthRef.current) {
+      const isInitial = lastMsgLengthRef.current === 0;
+      if (!isInitial) {
+        const activeSettings = isOverlayRoute ? obsSettings : settings;
+        playNotificationSound(activeSettings);
+      }
+    }
+    lastMsgLengthRef.current = messages.length;
+  }, [messages, isOverlayRoute, settings, obsSettings]);
 
   // Sync settings with the server so OBS Browser Source instances pull them immediately
   const syncSettingsWithObs = async () => {
@@ -1006,27 +1118,7 @@ export default function App() {
     }
   }, [isOverlayRoute]);
 
-  // PROACTIVE REAL-TIME BACKGROUND SETTINGS AUTO-SYNCER
-  // Automatically syncs slider, checkbox or color adjustments to the server cache so OBS re-renders with zero latency
-  useEffect(() => {
-    if (isOverlayRoute) return; // Only process on the main Streamer Dashboard / Control Panel context
-
-    const delayDebounce = setTimeout(async () => {
-      try {
-        await fetch("/api/youtube/settings-sync", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ settings }),
-        });
-      } catch (err) {
-        console.warn("Silent background settings sync timed out:", err);
-      }
-    }, 500); // 500ms debounce ensures zero server spam when users drag sliders continuously
-
-    return () => clearTimeout(delayDebounce);
-  }, [settings, isOverlayRoute]);
+  // PROACTIVE REAL-TIME BACKGROUND SETTINGS AUTO-SYNCER - REMOVED AS REQUESTED TO REQUIRE EXPLICIT SAVE BUTTON CLICK to sync OBS
 
   // 5. DRAG & RESIZE MANIPULATORS (Sprint 2 UI/UX features, AC-12, AC-13, AC-14)
   const handleMouseDownDrag = (e: React.MouseEvent) => {
@@ -1356,14 +1448,6 @@ export default function App() {
                       <h1 className="font-bold tracking-wider text-base text-slate-100 uppercase font-sans flex items-center gap-2">
                         <span>YOUTUBE CHAT OVERLAY</span>
                         <span className="text-[10px] py-0.5 px-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full font-mono font-semibold animate-pulse">OVERLAY PLAYGROUND</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowHelpModal(true)}
-                          className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 hover:bg-indigo-650 hover:text-white font-black border border-slate-700 hover:border-indigo-500 flex items-center justify-center cursor-pointer text-xs transition-all tracking-normal ml-1"
-                          title="Xem hướng dẫn sử dụng & phím tắt"
-                        >
-                          !
-                        </button>
                       </h1>
                       <p className="text-[11px] text-slate-400">
                         Bảng điều chỉnh và đồng bộ hóa tương tác không viền dành cho Streamer
@@ -1373,18 +1457,6 @@ export default function App() {
 
                   {/* Status Indicators & Live Resource tracking info */}
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 font-mono">
-                      <div className="flex items-center gap-1">
-                        <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>CPU: {streamStatus.performance.fps ? Math.floor(streamStatus.performance.fps / 15) : 3}%</span>
-                      </div>
-                      <span className="text-slate-800">|</span>
-                      <div className="flex items-center gap-1">
-                        <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>RAM: ~32MB</span>
-                      </div>
-                    </div>
-
                     <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
                       <span className={`w-2.5 h-2.5 rounded-full ${streamStatus.isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500 animate-ping"}`} />
                       <span className="text-slate-300 text-[11px] font-semibold">
@@ -2181,14 +2253,6 @@ export default function App() {
           <div>
             <h1 className="font-bold tracking-tight text-base text-slate-100 uppercase font-grotesk flex items-center gap-2">
               <span>YouTube Chat Overlay</span>
-              <button
-                type="button"
-                onClick={() => setShowHelpModal(true)}
-                className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 hover:bg-indigo-650 hover:text-white font-black border border-slate-700 hover:border-indigo-500 flex items-center justify-center cursor-pointer text-xs transition-all tracking-normal"
-                title="Xem hướng dẫn sử dụng & phím tắt"
-              >
-                !
-              </button>
             </h1>
             <p className="text-[11px] text-slate-400">
               Công cụ quản lý, tùy chỉnh bộ khung chat trong suốt gắn OBS Livestream
@@ -2206,14 +2270,6 @@ export default function App() {
               ← Đóng Bảng Điều Khiển (Quay Lại Overlay)
             </button>
           )}
-
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 font-mono">
-            <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-            <span>CPU: {streamStatus.performance.fps ? Math.floor(streamStatus.performance.fps / 15) : 0}%</span>
-            <span className="text-slate-800">|</span>
-            <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-            <span>RAM: ~32MB</span>
-          </div>
 
           <div className="flex items-center gap-1 bg-slate-800/60 px-3 py-1 text-xs rounded-full border border-slate-700">
             <span className={`w-2.5 h-2.5 rounded-full ${streamStatus.isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
@@ -2384,6 +2440,123 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* 🔊 ÂM HIỆU TIN NHẮN MỚI */}
+                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 space-y-3.5">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-indigo-400 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Volume2 className="w-4 h-4 shrink-0 text-indigo-505" />
+                      <span>Âm hiệu tin nhắn mới</span>
+                    </h4>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.soundEnabled || false}
+                        onChange={(e) => updateSettings({ soundEnabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <span className="ml-2 text-xs font-bold text-slate-300">Bật âm báo</span>
+                    </label>
+                  </div>
+
+                  {settings.soundEnabled && (
+                    <div className="space-y-3.5 pt-1">
+                      {/* Sound selector */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 uppercase font-semibold">Loại âm thanh</label>
+                          <select
+                            value={settings.soundType || "default"}
+                            onChange={(e) => updateSettings({ soundType: e.target.value as any })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-205 focus:outline-none focus:border-indigo-550 cursor-pointer"
+                          >
+                            <option value="default">🎵 Synth Đôi (Mặc định)</option>
+                            <option value="bell">🔔 Chuông Ngân (Bell)</option>
+                            <option value="pop">🎈 Bong bóng (Pop)</option>
+                            <option value="synth">⚡ Sci-Fi Bleep</option>
+                            <option value="custom_url">🔗 Đường dẫn URL (.mp3)</option>
+                            <option value="custom_file">📥 Tải tệp lên (.wav/mp3)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 id-label uppercase font-semibold">Âm lượng ({Math.round((settings.soundVolume || 0.5) * 100)}%)</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={settings.soundVolume ?? 0.5}
+                            onChange={(e) => updateSettings({ soundVolume: parseFloat(e.target.value) })}
+                            className="w-full h-2 bg-slate-950 rounded-lg accent-indigo-500 cursor-pointer mt-2"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Custom Audio URL */}
+                      {settings.soundType === "custom_url" && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 uppercase font-semibold">Địa chỉ URL âm thanh</label>
+                          <input
+                            type="text"
+                            placeholder="https://example.com/sound.mp3"
+                            value={settings.soundUrl || ""}
+                            onChange={(e) => updateSettings({ soundUrl: e.target.value })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      )}
+
+                      {/* Custom File Uploader */}
+                      {settings.soundType === "custom_file" && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] text-slate-405 uppercase font-semibold">Tải lên tệp âm thanh của bạn</label>
+                          <div className="flex items-center gap-3">
+                            <label className="bg-slate-950 hover:bg-slate-800 border border-slate-800 px-3 py-2 rounded-lg text-xs text-slate-300 font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                              <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>Chọn tệp .wav / .mp3</span>
+                              <input
+                                type="file"
+                                accept="audio/*"
+                                className="hidden"
+                                id="custom-sound-file-uploader"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      const base64 = event.target?.result as string;
+                                      updateSettings({
+                                        soundFileBase64: base64,
+                                        soundFileName: file.name
+                                      });
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                            <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                              {settings.soundFileName || "Chưa chọn tệp"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Test trigger sound button */}
+                      <button
+                        type="button"
+                        onClick={() => playNotificationSound(settings)}
+                        className="w-full bg-slate-950 hover:bg-slate-800 text-slate-3wap border border-slate-800 hover:border-indigo-500/50 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        id="test-notification-sound-btn"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Nghe thử âm báo mẫu</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* 🎮 DISCORD-STYLE ACTIVE GAME OVERLAY CONTROL */}
                 <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 space-y-3">
@@ -2785,6 +2958,27 @@ export default function App() {
                     </select>
                   </div>
                 </div>
+
+                {/* Giao diện unsaved save block */}
+                {JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
+                  <div className="bg-slate-900 border border-indigo-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <div className="text-left flex-1">
+                      <div className="text-xs font-bold text-indigo-400 flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Có thay đổi chưa lưu!</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Bạn đã cập nhật giao diện, hãy lưu lại để đồng bộ trực tiếp sang OBS.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={syncSettingsWithObs}
+                      className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-650/15 transition-all uppercase tracking-wider"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Lưu & Đồng bộ</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2926,7 +3120,7 @@ export default function App() {
           {/* VIRTUAL MONITOR BOUND SCREEN CONTAINER */}
           <div
             ref={viewportRef}
-            className={`relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end h-[420px] shrink-0`}
+            className={`relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end h-[840px] shrink-0`}
           >
             {/* Draggable & Resizable overlay frame */}
             {isOverlayVisible ? (

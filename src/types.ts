@@ -34,6 +34,14 @@ export interface OverlaySettings {
   customHtml?: string;     // user custom html
   customCss?: string;      // user custom css
   customJs?: string;       // user custom javascript
+  
+  // Notification Sound configuration
+  soundEnabled?: boolean;
+  soundType?: "default" | "bell" | "pop" | "synth" | "custom_url" | "custom_file";
+  soundVolume?: number;     // 0 to 1
+  soundUrl?: string;
+  soundFileBase64?: string; // base64 string of sound
+  soundFileName?: string;   // friendly uploaded sound name
 }
 
 export interface FilterKeyword {

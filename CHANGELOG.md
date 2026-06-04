@@ -4,6 +4,18 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.3] - 2026-06-04
+
+### 🚀 Tính năng nổi bật & Tùy chỉnh người dùng (Notification Sounds & Workspace Optimization)
+- **Hệ thống âm hiệu tin nhắn mới**: Tích hợp công nghệ tổng hợp âm thanh Web Audio API tiên tiến để phát nhạc chuông thông báo trực tiếp khi có bình luận mới xuất hiện. Hỗ trợ 4 bộ âm mặc định du dương (Synth Đôi, Chuông Ngân, Bong Bóng, và Sci-Fi Bleep) chạy mượt mà ngay cả khi không có kết nối internet, đồng thời cho phép streamer tùy biến sử dụng liên kết âm thanh bên ngoài (Custom URL) hoặc trực tiếp đăng tải tệp âm thanh cá nhân (`.mp3`/`.wav`) với khả năng điều chỉnh âm lượng rực rỡ.
+- **Xem trước tối ưu không gian**: Tăng kích thước chiều cao khung nhìn của Live Setup Preview lên gấp đôi (từ 420px lên 840px), mở rộng tầm mắt giúp quan sát tổng quan bố cục và nội dung tin nhắn chạy trên luồng dễ dàng hơn.
+- **Cơ chế cập nhật chủ động (Cần xác nhận lưu)**: Giao diện Tùy chỉnh Giao diện sẽ không tự động lưu và gửi thông tin thay đổi tới OBS ngay lập tức để tránh làm phiền người xem stream khi bạn đang setup dở. Nút "Lưu & Đồng bộ" thông minh sẽ xuất hiện một cách mượt mà ở phía dưới phần cấu hình chỉ khi phát hiện bất kỳ tùy biến nào khác biệt so với trạng thái cũ.
+
+### 🧹 Tinh giản giao diện & Dọn dẹp (UI Cleanups)
+- **Loại bỏ các thành phần rườm rà**: Đã loại bỏ hoàn toàn nút trợ giúp chấm than (`!`) bên cạnh tiêu đề chính "Youtube Chat Overlay" và gỡ bỏ hoàn toàn thẻ giám sát CPU & RAM để tối giản diện tích, đem lại một phong cách hiển thị cao cấp và tập trung tuyệt đối.
+
+---
+
 ## [1.1.0] - 2026-06-04
 
 ### 🚀 Tính năng nổi bật & Nâng cấp bảo mật (Major Security & Real-Time Sync Sync Upgrade)
