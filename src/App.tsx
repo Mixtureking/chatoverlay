@@ -825,6 +825,62 @@ export default function App() {
     const effectiveApiKey = obsApiKey || (obsSettings as any).apiKey;
 
     if (isOverlayRoute && effectiveChatId && effectiveApiKey) {
+      if (effectiveChatId === "SIMULATED" || effectiveApiKey === "SANDBOX_MOCK_DRIVEN") {
+        // Run a gorgeous client-side mock simulation loop immediately so OBS overlays never start blank during tests!
+        const simulationLoop = () => {
+          const randIdx = Math.floor(Math.random() * SAMPLE_MESSAGES_TEMPLATES.length);
+          const tpl = SAMPLE_MESSAGES_TEMPLATES[randIdx];
+          
+          const isSuperChat = tpl.role === "superchat";
+          const newMsg: ChatMessage = {
+            id: `sim-obs-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            authorName: tpl.name,
+            authorPhotoUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(tpl.name)}`,
+            messageText: tpl.text,
+            isModerator: tpl.role === "moderator",
+            isOwner: tpl.role === "owner" || tpl.name === "Chủ Kênh Vip",
+            isSponsor: tpl.role === "sponsor",
+            isVerified: tpl.role === "moderator" || tpl.role === "sponsor",
+            isSuperChat,
+            superChatColor: tpl.color || "#1e88e5",
+            superChatAmountText: tpl.amount || "",
+            tier: tpl.tier || 1,
+            timestamp: Date.now(),
+          };
+
+          setMessages((prev) => {
+            const combined = [...prev, newMsg];
+            return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+          });
+        };
+
+        // Inject first-wave initial mock messages immediately so the overlay does NOT start blank!
+        const initialMsgs: ChatMessage[] = [];
+        const itemsToLoad = Math.min(4, SAMPLE_MESSAGES_TEMPLATES.length);
+        for (let i = 0; i < itemsToLoad; i++) {
+          const tpl = SAMPLE_MESSAGES_TEMPLATES[i];
+          initialMsgs.push({
+            id: `sim-obs-init-${i}-${Date.now()}`,
+            authorName: tpl.name,
+            authorPhotoUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(tpl.name)}`,
+            messageText: tpl.text,
+            isModerator: tpl.role === "moderator",
+            isOwner: tpl.role === "owner",
+            isSponsor: tpl.role === "sponsor",
+            isVerified: false,
+            isSuperChat: tpl.role === "superchat",
+            superChatColor: tpl.color || "#1e88e5",
+            superChatAmountText: tpl.amount || "",
+            tier: tpl.tier || 1,
+            timestamp: Date.now() - (itemsToLoad - i) * 6000,
+          });
+        }
+        setMessages(initialMsgs);
+
+        const interval = setInterval(simulationLoop, 3550);
+        return () => clearInterval(interval);
+      }
+
       const fetchLoop = async () => {
         // If the stream is offline, clear messages and do not fetch
         if ((obsSettings as any).isOffline) {

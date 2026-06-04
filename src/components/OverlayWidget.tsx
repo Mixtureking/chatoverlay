@@ -15,6 +15,19 @@ export default function OverlayWidget({
   previewMode = false,
 }: OverlayWidgetProps) {
   const [currentTimestamp, setCurrentTimestamp] = useState(Date.now());
+  const [showInitialNotice, setShowInitialNotice] = useState(true);
+
+  // Auto-hide the "Connected / Active" standby notice after 10 seconds of rendering
+  useEffect(() => {
+    if (previewMode) {
+      setShowInitialNotice(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowInitialNotice(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [previewMode]);
 
   // Update a ticking timer every second to evaluate message expiration (chatDuration)
   useEffect(() => {
@@ -52,21 +65,25 @@ export default function OverlayWidget({
     return ageInSeconds < settings.superChatDuration;
   });
 
-  // Calculate scaling factor styles
+  // Calculate scaling factor styles with robust fallbacks to prevent NaN / collapsed containers (Security/Design robustness Review)
+  const safeScale = typeof settings.scale === "number" && !isNaN(settings.scale) && settings.scale > 0 ? settings.scale : 1.0;
+  const safeFontSize = typeof settings.fontSize === "number" && !isNaN(settings.fontSize) && settings.fontSize > 0 ? settings.fontSize : 15;
+  const safeBgOpacity = typeof settings.bgOpacity === "number" && !isNaN(settings.bgOpacity) ? settings.bgOpacity : 0.85;
+
   const overlayScaleStyle = {
-    fontSize: `${settings.fontSize}px`,
-    transform: previewMode ? `none` : `scale(${settings.scale})`,
+    fontSize: `${safeFontSize}px`,
+    transform: previewMode ? `none` : `scale(${safeScale})`,
     transformOrigin: "top left",
-    width: previewMode ? "100%" : `${100 / settings.scale}%`,
-    height: previewMode ? "100%" : `${100 / settings.scale}%`,
+    width: previewMode ? "100%" : `${100 / safeScale}%`,
+    height: previewMode ? "100%" : `${100 / safeScale}%`,
   };
 
   // Helper to get font weights and colors
   const getUsernameColor = (msg: ChatMessage) => {
     if (msg.isOwner) return "#f43f5e"; // Rose-500 for streamer owner
-    if (msg.isModerator) return settings.moderatorColor;
-    if (msg.isSponsor) return settings.sponsorColor;
-    return settings.authorColor;
+    if (msg.isModerator) return settings.moderatorColor || "#34d399";
+    if (msg.isSponsor) return settings.sponsorColor || "#fbbf24";
+    return settings.authorColor || "#bae6fd";
   };
 
   // 1. Trigger custom chat updates for custom JS templates
@@ -119,13 +136,30 @@ export default function OverlayWidget({
       }`}
       style={{
         ...overlayScaleStyle,
-        "--overlay-bg": `${settings.bgColor}${Math.round(
-          settings.bgOpacity * 255
+        "--overlay-bg": `${settings.bgColor || "#0f172a"}${Math.round(
+          safeBgOpacity * 255
         )
           .toString(16)
           .padStart(2, "0")}`,
       } as React.CSSProperties}
     >
+      {/* 🔴 Transient Connected Standby Banner for first-time OBS source confirmations */}
+      {messages.length === 0 && showInitialNotice && !previewMode && (
+        <div className="absolute inset-x-4 top-4 bg-slate-900/90 backdrop-blur-md border border-indigo-500/30 p-3.5 rounded-xl text-slate-100 flex items-center gap-3 shadow-lg select-none pointer-events-none animate-slide-in font-sans z-50">
+          <div className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </div>
+          <div className="flex-1 text-[11px] leading-normal font-sans">
+            <div className="font-bold text-slate-100 tracking-wide uppercase flex items-center gap-1">
+              <span>ĐĂNG NHẬP OVERLAY THÀNH CÔNG</span>
+              <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded tracking-normal normal-case">Standby</span>
+            </div>
+            <p className="text-slate-300 mt-0.5">Khung overlay đã kết nối & sẵn sàng. Đang chờ đợi tin nhắn mới từ YouTube Live Chat...</p>
+          </div>
+        </div>
+      )}
+
       {/* 👑 Section PINNED SUPER CHATS at the Top */}
       {activeSuperChats.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2 z-10">
