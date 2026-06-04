@@ -43,7 +43,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
 // Helper to clean up HTML strings to prevent XSS (Security Review SC-02)
 function sanitizeHtml(text: string): string {

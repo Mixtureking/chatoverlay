@@ -35,9 +35,10 @@ import {
   PictureInPicture,
   Save,
   Volume2,
+  Image,
 } from "lucide-react";
 
-// Simple lightweight IndexedDB utility for large sound files
+// Simple lightweight IndexedDB utility for large files (sounds & background images)
 const getSoundFromIndexedDB = (): Promise<string | null> => {
   return new Promise((resolve) => {
     try {
@@ -88,9 +89,59 @@ const saveSoundToIndexedDB = (base64: string): Promise<boolean> => {
   });
 };
 
+const getBgImageFromIndexedDB = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open("SoundDB", 1);
+      request.onupgradeneeded = (e) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("sounds")) {
+          db.createObjectStore("sounds");
+        }
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction("sounds", "readonly");
+        const store = transaction.objectStore("sounds");
+        const getReq = store.get("custom_bg");
+        getReq.onsuccess = () => resolve(getReq.result || null);
+        getReq.onerror = () => resolve(null);
+      };
+      request.onerror = () => resolve(null);
+    } catch (err) {
+      resolve(null);
+    }
+  });
+};
+
+const saveBgImageToIndexedDB = (base64: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open("SoundDB", 1);
+      request.onupgradeneeded = (e) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("sounds")) {
+          db.createObjectStore("sounds");
+        }
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction("sounds", "readwrite");
+        const store = transaction.objectStore("sounds");
+        const putReq = store.put(base64, "custom_bg");
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => resolve(false);
+      };
+      request.onerror = () => resolve(false);
+    } catch (err) {
+      resolve(false);
+    }
+  });
+};
+
 const safeSaveSettingsToLocalStorage = (updated: OverlaySettings) => {
   try {
-    const { soundFileBase64, ...toSave } = updated;
+    const { soundFileBase64, bgImageBase64, ...toSave } = updated;
     localStorage.setItem("yt_overlay_settings", JSON.stringify(toSave));
   } catch (err) {
     console.warn("Failed to write to localStorage:", err);
@@ -106,6 +157,7 @@ try {
         const data = JSON.parse(value);
         if (data && typeof data === "object") {
           delete data.soundFileBase64;
+          delete data.bgImageBase64;
           originalSetItem.call(localStorage, key, JSON.stringify(data));
           return;
         }
@@ -119,16 +171,54 @@ try {
   console.warn("Could not patch localStorage:", e);
 }
 
+// Sound control tracking (UT-19/S-02)
+let currentAudioPlay: HTMLAudioElement | null = null;
+let currentAudioContext: AudioContext | null = null;
+let lastPlayTimeout: any = null;
+
 // Robust Web Audio context synth and URL player for new message notifications
 const playNotificationSound = (settings: OverlaySettings) => {
   if (!settings.soundEnabled) return;
   const volume = typeof settings.soundVolume === "number" ? settings.soundVolume : 0.5;
 
+  // 1. Terminate any previous media audios immediately
+  if (currentAudioPlay) {
+    try {
+      currentAudioPlay.pause();
+      currentAudioPlay.currentTime = 0;
+    } catch {}
+    currentAudioPlay = null;
+  }
+  // 2. Terminate any previous active AudioContexts
+  if (currentAudioContext) {
+    try {
+      currentAudioContext.close().catch(() => {});
+    } catch {}
+    currentAudioContext = null;
+  }
+  // 3. Clear existing timeouts
+  if (lastPlayTimeout) {
+    clearTimeout(lastPlayTimeout);
+    lastPlayTimeout = null;
+  }
+
   if (settings.soundType === "custom_url" && settings.soundUrl) {
     try {
       const audio = new Audio(settings.soundUrl);
       audio.volume = volume;
+      currentAudioPlay = audio;
       audio.play().catch((e) => console.warn("Audio play failed:", e));
+
+      // Limit playback to the first 5 seconds
+      lastPlayTimeout = setTimeout(() => {
+        if (currentAudioPlay === audio) {
+          try {
+            audio.pause();
+            audio.currentTime = 0;
+          } catch {}
+          currentAudioPlay = null;
+        }
+      }, 5000);
     } catch (err) {
       console.warn("Audio play error:", err);
     }
@@ -139,7 +229,19 @@ const playNotificationSound = (settings: OverlaySettings) => {
     try {
       const audio = new Audio(settings.soundFileBase64);
       audio.volume = volume;
+      currentAudioPlay = audio;
       audio.play().catch((e) => console.warn("Audio file play failed:", e));
+
+      // Limit playback to the first 5 seconds
+      lastPlayTimeout = setTimeout(() => {
+        if (currentAudioPlay === audio) {
+          try {
+            audio.pause();
+            audio.currentTime = 0;
+          } catch {}
+          currentAudioPlay = null;
+        }
+      }, 5000);
     } catch (err) {
       console.warn("Audio file play error:", err);
     }
@@ -151,6 +253,7 @@ const playNotificationSound = (settings: OverlaySettings) => {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
+    currentAudioContext = ctx;
     const osc = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
@@ -235,6 +338,16 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   soundUrl: "",
   soundFileBase64: "",
   soundFileName: "",
+  bgImageEnabled: false,
+  bgImageType: "pattern",
+  bgImageUrl: "",
+  bgImageBase64: "",
+  bgImageOpacity: 0.3,
+  bgImageBlur: 0,
+  bgImagePreset: "grid",
+  decorativeIconEnabled: false,
+  decorativeIconType: "star",
+  decorativeIconPosition: "before_name",
   customHtml: `<div id="custom-chat-box" class="custom-scroll">
   <!-- Tin nhắn mới sẽ được biểu diễn tự động tại đây -->
 </div>`,
@@ -493,23 +606,26 @@ export default function App() {
         .catch((err) => console.error("Error fetching initial synced settings:", err));
     }
 
-    // Also retrieve the custom sound from IndexedDB safely on mount for both streamer and overlay views
-    getSoundFromIndexedDB().then((savedSoundBase64) => {
-      if (savedSoundBase64) {
+    // Also retrieve the custom sound and custom background image from IndexedDB safely on mount for both streamer and overlay views
+    Promise.all([getSoundFromIndexedDB(), getBgImageFromIndexedDB()])
+      .then(([savedSoundBase64, savedBgImageBase64]) => {
         setSettings((prev) => ({
           ...prev,
-          soundFileBase64: savedSoundBase64,
+          ...(savedSoundBase64 ? { soundFileBase64: savedSoundBase64 } : {}),
+          ...(savedBgImageBase64 ? { bgImageBase64: savedBgImageBase64 } : {}),
         }));
         setObsSettings((prev) => ({
           ...prev,
-          soundFileBase64: savedSoundBase64,
+          ...(savedSoundBase64 ? { soundFileBase64: savedSoundBase64 } : {}),
+          ...(savedBgImageBase64 ? { bgImageBase64: savedBgImageBase64 } : {}),
         }));
         setSavedSettingsBenchmark((prev) => ({
           ...prev,
-          soundFileBase64: savedSoundBase64,
+          ...(savedSoundBase64 ? { soundFileBase64: savedSoundBase64 } : {}),
+          ...(savedBgImageBase64 ? { bgImageBase64: savedBgImageBase64 } : {}),
         }));
-      }
-    }).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
   // Expose global callback for Electron main process hotkey events to trigger locked state in React window
@@ -2204,18 +2320,7 @@ export default function App() {
 
                 </div>
 
-                {JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
-                  <div className="absolute bottom-6 right-6 z-55 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
-                    <button
-                      type="button"
-                      onClick={syncSettingsWithObs}
-                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] text-white font-extrabold py-3.5 px-6 rounded-2xl text-[11px] uppercase tracking-wider flex items-center justify-center gap-2.5 cursor-pointer border border-emerald-400/20 shadow-[0_4px_20px_rgba(16,185,129,0.35)] transition-all"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</span>
-                    </button>
-                  </div>
-                )}
+
 
               </div>
             </div>
@@ -2334,6 +2439,29 @@ export default function App() {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600/95 text-white text-xs py-2 px-4 rounded-xl shadow-lg border border-indigo-400 font-bold backdrop-blur flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 animate-bounce" />
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* 💾 Globally Floating Unsaved Changes Card (Gần góc dưới bên phải màn hình, chạy theo thanh cuộn) */}
+      {!isOverlayRoute && JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 p-4 rounded-xl flex flex-col sm:flex-row items-center gap-4.5 shadow-2xl shadow-indigo-500/20 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-xs sm:max-w-md pointer-events-auto">
+          <div className="text-left flex-1 select-none">
+            <div className="text-xs font-bold text-indigo-400 flex items-center gap-1.5 leading-none">
+              <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse shrink-0" />
+              <span>Chưa lưu thay đổi!</span>
+            </div>
+            <p className="text-[10px] text-slate-300 mt-1.5 leading-normal">
+              Bạn đang có thay đổi cấu hình chưa đồng bộ sang OBS. Nhấp để cập nhật trực tiếp.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={syncSettingsWithObs}
+            className="w-full sm:w-auto bg-indigo-650 hover:bg-indigo-650 active:scale-95 text-white font-black py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20 transition-all uppercase tracking-wider shrink-0"
+          >
+            <Save className="w-4 h-4" />
+            <span>Lưu thay đổi</span>
+          </button>
         </div>
       )}
 
@@ -3070,26 +3198,226 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Giao diện unsaved save block */}
-                {JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
-                  <div className="bg-slate-900 border border-indigo-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                    <div className="text-left flex-1">
-                      <div className="text-xs font-bold text-indigo-400 flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Có thay đổi chưa lưu!</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">Bạn đã cập nhật giao diện, hãy lưu lại để đồng bộ trực tiếp sang OBS.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={syncSettingsWithObs}
-                      className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-650/15 transition-all uppercase tracking-wider"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Lưu & Đồng bộ</span>
-                    </button>
+                {/* 🖼️ Chọn ảnh làm background khung chat */}
+                <div className="space-y-4 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-indigo-400 tracking-wide uppercase flex items-center gap-1.5">
+                      <Image className="w-3.5 h-3.5" />
+                      <span>Hình nền khung chat (Background)</span>
+                    </h4>
+                    <input
+                      type="checkbox"
+                      checked={settings.bgImageEnabled || false}
+                      onChange={(e) => updateSettings({ bgImageEnabled: e.target.checked })}
+                      className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                    />
                   </div>
-                )}
+
+                  {settings.bgImageEnabled && (
+                    <div className="space-y-3.5 animate-in fade-in duration-200">
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-slate-400 block">Nguồn ảnh nền</label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { value: "pattern", label: "Họa tiết" },
+                            { value: "gradient", label: "Chuyển màu" },
+                            { value: "custom_url", label: "Đường dẫn URL" },
+                            { value: "upload", label: "Tải ảnh lên" },
+                          ].map((x) => (
+                            <button
+                              key={x.value}
+                              type="button"
+                              onClick={() => updateSettings({ bgImageType: x.value as any })}
+                              className={`py-1.5 px-0.5 rounded text-[10px] font-bold border transition-all truncate ${
+                                settings.bgImageType === x.value
+                                  ? "bg-indigo-600 text-white border-indigo-500"
+                                  : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
+                              }`}
+                            >
+                              {x.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {settings.bgImageType === "pattern" && (
+                        <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
+                          <label className="text-[11px] text-slate-400 block">Chọn họa tiết mẫu</label>
+                          <select
+                            value={settings.bgImagePreset || "grid"}
+                            onChange={(e) => updateSettings({ bgImagePreset: e.target.value as any })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                          >
+                            <option value="grid">Lưới mắt cáo cổ điển (Grid Line)</option>
+                            <option value="dots">Mưa hạt chấm tròn nhẹ (Dots Mesh)</option>
+                            <option value="waves">Giao hưởng ngấn sóng (Waves Rhythm)</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {settings.bgImageType === "gradient" && (
+                        <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
+                          <label className="text-[11px] text-slate-400 block">Chọn dải chuyển màu</label>
+                          <select
+                            value={settings.bgImagePreset || "gradient-sunset"}
+                            onChange={(e) => updateSettings({ bgImagePreset: e.target.value as any })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                          >
+                            <option value="gradient-sunset">Hoàng hôn rực rỡ (Sunset Coral)</option>
+                            <option value="gradient-neon">Màu sắc điện tử (Retro Neon)</option>
+                            <option value="gradient-forest">Thanh mát thiên nhiên (Forest Teal)</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {settings.bgImageType === "custom_url" && (
+                        <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
+                          <label className="text-[11px] text-slate-400 block">Đường dẫn tệp ảnh (URL)</label>
+                          <input
+                            type="text"
+                            placeholder="Nhập liên kết https://... hoặc file://"
+                            value={settings.bgImageUrl || ""}
+                            onChange={(e) => updateSettings({ bgImageUrl: e.target.value })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      )}
+
+                      {settings.bgImageType === "upload" && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-150">
+                          <label className="text-[11px] text-slate-400 block font-semibold text-slate-300">Tải tệp ảnh nền từ thiết bị</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 8 * 1024 * 1024) {
+                                  showToast("⚠️ Ảnh quá lớn! Vui lòng chọn ảnh dưới 8MB.");
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = async (event) => {
+                                  try {
+                                    const base64 = event.target?.result as string;
+                                    const saved = await saveBgImageToIndexedDB(base64);
+                                    if (saved) {
+                                      updateSettings({ bgImageBase64: base64 });
+                                      showToast("📥 Đã tải lên và lưu ảnh nền khung chat thành công!");
+                                    } else {
+                                      showToast("⚠️ Không thể lưu ảnh nền vào bộ nhớ trình duyệt!");
+                                    }
+                                  } catch (err) {
+                                    console.error("Lỗi khi xử lý ảnh nền:", err);
+                                    showToast("❌ Lỗi xử lý ảnh nền!");
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-650 file:text-white hover:file:bg-indigo-600 file:cursor-pointer cursor-pointer"
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-400">Độ đậm bóng ảnh</span>
+                            <span className="font-bold text-indigo-400">{Math.round((settings.bgImageOpacity ?? 0.3) * 100)}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1.0"
+                            step="0.05"
+                            value={settings.bgImageOpacity ?? 0.3}
+                            onChange={(e) => updateSettings({ bgImageOpacity: parseFloat(e.target.value) })}
+                            className="w-full accent-indigo-500 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-400">Độ nhòe (Blur)</span>
+                            <span className="font-bold text-indigo-400">{settings.bgImageBlur ?? 0}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="12"
+                            step="1"
+                            value={settings.bgImageBlur ?? 0}
+                            onChange={(e) => updateSettings({ bgImageBlur: parseInt(e.target.value, 10) })}
+                            className="w-full accent-indigo-500 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ⚡ Thêm các icon nhỏ đi cùng tin nhắn chat */}
+                <div className="space-y-4 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-indigo-400 tracking-wide uppercase flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Biểu tượng trang trí tin nhắn (Tiny Icons)</span>
+                    </h4>
+                    <input
+                      type="checkbox"
+                      checked={settings.decorativeIconEnabled || false}
+                      onChange={(e) => updateSettings({ decorativeIconEnabled: e.target.checked })}
+                      className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {settings.decorativeIconEnabled && (
+                    <div className="space-y-3.5 animate-in fade-in duration-150">
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-slate-400 block">Chọn biểu tượng đi kèm</label>
+                        <select
+                          value={settings.decorativeIconType || "star"}
+                          onChange={(e) => updateSettings({ decorativeIconType: e.target.value as any })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                        >
+                          <option value="star">⭐ Ngôi sao hiếu khách (Glowing Star)</option>
+                          <option value="heart">❤️ Trái tim nồng nhiệt (Warm Heart)</option>
+                          <option value="fire">🔥 Lửa cháy bùng nổ (Hot Fire)</option>
+                          <option value="sparkles">✨ Chòm sao lấp lánh (Sparkling Magic)</option>
+                          <option value="crown">👑 Vương miện quyền quý (Royal Crown)</option>
+                          <option value="controller">🎮 Máy chơi game giải trí (Gamepad console)</option>
+                          <option value="bolt">⚡ Tia chớp điện lượng (High voltage Bolt)</option>
+                          <option value="coffee">☕ Cốc cà phê thư giãn (Coffee bar cup)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] text-slate-400 block">Vị trí hiển thị biểu tượng</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { value: "before_name", label: "Trước phần tên" },
+                            { value: "after_name", label: "Sau phần tên" },
+                            { value: "before_msg", label: "Trước tin nhắn" },
+                          ].map((pos) => (
+                            <button
+                              key={pos.value}
+                              type="button"
+                              onClick={() => updateSettings({ decorativeIconPosition: pos.value as any })}
+                              className={`py-1.5 rounded text-[10px] font-extrabold border transition-all ${
+                                settings.decorativeIconPosition === pos.value
+                                  ? "bg-indigo-600 text-white border-indigo-500"
+                                  : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
+                              }`}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

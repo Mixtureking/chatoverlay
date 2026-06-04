@@ -42,6 +42,20 @@ export interface OverlaySettings {
   soundUrl?: string;
   soundFileBase64?: string; // base64 string of sound
   soundFileName?: string;   // friendly uploaded sound name
+
+  // Chat Box Background Image customization
+  bgImageEnabled?: boolean;
+  bgImageType?: "pattern" | "gradient" | "custom_url" | "upload";
+  bgImageUrl?: string;
+  bgImageBase64?: string;
+  bgImageOpacity?: number;  // 0 to 1
+  bgImageBlur?: number;     // px (0 to 20)
+  bgImagePreset?: "grid" | "dots" | "waves" | "gradient-sunset" | "gradient-neon" | "gradient-forest";
+
+  // Decorative companion tiny icons alongside chat messages
+  decorativeIconEnabled?: boolean;
+  decorativeIconType?: "star" | "heart" | "fire" | "sparkles" | "crown" | "controller" | "bolt" | "coffee";
+  decorativeIconPosition?: "before_name" | "after_name" | "before_msg";
 }
 
 export interface FilterKeyword {

@@ -1,7 +1,53 @@
 import React, { useEffect, useState } from "react";
 import { ChatMessage, OverlaySettings } from "../types";
-import { Shield, Sparkles, Star, Award } from "lucide-react";
+import { Shield, Sparkles, Star, Award, Heart, Flame, Crown, Gamepad2, Bolt, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+const getPresetBackgroundStyle = (preset: string): React.CSSProperties => {
+  if (preset === "grid") {
+    return {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 0h40v40H0z' fill='none'/%3E%3Cpath d='M40 0H0v40' fill='none' stroke='rgba(255,255,255,0.12)' stroke-width='1'/%3E%3C/svg%3E")`,
+      backgroundSize: "40px 40px"
+    };
+  }
+  if (preset === "dots") {
+    return {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='3' cy='3' r='1.5' fill='rgba(255,255,255,0.15)'/%3E%3C/svg%3E")`,
+      backgroundSize: "20px 20px"
+    };
+  }
+  if (preset === "waves") {
+    return {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30' viewBox='0 0 60 30'%3E%3Cpath d='M0 15c15-15 15 15 30 0s15-15 30 0' fill='none' stroke='rgba(255,255,255,0.12)' stroke-width='1.5'/%3E%3C/svg%3E")`,
+      backgroundSize: "60px 30px"
+    };
+  }
+  return {};
+};
+
+const renderDecorativeIcon = (type: string) => {
+  const iconClass = "w-3.5 h-3.5 inline shrink-0 align-middle select-none";
+  switch (type) {
+    case "fire":
+      return <Flame className={`${iconClass} text-orange-500 animate-pulse mr-1`} fill="currentColor" />;
+    case "heart":
+      return <Heart className={`${iconClass} text-rose-500 animate-pulse mr-1`} fill="currentColor" />;
+    case "star":
+      return <Star className={`${iconClass} text-yellow-400 mr-1`} fill="currentColor" />;
+    case "sparkles":
+      return <Sparkles className={`${iconClass} text-indigo-400 animate-pulse mr-1`} />;
+    case "crown":
+      return <Crown className={`${iconClass} text-amber-400 mr-1`} fill="currentColor" />;
+    case "controller":
+      return <Gamepad2 className={`${iconClass} text-emerald-400 mr-1`} />;
+    case "bolt":
+      return <Bolt className={`${iconClass} text-amber-300 mr-1`} fill="currentColor" />;
+    case "coffee":
+      return <Coffee className={`${iconClass} text-amber-600 mr-1`} />;
+    default:
+      return null;
+  }
+};
 
 interface OverlayWidgetProps {
   messages: ChatMessage[];
@@ -279,7 +325,7 @@ export default function OverlayWidget({
   return (
     <div
       id={containerId}
-      className={`h-full flex flex-col p-4 select-none overflow-hidden transition-all duration-300 ${fontClass} ${
+      className={`relative h-full flex flex-col p-4 select-none overflow-hidden transition-all duration-300 ${fontClass} ${
         settings.isTransparent ? "bg-transparent" : "transparent-bg-panel"
       }`}
       style={{
@@ -291,6 +337,52 @@ export default function OverlayWidget({
           .padStart(2, "0")}`,
       } as React.CSSProperties}
     >
+      {/* 🖼️ Chat Box Background Image Selection/Upload */}
+      {settings.bgImageEnabled && (
+        <div 
+          className="absolute inset-0 -z-10 pointer-events-none select-none overflow-hidden"
+          style={{
+            opacity: typeof settings.bgImageOpacity === "number" ? settings.bgImageOpacity : 0.3,
+            filter: settings.bgImageBlur ? `blur(${settings.bgImageBlur}px)` : undefined,
+          }}
+        >
+          {settings.bgImageType === "pattern" && settings.bgImagePreset && (
+            <div 
+              className="w-full h-full opacity-60"
+              style={getPresetBackgroundStyle(settings.bgImagePreset)} 
+            />
+          )}
+
+          {settings.bgImageType === "gradient" && settings.bgImagePreset && (
+            <div 
+              className={`w-full h-full bg-gradient-to-tr ${
+                settings.bgImagePreset === "gradient-sunset" ? "from-pink-500 via-red-500 to-yellow-500" :
+                settings.bgImagePreset === "gradient-neon" ? "from-indigo-500 via-purple-500 to-pink-500" :
+                settings.bgImagePreset === "gradient-forest" ? "from-emerald-500 via-teal-500 to-cyan-500" : "from-slate-700 to-slate-900"
+              }`} 
+            />
+          )}
+
+          {settings.bgImageType === "custom_url" && settings.bgImageUrl && (
+            <img 
+              src={settings.bgImageUrl} 
+              alt="Chat background url" 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
+            />
+          )}
+
+          {settings.bgImageType === "upload" && settings.bgImageBase64 && (
+            <img 
+              src={settings.bgImageBase64} 
+              alt="Chat background uploaded" 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
+            />
+          )}
+        </div>
+      )}
+
       {/* 🔴 Transient Connected Standby Banner for first-time OBS source confirmations */}
       {messages.length === 0 && showInitialNotice && !previewMode && (
         <div className="absolute inset-x-4 top-4 bg-slate-900/90 backdrop-blur-md border border-indigo-500/30 p-3.5 rounded-xl text-slate-100 flex items-center gap-3 shadow-lg select-none pointer-events-none animate-slide-in font-sans z-50">
@@ -471,6 +563,11 @@ export default function OverlayWidget({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-1 mb-0.5">
+                      {/* Decorative companion tiny icon (position: before_name) */}
+                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
+                        renderDecorativeIcon(settings.decorativeIconType)
+                      )}
+
                       {/* Name with specific styling */}
                       <span
                         className="font-bold tracking-tight text-ellipsis overflow-hidden whitespace-nowrap"
@@ -478,6 +575,11 @@ export default function OverlayWidget({
                       >
                         {msg.authorName}
                       </span>
+
+                      {/* Decorative companion tiny icon (position: after_name) */}
+                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
+                        renderDecorativeIcon(settings.decorativeIconType)
+                      )}
 
                       {/* Display Creator/Mod Badges if enabled */}
                       {settings.showBadges && (
@@ -524,7 +626,11 @@ export default function OverlayWidget({
                       className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight"
                       style={{ color: settings.textColor }}
                     >
-                      {msg.messageText}
+                      {/* Decorative companion tiny icon (position: before_msg) */}
+                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_msg" && settings.decorativeIconType && (
+                        renderDecorativeIcon(settings.decorativeIconType)
+                      )}
+                      <span>{msg.messageText}</span>
                     </div>
                   </div>
                 </motion.div>
