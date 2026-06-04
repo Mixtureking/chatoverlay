@@ -37,6 +37,88 @@ import {
   Volume2,
 } from "lucide-react";
 
+// Simple lightweight IndexedDB utility for large sound files
+const getSoundFromIndexedDB = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open("SoundDB", 1);
+      request.onupgradeneeded = (e) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("sounds")) {
+          db.createObjectStore("sounds");
+        }
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction("sounds", "readonly");
+        const store = transaction.objectStore("sounds");
+        const getReq = store.get("custom_sound");
+        getReq.onsuccess = () => resolve(getReq.result || null);
+        getReq.onerror = () => resolve(null);
+      };
+      request.onerror = () => resolve(null);
+    } catch (err) {
+      resolve(null);
+    }
+  });
+};
+
+const saveSoundToIndexedDB = (base64: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open("SoundDB", 1);
+      request.onupgradeneeded = (e) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("sounds")) {
+          db.createObjectStore("sounds");
+        }
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction("sounds", "readwrite");
+        const store = transaction.objectStore("sounds");
+        const putReq = store.put(base64, "custom_sound");
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => resolve(false);
+      };
+      request.onerror = () => resolve(false);
+    } catch (err) {
+      resolve(false);
+    }
+  });
+};
+
+const safeSaveSettingsToLocalStorage = (updated: OverlaySettings) => {
+  try {
+    const { soundFileBase64, ...toSave } = updated;
+    localStorage.setItem("yt_overlay_settings", JSON.stringify(toSave));
+  } catch (err) {
+    console.warn("Failed to write to localStorage:", err);
+  }
+};
+
+// Global ultimate foolproof layer to intercept any standard localStorage.setItem calls and strip massive base64 properties dynamically
+try {
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    if (key === "yt_overlay_settings") {
+      try {
+        const data = JSON.parse(value);
+        if (data && typeof data === "object") {
+          delete data.soundFileBase64;
+          originalSetItem.call(localStorage, key, JSON.stringify(data));
+          return;
+        }
+      } catch (err) {
+        // Fallback to default
+      }
+    }
+    originalSetItem.call(localStorage, key, value);
+  };
+} catch (e) {
+  console.warn("Could not patch localStorage:", e);
+}
+
 // Robust Web Audio context synth and URL player for new message notifications
 const playNotificationSound = (settings: OverlaySettings) => {
   if (!settings.soundEnabled) return;
@@ -410,6 +492,24 @@ export default function App() {
         })
         .catch((err) => console.error("Error fetching initial synced settings:", err));
     }
+
+    // Also retrieve the custom sound from IndexedDB safely on mount for both streamer and overlay views
+    getSoundFromIndexedDB().then((savedSoundBase64) => {
+      if (savedSoundBase64) {
+        setSettings((prev) => ({
+          ...prev,
+          soundFileBase64: savedSoundBase64,
+        }));
+        setObsSettings((prev) => ({
+          ...prev,
+          soundFileBase64: savedSoundBase64,
+        }));
+        setSavedSettingsBenchmark((prev) => ({
+          ...prev,
+          soundFileBase64: savedSoundBase64,
+        }));
+      }
+    }).catch(() => {});
   }, []);
 
   // Expose global callback for Electron main process hotkey events to trigger locked state in React window
@@ -565,7 +665,7 @@ export default function App() {
   const updateSettings = (newSettings: Partial<OverlaySettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      localStorage.setItem("yt_overlay_settings", JSON.stringify(updated));
+      safeSaveSettingsToLocalStorage(updated);
       return updated;
     });
   };
@@ -586,12 +686,13 @@ export default function App() {
   // Sync settings with the server so OBS Browser Source instances pull them immediately
   const syncSettingsWithObs = async () => {
     try {
+      const { soundFileBase64, ...settingsToSync } = settings;
       const response = await fetch("/api/youtube/settings-sync", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ settings }),
+        body: JSON.stringify({ settings: settingsToSync }),
       });
       if (response.ok) {
         setSavedSettingsBenchmark(settings);
@@ -1205,7 +1306,7 @@ export default function App() {
         // merge settings safely
         const loadedSettings = { ...DEFAULT_SETTINGS, ...data.settings };
         setSettings(loadedSettings);
-        localStorage.setItem("yt_overlay_settings", JSON.stringify(loadedSettings));
+        safeSaveSettingsToLocalStorage(loadedSettings);
 
         if (Array.isArray(data.blacklist)) {
           setBlacklist(data.blacklist);
@@ -2172,12 +2273,8 @@ export default function App() {
                       const val = parseInt(e.target.value, 10);
                       const updated = { ...obsSettings, fontSize: val };
                       setObsSettings(updated);
-                      localStorage.setItem("yt_overlay_settings", JSON.stringify(updated));
-                      fetch("/api/youtube/settings-sync", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ settings: updated }),
-                      }).catch(() => {});
+                      setSettings(updated);
+                      safeSaveSettingsToLocalStorage(updated);
                     }}
                     className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                   />
@@ -2197,12 +2294,8 @@ export default function App() {
                       const val = parseFloat(e.target.value) / 100;
                       const updated = { ...obsSettings, bgOpacity: val };
                       setObsSettings(updated);
-                      localStorage.setItem("yt_overlay_settings", JSON.stringify(updated));
-                      fetch("/api/youtube/settings-sync", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ settings: updated }),
-                      }).catch(() => {});
+                      setSettings(updated);
+                      safeSaveSettingsToLocalStorage(updated);
                     }}
                     className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                   />
@@ -2524,13 +2617,31 @@ export default function App() {
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
+                                    if (file.size > 8 * 1024 * 1024) {
+                                      showToast("⚠️ Tệp tin quá lớn! Vui lòng chọn tệp dưới 8MB.");
+                                      return;
+                                    }
                                     const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      const base64 = event.target?.result as string;
-                                      updateSettings({
-                                        soundFileBase64: base64,
-                                        soundFileName: file.name
-                                      });
+                                    reader.onload = async (event) => {
+                                      try {
+                                        const base64 = event.target?.result as string;
+                                        const saved = await saveSoundToIndexedDB(base64);
+                                        if (saved) {
+                                          updateSettings({
+                                            soundFileBase64: base64,
+                                            soundFileName: file.name
+                                          });
+                                          showToast("📥 Đã tải lên và lưu tệp âm thanh!");
+                                        } else {
+                                          showToast("⚠️ Không thể lưu tệp âm thanh vào bộ nhớ trình duyệt!");
+                                        }
+                                      } catch (err) {
+                                        console.error("Lỗi khi xử lý tệp âm thanh:", err);
+                                        showToast("❌ Lỗi xử lý âm thanh!");
+                                      }
+                                    };
+                                    reader.onerror = () => {
+                                      showToast("❌ Lỗi đọc tệp tin âm thanh!");
                                     };
                                     reader.readAsDataURL(file);
                                   }

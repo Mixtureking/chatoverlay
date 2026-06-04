@@ -14,10 +14,6 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 ### 🧹 Tinh giản giao diện & Dọn dẹp (UI Cleanups)
 - **Loại bỏ các thành phần rườm rà**: Đã loại bỏ hoàn toàn nút trợ giúp chấm than (`!`) bên cạnh tiêu đề chính "Youtube Chat Overlay" và gỡ bỏ hoàn toàn thẻ giám sát CPU & RAM để tối giản diện tích, đem lại một phong cách hiển thị cao cấp và tập trung tuyệt đối.
 
----
-
-## [1.1.0] - 2026-06-04
-
 ### 🚀 Tính năng nổi bật & Nâng cấp bảo mật (Major Security & Real-Time Sync Sync Upgrade)
 - **Mã hóa URL cấu hình bảo mật chống rò rỉ (`?ob=...`)**: Sử dụng thuật toán nén thông minh và mã hóa Base64 an toàn cho URL (URL-safe Base64) hỗ trợ đầy đủ ký ký tự UTF-8 (tiện lợi cho phông chữ tiếng Việt). Giờ đây, các thông tin nhạy cảm của streamer bao gồm `liveChatId` và `apiKey` của YouTube API đều được ẩn giấu hoàn toàn dưới dạng mã khóa bảo mật, loại bỏ hoàn toàn khả năng lộ thông tin cấu hình và API key cá nhân khi Streamer chụp màn hình hay hiển thị liên kết trên sóng livestream.
 - **Dẫn hướng trực tiếp tại Trang Gốc (Root Routing)**: Khắc phục triệt để lỗi 404 NOT FOUND phổ biến trên các nền tảng máy chủ tĩnh (như Vercel) bằng cách định cấu hình liên kết OBS trỏ trực tiếp về trang gốc `/` kết hợp tham số mã hóa khóa bảo mật `?ob=...`. Hệ thống sẽ tự động giải mã và áp chế giao diện Overlay tinh chuẩn ngay lập tức, đem lại khả năng tương thích tuyệt hảo trên mọi môi trường máy chủ đám mây.
