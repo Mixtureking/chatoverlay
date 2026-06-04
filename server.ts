@@ -3,6 +3,18 @@ import path from "path";
 import dns from "dns";
 import fs from "fs";
 
+// Helper to log errors & transactions to a file for runtime inspection
+function logToFile(message: string) {
+  try {
+    const logPath = path.join(process.cwd(), "server.log");
+    const timestamp = new Date().toISOString();
+    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+    console.log(`[LOGGER] ${message}`);
+  } catch (err) {
+    // Suppress logging failures
+  }
+}
+
 // Ensure DNS resolution works correctly in sandboxed environments
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
 
@@ -49,29 +61,39 @@ function extractVideoId(input: string): string {
 app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res): Promise<any> => {
   const { videoUrlOrId, apiKey } = req.body;
 
+  logToFile(`Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "${videoUrlOrId}", API Key ẩn: "${apiKey ? apiKey.substring(0, 6) + '...' : 'Không có'}"`);
+
   if (!videoUrlOrId) {
+    logToFile("Lỗi: Thiếu thông tin Video URL hoặc ID");
     return res.status(400).json({ error: "Thiếu thông tin Video URL hoặc ID" });
   }
 
   if (!apiKey) {
+    logToFile("Lỗi: Thiếu YouTube API Key");
     return res.status(400).json({ error: "Thiếu YouTube API Key" });
   }
 
   const videoId = extractVideoId(videoUrlOrId);
+  logToFile(`Trích xuất thành công Video ID: "${videoId}"`);
 
   try {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,snippet&id=${videoId}&key=${apiKey}`;
+    logToFile(`Bắt đầu fetch Google API: ${url.replace(apiKey, "HIDDEN")}`);
     const response = await fetch(url);
+    logToFile(`Google API trả về mã phản hồi: ${response.status} (${response.statusText})`);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const message = errorData?.error?.message || "Lỗi API từ Google";
       const status = response.status;
+      logToFile(`Lỗi kết nối hoặc API phản hồi không thành công: ${JSON.stringify(errorData)}`);
       return res.status(status).json({ error: `Google API Error (${status}): ${message}` });
     }
 
     const data = await response.json();
+    logToFile(`Dữ liệu Google API lấy về thành công: items count = ${data.items ? data.items.length : 0}`);
     if (!data.items || data.items.length === 0) {
+      logToFile(`Lỗi: Không tìm thấy video trên YouTube với ID "${videoId}"`);
       return res.status(404).json({ error: "Không tìm thấy video. Vui lòng kiểm tra lại URL hoặc ID." });
     }
 
@@ -80,18 +102,22 @@ app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res
     const snippet = videoItem.snippet;
 
     if (!liveStreamingDetails) {
+      logToFile(`Lỗi: Video "${videoId}" không chứa liveStreamingDetails. Không phải livestream/trực tiếp.`);
       return res.status(400).json({ 
         error: "Đây không phải là video Livestream hoặc video công chiếu trực tiếp." 
       });
     }
 
     const activeLiveChatId = liveStreamingDetails.activeLiveChatId;
+    logToFile(`Thông tin livestream: activeLiveChatId="${activeLiveChatId}"`);
     if (!activeLiveChatId) {
+      logToFile(`Lỗi: Livestream "${videoId}" không có activeLiveChatId. Có thể livestream đã kết thúc.`);
       return res.status(400).json({ 
         error: "Livestream này đã kết thúc hoặc không có khung chat trực tiếp nào đang hoạt động." 
       });
     }
 
+    logToFile(`Thực hiện trả về dữ liệu kết nối thành công: activeLiveChatId="${activeLiveChatId}", title="${snippet.title}"`);
     res.json({
       activeLiveChatId,
       videoId,
@@ -100,7 +126,7 @@ app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res
       viewerCount: liveStreamingDetails.concurrentViewers ? parseInt(liveStreamingDetails.concurrentViewers, 10) : 0,
     });
   } catch (error: any) {
-    console.error("Error fetching live-chat-id:", error);
+    logToFile(`Gặp exception cực kỳ nghiêm trọng trong live-chat-id try-catch: ${error?.message || error}\nStack trace: ${error?.stack}`);
     res.status(500).json({ error: `Lỗi máy chủ kết nối YouTube: ${error.message}` });
   }
 });
