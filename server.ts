@@ -46,7 +46,7 @@ function extractVideoId(input: string): string {
 }
 
 // API Route 1: Get Active Live Chat ID & Broadcast Info from Video ID
-app.post("/api/youtube/live-chat-id", async (req, res): Promise<any> => {
+app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id"], async (req, res): Promise<any> => {
   const { videoUrlOrId, apiKey } = req.body;
 
   if (!videoUrlOrId) {
@@ -106,7 +106,7 @@ app.post("/api/youtube/live-chat-id", async (req, res): Promise<any> => {
 });
 
 // API Route 2: Fetch Live Chat Messages and Stream Details
-app.get("/api/youtube/messages", async (req, res): Promise<any> => {
+app.get(["/api/youtube/messages", "/youtube/messages"], async (req, res): Promise<any> => {
   const { liveChatId, apiKey, pageToken } = req.query;
 
   if (!liveChatId || !apiKey) {
@@ -203,7 +203,7 @@ app.get("/api/youtube/messages", async (req, res): Promise<any> => {
 });
 
 // API Route 3: Fetch view count / info in parallel
-app.get("/api/youtube/viewers", async (req, res): Promise<any> => {
+app.get(["/api/youtube/viewers", "/youtube/viewers"], async (req, res): Promise<any> => {
   const { videoId, apiKey } = req.query;
 
   if (!videoId || !apiKey) {
@@ -231,7 +231,7 @@ app.get("/api/youtube/viewers", async (req, res): Promise<any> => {
 // Server-side settings cache to allow OBS and popouts to stay automatically in sync with the streamer control panel
 let cachedOverlaySettings: any = null;
 
-app.post("/api/youtube/settings-sync", (req, res) => {
+app.post(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
   const { settings } = req.body;
   if (settings) {
     cachedOverlaySettings = settings;
@@ -240,12 +240,12 @@ app.post("/api/youtube/settings-sync", (req, res) => {
   res.status(400).json({ error: "Missing settings payload" });
 });
 
-app.get("/api/youtube/settings-sync", (req, res) => {
+app.get(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
   res.json({ settings: cachedOverlaySettings });
 });
 
 // APIs bridging requests to Electron Main Process for Discord-style always on top overlay
-app.get("/api/desktop-overlay/status", (req, res) => {
+app.get(["/api/desktop-overlay/status", "/desktop-overlay/status"], (req, res) => {
   const control = (global as any).electronOverlayControl;
   if (control) {
     return res.json({
@@ -256,7 +256,7 @@ app.get("/api/desktop-overlay/status", (req, res) => {
   res.json({ isElectron: false, isOpen: false });
 });
 
-app.post("/api/desktop-overlay/toggle", (req, res) => {
+app.post(["/api/desktop-overlay/toggle", "/desktop-overlay/toggle"], (req, res) => {
   const { show } = req.body;
   const control = (global as any).electronOverlayControl;
   if (control) {
@@ -266,7 +266,7 @@ app.post("/api/desktop-overlay/toggle", (req, res) => {
   res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
 });
 
-app.post("/api/desktop-overlay/set-locked", (req, res) => {
+app.post(["/api/desktop-overlay/set-locked", "/desktop-overlay/set-locked"], (req, res) => {
   const { locked } = req.body;
   const control = (global as any).electronOverlayControl;
   if (control) {
@@ -276,7 +276,7 @@ app.post("/api/desktop-overlay/set-locked", (req, res) => {
   res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
 });
 
-app.post("/api/desktop-overlay/set-ignore-mouse", (req, res) => {
+app.post(["/api/desktop-overlay/set-ignore-mouse", "/desktop-overlay/set-ignore-mouse"], (req, res) => {
   const { ignore } = req.body;
   const control = (global as any).electronOverlayControl;
   if (control) {
@@ -288,6 +288,14 @@ app.post("/api/desktop-overlay/set-ignore-mouse", (req, res) => {
     return res.json({ success: true, ignore: !!ignore });
   }
   res.status(400).json({ error: "Ứng dụng đang không chạy trong môi trường Desktop Electron." });
+});
+
+// Express global error handle middleware (Ensures error formatting always outputs JSON, preventing HTML 500 errors)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Express App Critical Error Handling:", err);
+  res.status(err.status || 500).json({
+    error: `Lỗi máy chủ kết nối YouTube hoặc cấu hình: ${err.message || err}`
+  });
 });
 
 // Vite & Static file handler initialization

@@ -163,6 +163,7 @@ export default function App() {
   const [obsSettings, setObsSettings] = useState<OverlaySettings>(DEFAULT_SETTINGS);
   const [obsChatId, setObsChatId] = useState<string>("");
   const [obsApiKey, setObsApiKey] = useState<string>("");
+  const [isObsGeneratorRevealed, setIsObsGeneratorRevealed] = useState(false);
 
   // New states for interactive dragging & fullscreen launcher overlays
   const [isMouseDownOnHandle, setIsMouseDownOnHandle] = useState(false);
@@ -2392,58 +2393,95 @@ export default function App() {
 
                 {/* PROFILE CONFIG STORAGE & OBS URL BOX */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-indigo-400" />
-                    <span>OBS Browser Source Generator</span>
-                  </h3>
-
-                  <p className="text-xs text-slate-400 leading-normal">
-                    Sau khi dán link vào nguồn Trình duyệt (Browser Source) trên OBS Studio, bạn không cần phải đổi link hay dán lại nữa.
-                  </p>
-
-                  <div className="bg-emerald-950/20 border border-emerald-500/25 p-2.5 rounded-xl text-[11px] text-emerald-400 leading-normal flex items-start gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Tính năng Đồng Bộ Sống:</strong> Bạn chỉ cần gắn link này vào OBS một lần. Mỗi khi tùy chỉnh màu sắc/cỡ chữ ở tab bên, chỉ cần nhấn nút <strong>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</strong>, giao diện trên stream sẽ thay đổi ngay lập tức!
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2 flex flex-col">
-                    <div className="font-mono text-[10px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[120px] overflow-y-auto">
-                      {compileObsLink()}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyObsLink}
-                      className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Sao chép Link OBS Overlay</span>
-                    </button>
-                  </div>
-
-                  {/* Config upload and export panels (US-11, T3-03, T3-04) */}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleExportConfig}
-                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Xuất File Cấu Hình</span>
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-indigo-400" />
+                      <span>OBS Browser Source Generator</span>
+                    </h3>
                     
-                    <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Nhập File Cấu Hình</span>
-                      <input
-                        type="file"
-                        accept=".json"
-                        onChange={handleImportConfig}
-                        className="hidden"
-                      />
-                    </label>
+                    {isObsGeneratorRevealed && (
+                      <button
+                        type="button"
+                        onClick={() => setIsObsGeneratorRevealed(false)}
+                        className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-[10px] font-bold px-2 py-0.5 rounded transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
+                      >
+                        <EyeOff className="w-3 h-3" />
+                        <span>Che bảo mật</span>
+                      </button>
+                    )}
                   </div>
+
+                  {!isObsGeneratorRevealed ? (
+                    <div className="relative overflow-hidden rounded-xl border border-dashed border-red-500/20 bg-slate-900/40 p-5 mt-2 transition-all">
+                      <div className="flex flex-col items-center justify-center text-center py-3">
+                        <EyeOff className="w-8 h-8 text-rose-500 mb-2 animate-pulse" />
+                        <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider text-rose-400">
+                          OBS Generator ĐÃ BỊ CHE BẢO MẬT
+                        </h4>
+                        <p className="text-[11px] text-slate-400 max-w-[280px] mt-1.5 mb-4 leading-normal">
+                          Tránh vô tình để lộ Link OBS chứa API Key và ID livestream cá nhân của bạn khi đang trực tiếp.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsObsGeneratorRevealed(true)}
+                          className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[11px] font-bold px-4 py-2 rounded-lg transition-all border border-indigo-500/30 cursor-pointer shadow-lg flex items-center gap-1.5"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Hiển thị Link OBS</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-slate-400 leading-normal">
+                        Sau khi dán link vào nguồn Trình duyệt (Browser Source) trên OBS Studio, bạn không cần phải đổi link hay dán lại nữa.
+                      </p>
+
+                      <div className="bg-emerald-950/20 border border-emerald-500/25 p-2.5 rounded-xl text-[11px] text-emerald-400 leading-normal flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Tính năng Đồng Bộ Sống:</strong> Bạn chỉ cần gắn link này vào OBS một lần. Mỗi khi tùy chỉnh màu sắc/cỡ chữ ở tab bên, chỉ cần nhấn nút <strong>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</strong>, giao diện trên stream sẽ thay đổi ngay lập tức!
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2 flex flex-col">
+                        <div className="font-mono text-[10px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[120px] overflow-y-auto">
+                          {compileObsLink()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopyObsLink}
+                          className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Sao chép Link OBS Overlay</span>
+                        </button>
+                      </div>
+
+                      {/* Config upload and export panels (US-11, T3-03, T3-04) */}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleExportConfig}
+                          className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Xuất File Cấu Hình</span>
+                        </button>
+                        
+                        <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Nhập File Cấu Hình</span>
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleImportConfig}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </>
+                  )}
 
                   {/* Dedicated Streamer Screen Widget Launcher (Special UX Request) */}
                   <div className="space-y-3 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80 mt-4">
