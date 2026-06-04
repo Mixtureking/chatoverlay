@@ -1,12 +1,12 @@
 # Tài liệu Đặc tả Kỹ thuật (Technical Specification - SPEC) 📝
 
-Tài liệu này đặc tả chi tiết các yêu cầu chức năng, luồng xử lý dữ liệu, cấu trúc dữ liệu cấu hình, và các API tương tác trong ứng dụng **YouTube Chat OBS Overlay**.
+Tài liệu này đặc tả chi tiết các yêu cầu chức năng, luồng xử lý dữ liệu, định cấu hình mã hóa bảo mật, và hệ thống các API nội bộ phục vụ cho ứng dụng **YouTube Chat OBS Overlay**.
 
 ---
 
-## 1. Bản Đồ API nội bộ (Backend Routes Spec)
+## 1. Bản Đồ API nội bộ (Backend API Specifications)
 
-Mẫu máy chủ Express phía Backend cung cấp các API sau để phục vụ Frontend kết nối tới dịch vụ YouTube API tránh rò rỉ API Key và thực hiện Đồng bộ hóa luồng livestream.
+Máy chủ Express phía Backend cung cấp các API để thực hiện Đồng bộ hóa luồng livestream, trung chuyển dữ liệu chat an toàn của YouTube và duy trì bộ đệm cấu hình.
 
 ### 1.1 Lấy Active Live Chat ID từ URL video
 - **Endpoint**: `POST /api/youtube/live-chat-id`
@@ -41,8 +41,8 @@ Mẫu máy chủ Express phía Backend cung cấp các API sau để phục vụ
   - `apiKey` (string, bắt buộc): Khóa API YouTube hợp lệ.
   - `pageToken` (string, tùy chọn): Token phân trang cho lần lấy dữ liệu tiếp theo.
 - **Xử lý**:
-  1. Gửi request tới YouTube API: `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={liveChatId}&part=snippet,authorDetails&key={apiKey}&maxResults=100&pageToken={pageToken}`.
-  2. Map và chuẩn hóa dữ liệu tin nhắn bao gồm huy hiệu, phân loại Super Chat dựa trên cấp độ tiền mặt (Tiers từ 1 đến 6).
+  1. Thẩm định kết nối và thực hiện tải từ YouTube Live Chat API: `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId={liveChatId}&part=snippet,authorDetails&key={apiKey}&maxResults=100&pageToken={pageToken}`.
+  2. Lọc thông tin, sắp xếp và chuẩn hóa các trường thông tin tác giả, avatar, thẻ quyền Moderator/Hội viên/Chủ kênh và dữ liệu đóng góp Super Chat.
   3. Áp dụng cơ chế lọc mã độc hại XSS (`sanitizeHtml`) cho nội dung tin nhắn và tên người dùng để bảo vệ môi trường hiển thị Web.
 - **Phản hồi thành công (200 OK)**:
 ```json
@@ -50,45 +50,55 @@ Mẫu máy chủ Express phía Backend cung cấp các API sau để phục vụ
   "messages": [
     {
       "id": "msg-17173920...",
-      "authorName": "Coder Pro",
+      "authorName": "Steamer Pro",
       "authorPhotoUrl": "https://...",
-      "messageText": "Xin chào mọi người!",
+      "messageText": "Giao diện overlay đẹp quá ad ơi! 🔥",
       "isModerator": false,
       "isOwner": false,
       "isSponsor": true,
       "isVerified": false,
       "isSuperChat": false,
-      "superChatColor": "#1565c0",
+      "superChatColor": "",
       "superChatAmountText": "",
       "tier": 1,
       "timestamp": 1717392015000
     }
   ],
   "nextPageToken": "AL9yKbd-LXv...",
-  "pollingIntervalMillis": 4000,
-  "offlineAt": null
+  "pollingIntervalMillis": 4000
 }
 ```
 
 ---
 
 ### 1.3 Đồng bộ thiết lập tùy chọn hiển thị (Settings Sync)
-Cơ chế cốt lõi để giữ giao diện thiết lập của streamer và hiển thị OBS luôn tương thích mà không cần load lại trình duyệt.
+Giúp đồng hồ thiết lập của streamer và hiển thị OBS luôn tương thích và tức thời thông qua bộ nhớ đệm (Cache) trên Server mà không cần ép tải lại nguồn trình duyệt.
 
-- **Lưu thiết lập (Save/Push Settings)**:
+- **Lưu thiết lập (Save/Push Settings - Tự động gọi Debounced ngầm)**:
   - **Endpoint**: `POST /api/youtube/settings-sync`
   - **Body Payload**:
   ```json
   {
     "settings": {
-      "fontSize": "16px",
+      "fontSize": 15,
+      "fontFamily": "Inter",
       "textColor": "#ffffff",
-      "backgroundColor": "rgba(15, 23, 42, 0.8)",
-      "badgeVisible": true,
-      "animationType": "slide-up",
-      "maxMessages": 50,
-      "themeType": "modern-slate",
-      "superchatOutline": true
+      "bgColor": "#0f172a",
+      "bgOpacity": 0.85,
+      "authorColor": "#bae6fd",
+      "moderatorColor": "#34d399",
+      "sponsorColor": "#fbbf24",
+      "superChatDuration": 45,
+      "chatDuration": 0,
+      "isTransparent": false,
+      "scale": 1,
+      "showAvatar": true,
+      "showBadges": true,
+      "animationType": "fade",
+      "useCustomCode": false,
+      "customHtml": "",
+      "customCss": "",
+      "customJs": ""
     }
   }
   ```
@@ -100,30 +110,44 @@ Cơ chế cốt lõi để giữ giao diện thiết lập của streamer và hi
 
 ---
 
-## 2. Đặc tả Mô hình Dữ liệu cấu hình (Configuration Spec)
+## 2. Đặc tả thuật toán Mã hóa & Giải mã URL (`?ob=...`)
 
-Dữ liệu thiết lập khung chat bao hàm các thuộc tính sau:
+Để giấu các tham số nhạy cảm của Streamer và triệt tiêu lỗi 404 trên các nhà mạng Static hosting, hệ thống sử dụng thuật toán nén thông tin mã hóa một dòng như sau:
 
-| Thuộc tính | Kiểu dữ liệu | Giá trị mặc định | Giải thích |
-| :--- | :--- | :--- | :--- |
-| `theme` | `string` | `"dark"` | Giao diện nền bảng điều khiển (`dark` / `light`) |
-| `chatTheme` | `string` | `"bubble"` | Kiểu hiển thị bong bóng chat (`bubble`, `clean`, `minimal`, `glassmorphism`) |
-| `fontSize` | `number` | `14` | Cỡ chữ hiển thị trong OBS (Đơn vị tính: px) |
-| `fontFamily` | `string` | `"Inter"` | Phông chữ chọn lọc (`Inter`, `Space Grotesk`, `JetBrains Mono`) |
-| `textColor` | `string` | `"#f8fafc"` | Mã màu hex cho màu chữ nội dung tin nhắn |
-| `bgColor` | `string` | `"rgba(15, 23, 42, 0.65)"` | Màu nền của bong bóng chat (Hỗ trợ độ trong suốt RGBA) |
-| `accentColor` | `string` | `"#6366f1"` | Màu tạo điểm nhấn (Tên tác giả, biểu tượng, viền) |
-| `maxMessages` | `number` | `30` | Lượng tin nhắn tối đa lưu trữ trên màn hình để tránh quá tải RAM của OBS |
-| `animationDuration` | `number` | `0.3` | Thời gian kéo dài hoạt ảnh hiển thị tin nhắn (giây) |
-| `showBadges` | `boolean` | `true` | Hiển thị biểu hiện đặc biệt của Moderator/Owner/Member/Verified |
-| `showAvatars` | `boolean` | `true` | Ẩn/hiển thị ảnh đại diện của người gõ phím |
-| `showSuperChatBanner` | `boolean` | `true` | Bật hoạt ảnh đặc biệt khi có Super Chat số tiền lớn |
-| `isTitleBold` | `boolean` | `true` | Viết đậm tên người dùng trong khung chat |
+### 2.1 Cơ chế Đóng mã (Encoding Client-Side)
+Toàn bộ thông tin cấu hình và kết nối được lưu thành một chuỗi JSON. Để tránh lỗi vỡ font tiếng Việt từ các trường văn bản, chuỗi được chuyển sang chuỗi an toàn nhị phân trước khi chuyển Base64:
+```typescript
+const jsonStr = JSON.stringify(config);
+// Hỗ trợ đầy đủ UTF-8 cho phông chữ tiếng Việt hoặc ký hiệu đặc biệt
+const utf8String = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+  return String.fromCharCode(parseInt(p1, 16));
+});
+const base64 = btoa(utf8String);
+// Chuyển Base64 sang dạng an toàn với các liên kết internet (URL Safe Base64)
+const urlSafeBase64 = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+return `${rootUrl}/?ob=${urlSafeBase64}`;
+```
+
+### 2.2 Cơ chế Giải mã (Decoding Client-Side)
+Khi OBS mở đường dẫn gởi kèm `?ob=...`, mã được chuyển đổi ngược, tự phục hồi cấu hình và áp dụng ngay tại chỗ:
+```typescript
+let base64 = obParam.replace(/-/g, "+").replace(/_/g, "/");
+while (base64.length % 4) {
+  base64 += "=";
+}
+const decodedJsonStr = decodeURIComponent(
+  atob(base64)
+    .split("")
+    .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+    .join("")
+);
+const decodedParams = JSON.parse(decodedJsonStr);
+```
 
 ---
 
 ## 3. Quy chuẩn Bảo mật & Hiệu năng
 
-- **Bảo mật API Key**: Hệ thống tuyệt đối **không chia sẻ API Key đến luồng URL hiển thị của OBS Overlay**. URL dán vào OBS chỉ chứa mã tham chiếu Overlay ID; máy chủ Express lưu giữ API Key an toàn và chỉ thực hiện các yêu cầu API YouTube trực tiếp từ máy chủ (Server-to-Server) bảo bọc an toàn.
-- **Ngăn chặn tấn công XSS**: Tên người dùng (`displayName`) và nội dung tin nhắn (`displayMessage`) được lọc sạch qua tiện ích `sanitizeHtml` để loại bỏ thẻ `<script>`, `<iframe>` và mã độc nhúng nguy hiểm.
-- **Điều phối Tần suất Polling (Rate Limiting Management)**: Máy chủ tự động tuân thủ cấu hình khoảng thời gian làm mới (`pollingIntervalMillis`) trả về từ phía API YouTube (thường là 4 giây) hoặc thích ứng theo cài đặt tối ưu tối thiểu 2 giây để tránh vượt định mức truy vấn cho phép (API Quota Limit) của tài khoản Google.
+- **Bảo mật tối cao cho API Key**: Nhờ thuật toán mã hóa `ob`, không một ai có thể nhìn thấy API Key hoặc Chat ID của streamer bằng mắt thường khi liên kết hiển thị trên OBS hoặc lúc chụp ảnh màn hình, chống rò rỉ và lạm dụng API ngoài ý muốn.
+- **Cơ chế Chống XSS**: Sử dụng hàm thanh lọc tin nhắn đầu vào nhằm loại bỏ dấu hiệu của các thẻ HTML độc hại, bảo vệ bảng hiển thị của stream khỏi các sự cố chiếm quyền hay spam nội dung phá hoại.
+- **Tối ưu băng thông**: Polling được đồng bộ chặt chẽ ở chu kỳ 4 giây cho tin nhắn, và 3 giây cho cài đặt tự động cập nhật, bảo đảm tốc độ phản hồi tức thì mà vẫn giữ được sự ổn định cho máy chủ và nằm gọn trong phạm vi hạn ngạch miễn phí của YouTube API.

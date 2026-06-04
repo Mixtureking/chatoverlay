@@ -1,17 +1,25 @@
 # YouTube Chat OBS Overlay Controller 🎥💬
 
-Ứng dụng full-stack (React + Express + Electron) tinh gọn và mạnh mẽ giúp các streamer YouTube tùy chỉnh, quản lý và hiển thị khung chat trực tiếp (YouTube Live Chat) lên luồng livestream của mình thông qua nguồn Trình duyệt (Browser Source) trong OBS Studio.
-
-Tích hợp tính năng **Đồng bộ Sống (Live Synchronization)**: Streamer chỉ cần dán link OBS một lần duy nhất vào OBS. Mỗi khi đổi màu sắc, cỡ chữ hay hiệu ứng hiển thị tại giao diện điều khiển, giao diện hiển thị trên stream sẽ được cập nhật ngay lập tức mà không cần tải lại nguồn (reload Browser Source).
+Ứng dụng full-stack (React + Express + Electron) tinh gọn, mạnh mẽ và bảo mật tối cao giúp các streamer YouTube tùy chỉnh, quản lý và hiển thị khung chat trực tiếp (YouTube Live Chat) lên luồng livestream của mình thông qua nguồn Trình duyệt (Browser Source) trong OBS Studio.
 
 ---
 
-## ✨ Tính năng chính
+## ✨ Điểm cải tiến & Tính năng nổi bật mới
 
-- **Cấu hình trực quan (Control Panel)**: Thay đổi màu sắc nền, màu chữ, kích cỡ font, khoảng cách hiển thị, ẩn/hiển thị huy hiệu (moderator, member, verified), các hiệu ứng hoạt ảnh xuất hiện của tin nhắn bằng Framer Motion (`motion`).
-- **Tốc độ Đồng bộ Sống (Live Sync)**: Sử dụng API đồng bộ hóa lưu trữ cấu hình trên server, giúp màn hình OBS tự động cập nhật cấu hình thiết lập tức thời mà không làm ảnh hưởng hay ngắt quãng tin nhắn chat trên livestream.
-- **Hỗ trợ Super Chat nổi bật**: Tự động nhận diện thiết lập Tiers của YouTube Super Chat và tô điểm màu sắc viền/background cao cấp theo quy chuẩn của YouTube.
-- **Ứng dụng Desktop Portable (.exe)**: Đóng gói hoàn chỉnh thành một phần mềm độc lập dành cho Windows giúp streamer tiện mở rộng, chạy mượt mà ngay trên máy tính mà không cần cài đặt phức tạp.
+1. **🔒 Mã hóa liên kết OBS Bảo mật tuyệt đối (`?ob=...`)**:
+   - Khắc phục nguy cơ lộ thông tin nhậy cảm (như `liveChatId` và YouTube `apiKey` cá nhân) khi streamer cài đặt hoặc chia sẻ giao diện màn hình.
+   - Toàn bộ thiết lập, mã kết nối và khóa API được nén cứng, chuyển mã nhị phân UTF-8 và mã hóa sang định dạng **URL-Safe Base64** tuyệt đẹp.
+
+2. **🌐 Đẫn hướng trực tiếp trang gốc (Zero Routing Error)**:
+   - Các nền tảng đám mây tĩnh (như Vercel) dễ phát sinh lỗi **404 NOT FOUND** khi truy cập trực tiếp các đường dẫn phụ như `/overlay`.
+   - Bằng cách cấu trúc liên kết OBS dưới dạng `/?ob=[code]` chạy thẳng từ trang gốc, ứng dụng triệt tiêu hoàn toàn lỗi 404, bảo đảm tải overlay mượt mà trong bất kể môi trường lưu trữ nào.
+
+3. **⚡ Tự động Đồng bộ hóa Không Gián đoạn (Debounced Live Auto-Sync)**:
+   - Loại bỏ thao tác phải nhấp nút "Cập Nhật" hoặc "Save" thủ công hằng ngày của Streamer.
+   - Bảng điều khiển tích hợp bộ quản lý thay đổi tự động được hoãn trễ 500ms (Debounce). Mỗi khi thực hiện điều chỉnh (kéo núm cỡ chữ, chọn bảng màu chữ, bấm nút bật avatar...), cấu hình tự lưu ngầm vào Server Cache. Khung hiển thị OBS tự nạp giao diện cập nhật sau dưới 3 giây một cách lặng lẽ.
+
+4. **👑 Super Chat Đa Tiers Cao Cấp**:
+   - Tự chọn dải màu khung nổi bật cho các hạn mức ủng hộ, duy trì hoạt ảnh ghim tin nhắn đầu bảng chuyên nghiệp giống hệt trải nghiệm trên nền tảng YouTube gốc.
 
 ---
 
@@ -25,7 +33,7 @@ Giải nén mã nguồn, mở Terminal hoặc Command Prompt tại thư mục d�
 npm install
 ```
 
-### 2. Chạy ứng dụng chế độ Phát triển (Development)
+### 2. Chạy ứng dụng chế độ phát triển (Development)
 Khởi chạy cả backend và frontend (Vite) đồng thời để chỉnh sửa mã nguồn:
 ```bash
 npm run dev
@@ -56,24 +64,17 @@ npm run build:win
 
 ### Sản phẩm thu được:
 Sau khi build hoàn tất, bạn sẽ nhận được file `.exe` nằm trong thư mục:
-`dist-electron/YouTube Chat Overlay.exe` (Dung lượng khoảng ~70-100MB do bao hàm sẵn runtime tối giản của Chromium và Node.js).
+`dist-electron/YouTube Chat Overlay.exe`.
 
 ---
 
-## 🌐 Cách kết nối vào OBS Studio
+## 🌐 Hướng dẫn kết nối vào OBS Studio
 
 1. **Bật ứng dụng lên** (hoặc chạy app qua file `.exe` / dòng lệnh `npm run dev`).
-2. Nhập **YouTube API Key** của bạn và **Video URL/ID** của luồng Livestream hiện tại.
-3. Bấm **Bắt đầu đồng bộ**.
+2. Nhập **YouTube API Key** của bạn và **Video URL/ID** của luồng Livestream hiện tại hoặc bật chế độ Giả Lập (Simulate) để kiểm tra giao diện.
+3. Bấm **Bắt đầu đồng bộ** để khởi động bộ dò trò chuyện.
 4. Chuyển sang tab **Thiết lập giao diện (Style CSS)** để căn chỉnh kích thước font, bảng màu sắc phù hợp với layout luồng stream của bạn.
-5. Sao chép **Đường dẫn liên kết OBS Overlay**.
+5. Nhấp nút **Sao chép Link OBS Overlay**. Bạn sẽ nhận được liên kết bảo mật có dạng: `http://localhost:3000/?ob=eyJs...`
 6. Mở **OBS Studio** -> Ấn nút **Dấu cộng (+)** ở khung Nguồn (Sources) -> Chọn **Trình duyệt (Browser)**.
-7. Dán đường link vừa sao chép vào ô **URL**. Thiết lập kích cỡ hiển thị rộng/cao phù hợp (Ví dụ: `width: 400`, `height: 600`) rồi nhấn **OK**.
-8. Mỗi khi bạn sửa CSS hoặc màu sắc trên Dashboard của app, chỉ cần nhấn nút **LƯU THIẾT LẬP & ĐỒNG BỘ** trên bảng điều khiển. Giao diện OBS sẽ cập nhật trực tiếp sau 1 giây!
-
----
-
-## 📂 Các cổng kết nối & Thiết lập
-
-- Mặc định ứng dụng chạy trên cổng kết nối nội bộ: `3000`.
-- Nếu tích hợp lên OBS của các thiết bị khác hoặc mạng nội bộ, hãy thay `localhost` bằng địa chỉ IP máy tính nội mạng của bạn (Ví dụ: `http://192.168.1.5:3000/obs-overlay`).
+7. Dán đường link vừa sao chép vào ô **URL**. Thiết lập kích cỡ hiển thị rộng/cao phù hợp (Ví dụ: và thiết lập độ phân giải mong muốn như rộng `400px`, cao `650px`) rồi nhấn **OK**.
+8. **Đồng bộ hóa tức thời**: Bây giờ, mỗi khi bạn thay đổi thông số giao diện tại Dashboard, khung hiển thị trên OBS sẽ tự động thay đổi theo ngay lập tức sau 1-3 giây mà không cần thao tác bấm "Lưu" thủ công, mang đến trải nghiệm điều khiển rực rỡ và chuyên nghiệp vô song!

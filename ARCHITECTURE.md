@@ -1,12 +1,12 @@
-# Tài liệu Kiến trúc Hệ thống (Architecture Blueprint - ARCHITECTURE) 🏗️
+# Tài liệu Kiến trúc Hệ thống (Architecture Blueprint) 🏗️
 
-Tài liệu này giải thích cấu trúc tổ chức mã nguồn, kiến trúc đa tầng (Hybrid Web-plus-Desktop), cách phân chia trách nhiệm giữa Client - Server - Electron, và cơ chế Đồng bộ hoạt động tức thời.
+Tài liệu này giải thích cấu trúc tổ chức mã nguồn, kiến trúc đa tầng (Hybrid Web-plus-Desktop), cách phân chia trách nhiệm giữa Client - Server - Electron, các cơ chế bảo mật mã hóa URL và Đồng bộ hóa thời gian thực tự động của ứng dụng.
 
 ---
 
 ## 1. Sơ đồ Kiến trúc Tổng quan (System Overview)
 
-Hệ thống được vận hành dưa trên thiết kế **Full-Stack lai ghép Đóng gói độc lập (Hybrid Architecture with Desktop Wrapper)**:
+Hệ thống được vận hành dựa trên thiết kế **Full-Stack lai ghép Đóng gói độc lập (Hybrid Architecture with Desktop Wrapper)**:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -18,6 +18,7 @@ Hệ thống được vận hành dưa trên thiết kế **Full-Stack lai ghép
 │  │ (Compiled Server CJS) │    │   │ (Embedded HTML) │  │
 │  │   Express / Node.js   ├────┼──►│  Vite + React   │  │
 │  │      Port 3000        │    │   │  Chromium UI    │  │
+│  │  (Settings Cache API) │    │   │                 │  │
 │  └───────────┬───────────┘    ┴   └────────┬────────┘  │
 └──────────────┼─────────────────────────────┼───────────┘
                │ Api Proxy Requests          │ Live Sync Polling
@@ -30,60 +31,72 @@ Hệ thống được vận hành dưa trên thiết kế **Full-Stack lai ghép
 
 ---
 
-## 2. Hoạt động của 3 Tầng Core Layers
+## 2. Hoạt động của các Tầng Cốt lõi (Core Layers)
 
 ### 2.1 Tầng Thể hiện & Trải nghiệm (Client Presentation Layer)
-- **Công nghệ**: React v19, Tailwind CSS v4, Framer Motion (`motion/react`).
+- **Công nghệ**: React v18, Tailwind CSS v4, Framer Motion (`motion/react`).
 - **Nhiệm vụ chính**:
-  - **Bảng điều khiển (Control Panel)**: Cho phép streamer thiết lập cấu hình của luồng chat, kết nối tài khoản stream, xem trước danh sách tin nhắn hiện thời.
-  - **Khung hiển thị nguồn (OBS Overlay View)**: Được tải trực tiếp từ OBS Studio bằng chế độ overlay (`?mode=overlay` hoặc `/obs-overlay`). Trang này không hiển thị điều khiển bên lề, chỉ chứa tin nhắn chat nền hiển thị trong suốt (Transparent background), liên tục cập nhật/đồng bộ cấu hình style CSS động từ Server nội bộ.
+  - **Bảng điều khiển (Control Panel)**: Cung cấp giao diện trực quan cho phép điều chỉnh màu sắc, cỡ chữ, phông dạng, bật/tắt avatar, huy hiệu hoặc tùy biến mã HTML/CSS/JS mở rộng.
+  - **Khung hiển thị nguồn (OBS Overlay View)**: Được nạp thẳng vào OBS Studio thông qua đường dẫn bảo mật. Bộ lọc trong suốt tự động lọc tin nhắn và thực hiện chuyển động mượt mà.
 
-### 2.2 Tầng Proxy & Xử lý Đồng bộ (Server Synchronization Layer)
+### 2.2 Tầng Bảo mật & Giải mã URL (Security & URL Obfuscation Layer)
+Để bảo vệ quyền riêng tư tối đa cho streamer và ngăn ngừa lỗi 404 NOT FOUND trên môi trường đám mây (Vercel, Netlify):
+1. **Kiến trúc Mã hóa Một nguồn (Base64url Configuration Obfuscator)**:
+   Khi streamer cấu chỉnh diện mạo, hệ thống tập hợp toàn bộ cấu hình (bao gồm `liveChatId`, `apiKey`, `fontSize`, `theme`, v.v.) vào một đối tượng JSON. Sau đó, nó áp dụng chu trình mã hóa byte UTF-8 và chuyển đổi thành một khóa Base64 an toàn cho URL (URL-safe string / loại bỏ `+`, `/`, `=`):
+   ```
+   [JSON Settings Space] ──► [UTF-8 String Buffer] ──► [Base64 Encoded Key] ──► [URL Parameter ob=...]
+   ```
+2. **Kiến trúc Giải mã Thích ứng (Decoding Middleware & Fallback Router)**:
+   Thay vì sử dụng liên kết con `/overlay` dễ gây 404 trên các dịch vụ lưu trữ tĩnh nếu không cấu hình URL rewrite, OBS Browser Source sử dụng đường dẫn gốc `/?ob=...`. Tại trang gốc, React sẽ phát hiện sự hiện diện của tham số `ob`, tự giải mã sang JSON ban đầu và cấu hình khởi động widget overlay trong suốt ngay lập tức.
+
+### 2.3 Tầng Đồng bộ hóa Tự động Debounced (Real-Time Background Sync Layer)
+- **Tình trạng cũ**: Streamer phải bấm nút "CẬP NHẬT" thủ công để đồng bộ giao diện sang OBS.
+- **Giải pháp Kiến trúc mới**:
+  - Tích hợp một **Auto-Syncer** sử dụng cơ chế trì hoãn cuộc gọi (Debounce 500ms) tại Dashboard điều khiển. 
+  - Mỗi khi một giá trị trượt, một ô tích hay bảng màu thay đổi, hệ thống sẽ tự động gởi yêu cầu `POST /api/youtube/settings-sync` ngầm lên cache lưu trữ của Server.
+  - Phía OBS Overlay Client định kỳ gửi yêu cầu `GET` lên cache này sau mỗi 3 giây để đồng bộ giao diện hiển thị tức thời, mang lại cảm giác thiết lập mượt mà, trực quan với độ trễ cực thấp mà không làm nghẽn năng lực xử lý của trình duyệt hay máy chủ.
+
+### 2.4 Tầng Proxy API (Server Networking Layer)
 - **Công nghệ**: Node.js, Express.js.
-- **Nêu bật vai trò**:
-  - **Giữ API Key an toàn**: Phía React gửi các tham số như livestream video URL hoặc ID; server sẽ tiếp nhận và đính kèm API Key kín của người dùng để tương tác trung gian với máy chủ Google, loại bỏ hoàn toàn khả năng rò rỉ API Key lên trình duyệt client-side công khai.
-  - **Bộ nhớ Cache Cấu hình (Settings Sync Cache)**: Khởi tạo biến `cachedOverlaySettings` đóng vai trò là một điểm nút đồng bộ tập trung. Khi bảng điều khiển gửi `POST /api/youtube/settings-sync`, cấu hình CSS sẽ được lưu vào cache. OBS Browser Source định kỳ lấy (`GET`) cấu hình này về và áp dụng trực quan ngay tức khắc mà không cần streamer phải tải lại (Flickerless refresh).
+- **Nhiệm vụ**:
+  - Giáp bảo vệ API Key nhờ hoạt động thu thập trung gian. Client gửi tin nhắn qua proxy, giữ API Key ở vùng an toàn.
+  - Quản lý bộ đệm và tần suất gọi tin nhắn từ YouTube Live Chat (chu kỳ 4 giây bổ sung phân trang `nextPageToken`) để vượt qua các cơ chế giới hạn khắt khe của Google.
 
-### 2.3 Tầng Ứng dụng Máy tính (Desktop Client Native Wrapper)
+### 2.5 Tầng Ứng dụng Desktop (Desktop Wrapper)
 - **Công nghệ**: Electron.
-- **Tập tin điểm đầu**: `electron-main.cjs`.
-- **Nhiệm vụ đóng gói**:
-  - Khi ứng dụng khách nhấp đúp vào file `.exe` di động, Electron sẽ chạy đoạn mã chính để khởi tạo máy chủ phụ Express ngầm trên nền (`require("./dist/server.cjs")`).
-  - Mở một cửa sổ Chromium an toàn trỏ đến địa chỉ cục bộ `http://localhost:3000` để streamer thiết lập.
-  - Hỗ trợ xử lý mở các liên kết bên ngoài (Ví dụ: hướng dẫn lấy API Key trên Google Cloud Console) trực tiếp trên trình duyệt mặc định của hệ điều hành dạng an toàn (`shell.openExternal`).
+- **Tương tác**: Kích hoạt máy chủ Express cục bộ thông qua file bundle `/dist/server.cjs` và duy trì cửa sổ Always-On-Top với cơ chế xuyên thấu chuột (Click-through) thông minh cho streamer khi chơi game.
 
 ---
 
-## 3. Cấu trúc Thư mục Dự án
+## 3. Cấu trúc Thư mục Dự án và Định dạng Sắp xếp
 
 ```
-├── .env.example                # Khai báo biến môi trường mẫu
-├── package.json                # Quản lý dependency, scripts build và cấu hình build Electron
-├── tsconfig.json               # Cấu hình kiểm tra kiểu định nghĩa TypeScript
-├── vite.config.ts              # Cấu hình đóng gói mã nguồn React 19 tĩnh của Vite
-├── server.ts                   # Mã nguồn Backend Express xử lý luồng YouTube, API Sync & Static fallback
-├── electron-main.cjs           # File khởi chạy chính của Electron khởi động Server + Window
-├── dist/                       # Output biên dịch HTML/JS/CSS tĩnh + server.cjs (CJS format)
-│   ├── index.html
-│   ├── server.cjs              # File bundle backend bởi esbuild
-│   └── assets/
-├── dist-electron/              # Output của electron-builder chứa file chương trình .exe di động
-│   └── YouTube Chat Overlay.exe  # File ứng dụng chạy trực tiếp trên Windows
-└── src/                        # Thư mục chứa mã nguồn Client chính (Vite/React)
-    ├── main.tsx                # Điểm mồi ứng dụng React
-    ├── index.css               # Globla CSS nhúng phông chữ & Tailwind CSS v4
-    ├── types.ts                # Định nghĩa toàn bộ kiểu dữ liệu (Interfaces / Enums)
-    ├── App.tsx                 # Giao diện Dashobard điều khiển luồng chat chính
+├── .env.example                # Khai báo các biến môi trường mẫu
+├── .gitignore                  # Chỉ định tài nguyên không lưu trữ (node_modules, build artifacts)
+├── ARCHITECTURE.md             # Tài liệu Kiến trúc Hệ thống (Xem file hiện tại)
+├── CHANGELOG.md                # Nhật ký Thay đổi chi tiết qua các phiên bản
+├── SPEC.md                     # Đặc tả kỹ thuật chi tiết về cấu trúc dữ liệu và API
+├── README.md                   # Hướng dẫn cài đặt và sử dụng ứng dụng nhanh gọn
+├── package.json                # Trình quản lý dependencies và các kịch bản build/đóng gói
+├── tsconfig.json               # Quy tắc kiểm tra kiểu và biên dịch của TypeScript
+├── vite.config.ts              # Công cụ cấu hình đóng gói mã tĩnh cho React
+├── server.ts                   # Máy chủ full-stack Express xử lý API YouTube, Cache Sync & tĩnh fallback
+├── electron-main.cjs           # File khởi chạy chính của Desktop Electron
+├── dist/                       # Mã nguồn biên dịch Ready-for-Deployment
+│   ├── index.html              # Tệp cấu trúc chính phục vụ khách hàng và OBS
+│   ├── server.cjs              # File bundle backend bởi esbuild chạy độc lập
+│   └── assets/                 # Các mã nguồn JS/CSS nén tối thiểu
+└── src/                        # Thư mục mã nguồn client-side React
+    ├── main.tsx                # Khởi tạo React Virtual DOM
+    ├── index.css               # Chứa Tailwind CSS v4 và nhập phông chữ hiển thị
+    ├── types.ts                # Định nghĩa các Interfaces và Enums phục vụ kiểu dữ liệu an toàn
+    ├── App.tsx                 # Giao diện cốt lõi (Bảng điều khiển và bộ mồi Router)
     └── components/
-        ├── HelpManual.tsx      # Giao diện Hướng dẫn & cấu hình chi tiết
-        └── OverlayWidget.tsx   # Khung hiển thị Overlay tối giản dành cho OBS
+        ├── HelpManual.tsx      # Tài liệu Hướng dẫn tương tác cho streamer trên giao diện
+        └── OverlayWidget.tsx   # Widget hiển thị Khung chat trong suốt dành riêng cho OBS
 ```
 
 ---
 
-## 4. Thiết kế Xử lý Tìm kiếm Đường dẫn Tĩnh (Fallback Asset Resolver)
-Để phần mềm hoạt động trơn tru cả ở môi trường phát triển (`npm run dev`), môi trường Node.js độc lập (`npm run start`), lẫn khi đóng gói trong file nén của Electron (`.exe`), thuật toán tìm kiếm tài nguyên tĩnh được thiết kế linh hoạt trong `server.ts`:
-
-1. Ban đầu, tìm thư mục build mặc định thông qua vị trí hiện tại của Node.js: `process.cwd()/dist`.
-2. Nếu không thấy tài nguyên, server tự động kiểm tra xem biến `__dirname` của CommonJS có tồn tại không (Đặc biệt cho gói bundle server đã biên dịch sang file `/dist/server.cjs` hoặc nén trong ASAR của Electron).
-3. Đổi vị trí tìm kiếm tệp sang thư mục lân cận trực thuộc tệp thực thi chính để tải tệp `index.html` lên một cách tuyệt đối, tránh triệt để lỗi màn hình đen hoặc thông báo "Not Found" khi chạy file thực thi dán liền `.exe` di động.
+## 4. Thiết kế Fallback Asset Resolver (Khắc phục Đen màn hình OBS)
+Khi chạy file portable `.exe` đóng gói, Node.js sẽ giải nén mã ra một thư mục tạm thời khác biệt với thư mục chạy lệnh (`process.cwd()`). Máy chủ Express được tối ưu hóa để tự động chuyển vùng tìm kiếm thư mục tĩnh `/dist` sang vùng của file `__dirname` nếu không tìm thấy tệp tin HTML gốc, đảm bảo tính ổn định tối cao, triệt tiêu lỗi hiển thị đen thui hay trang trống trên ứng dụng OBS của các streamer.
