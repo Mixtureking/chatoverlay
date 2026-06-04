@@ -72,10 +72,10 @@ export default function OverlayWidget({
 
   const overlayScaleStyle = {
     fontSize: `${safeFontSize}px`,
-    transform: previewMode ? `none` : `scale(${safeScale})`,
+    transform: `scale(${safeScale})`,
     transformOrigin: "top left",
-    width: previewMode ? "100%" : `${100 / safeScale}%`,
-    height: previewMode ? "100%" : `${100 / safeScale}%`,
+    width: `${100 / safeScale}%`,
+    height: `${100 / safeScale}%`,
   };
 
   // Debounce state to avoid running customJs compiles on every single keystroke (avoid browser freezes/crashes when typing)
@@ -323,16 +323,16 @@ export default function OverlayWidget({
                   />
                 )}
                 <div>
-                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-[0.8em]">
                     <span className="truncate max-w-[120px]">
                       {sc.authorName}
                     </span>
                     <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    <span className="bg-white/20 px-1 py-0.5 rounded text-[10px]">
+                    <span className="bg-white/20 px-1 py-0.5 rounded text-[0.7em]">
                       {sc.superChatAmountText}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-tight mt-0.5 truncate max-w-[200px]">
+                  <p className="text-[0.75em] leading-tight mt-0.5 truncate max-w-[200px]">
                     {sc.messageText || "Đã donate!"}
                   </p>
                 </div>
@@ -394,18 +394,18 @@ export default function OverlayWidget({
                             referrerPolicy="no-referrer"
                           />
                         )}
-                        <span className="truncate max-w-[150px] text-sm">
+                        <span className="truncate max-w-[150px] text-[0.95em]">
                           {msg.authorName}
                         </span>
                       </div>
-                      <div className="bg-black/25 px-2 py-0.5 rounded-full text-xs font-mono font-bold tracking-wider">
+                      <div className="bg-black/25 px-2 py-0.5 rounded-full text-[0.8em] font-mono font-bold tracking-wider">
                         {msg.superChatAmountText}
                       </div>
                     </div>
 
                     {/* Comment Area */}
                     <div
-                      className={`p-2.5 text-sm font-medium ${
+                      className={`p-2.5 text-[1em] font-medium ${
                         msg.tier === 4 ? "bg-amber-100" : "bg-black/10"
                       }`}
                       style={{
@@ -441,7 +441,7 @@ export default function OverlayWidget({
                   }
                   exit={{ opacity: 0, x: 30, transition: { duration: 0.1 } }}
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  className="flex items-start gap-2 text-sm leading-relaxed p-1 shrink-0 rounded hover:bg-white/5 transition-all"
+                  className="flex items-start gap-2 text-[1em] leading-relaxed p-1 shrink-0 rounded hover:bg-white/5 transition-all"
                 >
                   {settings.showAvatar && (
                     <img
@@ -498,7 +498,7 @@ export default function OverlayWidget({
                       )}
 
                       {/* Timing label for preview context/desktop monitoring option */}
-                      <span className="text-[10px] text-gray-400 opacity-60 ml-1 font-mono">
+                      <span className="text-[0.75em] text-gray-400 opacity-60 ml-1 font-mono">
                         {new Date(msg.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -509,7 +509,7 @@ export default function OverlayWidget({
 
                     {/* Chat Bubble / Message body block */}
                     <div
-                      className="text-sm font-normal break-words whitespace-pre-wrap leading-tight"
+                      className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight"
                       style={{ color: settings.textColor }}
                     >
                       {msg.messageText}
