@@ -305,6 +305,8 @@ export default function App() {
         .then((data) => {
           if (data && data.settings) {
             setObsSettings(data.settings);
+            setSettings(data.settings);
+            setSavedSettingsBenchmark(data.settings);
           }
         })
         .catch((err) => console.error("Error fetching initial synced settings:", err));
@@ -392,6 +394,17 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
+  const [savedSettingsBenchmark, setSavedSettingsBenchmark] = useState<OverlaySettings>(() => {
+    const saved = localStorage.getItem("yt_overlay_settings");
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return DEFAULT_SETTINGS; }
+    }
+    return DEFAULT_SETTINGS;
+  });
+
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [rightSubTab, setRightSubTab] = useState<"obs" | "custom" | "logs">("obs");
+
   const [blacklist, setBlacklist] = useState<FilterKeyword[]>(() => {
     const saved = localStorage.getItem("yt_overlay_blacklist");
     if (saved) {
@@ -469,6 +482,7 @@ export default function App() {
         body: JSON.stringify({ settings }),
       });
       if (response.ok) {
+        setSavedSettingsBenchmark(settings);
         showToast("💾 Đã lưu & đồng bộ giao diện OBS thành công!");
       } else {
         showToast("⚠️ Máy chủ từ chối thiết lập. Vui lòng thử lại!");
@@ -486,7 +500,13 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings }),
-      }).catch((err) => console.log("Silent initial backend sync:", err));
+      })
+      .then((res) => {
+        if (res.ok) {
+          setSavedSettingsBenchmark(settings);
+        }
+      })
+      .catch((err) => console.log("Silent initial backend sync:", err));
     }
   }, [isOverlayRoute]);
 
@@ -967,6 +987,7 @@ export default function App() {
             if (data && data.settings) {
               setObsSettings(data.settings);
               setSettings(data.settings);
+              setSavedSettingsBenchmark(data.settings);
               // Auto delete previous message contents if they went offline
               if (data.settings.isOffline) {
                 setMessages([]);
@@ -1335,6 +1356,14 @@ export default function App() {
                       <h1 className="font-bold tracking-wider text-base text-slate-100 uppercase font-sans flex items-center gap-2">
                         <span>YOUTUBE CHAT OVERLAY</span>
                         <span className="text-[10px] py-0.5 px-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full font-mono font-semibold animate-pulse">OVERLAY PLAYGROUND</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowHelpModal(true)}
+                          className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 hover:bg-indigo-650 hover:text-white font-black border border-slate-700 hover:border-indigo-500 flex items-center justify-center cursor-pointer text-xs transition-all tracking-normal ml-1"
+                          title="Xem hướng dẫn sử dụng & phím tắt"
+                        >
+                          !
+                        </button>
                       </h1>
                       <p className="text-[11px] text-slate-400">
                         Bảng điều chỉnh và đồng bộ hóa tương tác không viền dành cho Streamer
@@ -1411,17 +1440,6 @@ export default function App() {
                       >
                         <Shield className="w-3.5 h-3.5" />
                         <span>Bộ lọc</span>
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("help")}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          activeTab === "help"
-                            ? "bg-indigo-600/15 text-indigo-300 border border-indigo-500/20 shadow-inner"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-                        }`}
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                        <span>Hướng dẫn</span>
                       </button>
                     </div>
 
@@ -1560,20 +1578,6 @@ export default function App() {
                           </div>
 
                           <div className="space-y-4">
-                            {/* Sync Action Button */}
-                            <div className="bg-indigo-600/5 border border-indigo-500/25 p-3.5 rounded-xl space-y-2.5">
-                              <p className="text-[10px] text-slate-450 leading-normal">
-                                Lưu trữ các thay đổi này và cập nhật trực tiếp lên các nguồn OBS Browser Source đang hoạt động ngay lập tức!
-                              </p>
-                              <button
-                                onClick={syncSettingsWithObs}
-                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-550 text-white text-[11px] font-bold rounded-lg transition-all shadow-[0_0_15px_rgba(99,102,241,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Save className="w-3.5 h-3.5" />
-                                <span>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</span>
-                              </button>
-                            </div>
-
                             {/* Fonts family select */}
                             <div className="space-y-1.5">
                               <label className="text-[10px] text-slate-400 block font-semibold uppercase">Kiểu phông chữ (Fonts):</label>
@@ -1876,41 +1880,6 @@ export default function App() {
                         </div>
                       )}
 
-                      {activeTab === "help" && (
-                        <div className="space-y-4">
-                          <div className="text-xs font-bold text-indigo-300 border-b border-slate-850 pb-1.5 uppercase shrink-0">
-                            📖 Hướng dẫn cấu hình & Phím tắt máy tính
-                          </div>
-
-                          <div className="space-y-4 text-xs text-slate-300 leading-relaxed font-sans">
-                            <div className="p-3.5 bg-indigo-500/5 border border-indigo-500/20 rounded-xl space-y-2 text-indigo-300 shadow-inner">
-                              <div className="font-bold text-slate-200 flex items-center gap-1">
-                                <Keyboard className="w-4 h-4 inline text-indigo-405" />
-                                <span>PHÍM TẮT ĐIỀU KHIỂN TOÀN CỤC</span>
-                              </div>
-                              <div className="leading-snug space-y-1 font-sans">
-                                <div>• <kbd className="bg-slate-900 px-1 py-0.5 rounded border border-slate-750 text-indigo-400 font-mono font-bold">Ctrl + Alt + O</kbd> : Khóa / Mở khóa tương tác chuột đè lên game (Click-Through) toàn hệ thống.</div>
-                                <div>• <kbd className="bg-slate-900 px-1 py-0.5 rounded border border-slate-750 text-indigo-400 font-mono font-bold">Ctrl + Shift + C</kbd> : Ẩn / Hiện tức thời khung chat đang có trên màn hình.</div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <h5 className="font-bold text-slate-100 text-xs">Phát Game Toàn màn hình viền (Borderless):</h5>
-                              <p className="text-[11px] text-slate-400">
-                                Hãy chuyển cài đặt hiển thị game của bạn từ "Fullscreen" sang "Borderless Window" / "Cửa sổ không viền". Điều này giúp game hoạt động đồng thời với các cửa sổ trong suốt Always-on-top siêu mượt mà không bao giờ bị dán khuất.
-                              </p>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <h5 className="font-bold text-slate-100 text-xs">Căn chỉnh vị trí & Kích cỡ:</h5>
-                              <p className="text-[11px] text-slate-400">
-                                Khi khung chat được mở khóa, bạn hoàn toàn có thể nhấn giữ thanh tiêu đề "📍 Nhấn Giữ & Kéo Ở Đây..." để định vị trí bất kỳ góc nào trên máy tính, kéo rộng/hẹp tùy ý. Khi đã chuẩn vị trí, nhấn phím khóa để không can thiệp trải nghiệm click chuột chơi game.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
                     </div>
                   </div>
 
@@ -2049,6 +2018,19 @@ export default function App() {
 
                 </div>
 
+                {JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
+                  <div className="absolute bottom-6 right-6 z-55 animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={syncSettingsWithObs}
+                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] text-white font-extrabold py-3.5 px-6 rounded-2xl text-[11px] uppercase tracking-wider flex items-center justify-center gap-2.5 cursor-pointer border border-emerald-400/20 shadow-[0_4px_20px_rgba(16,185,129,0.35)] transition-all"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</span>
+                    </button>
+                  </div>
+                )}
+
               </div>
             </div>
           )}
@@ -2142,7 +2124,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="text-[10px] text-amber-305 font-medium leading-tight bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg flex items-start gap-1.5">
+              <div className="text-[10px] text-amber-350 font-medium leading-tight bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg flex items-start gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>Khi vào game, bấm <b>Khóa Click-Through</b> bên trên hoặc nhấn <b>Ctrl + Alt + O</b> để ẩn hoàn toàn khung viền tương tác.</span>
               </div>
@@ -2184,8 +2166,16 @@ export default function App() {
             <Tv className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold tracking-tight text-base text-slate-100 uppercase font-grotesk">
-              YouTube Chat Overlay
+            <h1 className="font-bold tracking-tight text-base text-slate-100 uppercase font-grotesk flex items-center gap-2">
+              <span>YouTube Chat Overlay</span>
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(true)}
+                className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 hover:bg-indigo-650 hover:text-white font-black border border-slate-700 hover:border-indigo-500 flex items-center justify-center cursor-pointer text-xs transition-all tracking-normal"
+                title="Xem hướng dẫn sử dụng & phím tắt"
+              >
+                !
+              </button>
             </h1>
             <p className="text-[11px] text-slate-400">
               Công cụ quản lý, tùy chỉnh bộ khung chat trong suốt gắn OBS Livestream
@@ -2223,7 +2213,7 @@ export default function App() {
 
       {/* Main split grid panel space */}
       <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5">
-        {/* LEFT COLUMN: CONTROL SUITE BOARD */}
+        {/* LEFT COLUMN: CONTROL SU BOARD */}
         <div className="col-span-1 lg:col-span-2 bg-slate-900/45 border-r border-slate-800/80 flex flex-col overflow-hidden">
           {/* Internal quick action tab buttons links */}
           <div className="flex bg-slate-900 border-b border-slate-800 shrink-0 p-1">
@@ -2259,17 +2249,6 @@ export default function App() {
             >
               <Shield className="w-3.5 h-3.5" />
               <span>Bộ lọc</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("help")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "help"
-                  ? "bg-slate-800 text-indigo-400 shadow-inner"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-              }`}
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>Hướng dẫn</span>
             </button>
           </div>
 
@@ -2536,135 +2515,6 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-
-                <hr className="border-slate-800" />
-
-                {/* PROFILE CONFIG STORAGE & OBS URL BOX */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-indigo-400" />
-                      <span>OBS Browser Source Generator</span>
-                    </h3>
-                    
-                    {isObsGeneratorRevealed && (
-                      <button
-                        type="button"
-                        onClick={() => setIsObsGeneratorRevealed(false)}
-                        className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-[10px] font-bold px-2 py-0.5 rounded transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
-                      >
-                        <EyeOff className="w-3 h-3" />
-                        <span>Che bảo mật</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {!isObsGeneratorRevealed ? (
-                    <div className="relative overflow-hidden rounded-xl border border-dashed border-red-500/20 bg-slate-900/40 p-5 mt-2 transition-all">
-                      <div className="flex flex-col items-center justify-center text-center py-3">
-                        <EyeOff className="w-8 h-8 text-rose-500 mb-2 animate-pulse" />
-                        <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider text-rose-400">
-                          OBS Generator ĐÃ BỊ CHE BẢO MẬT
-                        </h4>
-                        <p className="text-[11px] text-slate-400 max-w-[280px] mt-1.5 mb-4 leading-normal">
-                          Tránh vô tình để lộ Link OBS chứa API Key và ID livestream cá nhân của bạn khi đang trực tiếp.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setIsObsGeneratorRevealed(true)}
-                          className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[11px] font-bold px-4 py-2 rounded-lg transition-all border border-indigo-500/30 cursor-pointer shadow-lg flex items-center gap-1.5"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Hiển thị Link OBS</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-xs text-slate-400 leading-normal">
-                        Sau khi dán link vào nguồn Trình duyệt (Browser Source) trên OBS Studio, bạn không cần phải đổi link hay dán lại nữa.
-                      </p>
-
-                      <div className="bg-emerald-950/20 border border-emerald-500/25 p-2.5 rounded-xl text-[11px] text-emerald-400 leading-normal flex items-start gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>
-                          <strong>Tính năng Đồng Bộ Sống:</strong> Bạn chỉ cần gắn link này vào OBS một lần. Mỗi khi tùy chỉnh màu sắc/cỡ chữ ở tab bên, chỉ cần nhấn nút <strong>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</strong>, giao diện trên stream sẽ thay đổi ngay lập tức!
-                        </span>
-                      </div>
-
-                      <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2 flex flex-col">
-                        <div className="font-mono text-[10px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[120px] overflow-y-auto">
-                          {compileObsLink()}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyObsLink}
-                          className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Sao chép Link OBS Overlay</span>
-                        </button>
-                      </div>
-
-                      {/* Config upload and export panels (US-11, T3-03, T3-04) */}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleExportConfig}
-                          className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Xuất File Cấu Hình</span>
-                        </button>
-                        
-                        <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Nhập File Cấu Hình</span>
-                          <input
-                            type="file"
-                            accept=".json"
-                            onChange={handleImportConfig}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Dedicated Streamer Screen Widget Launcher (Special UX Request) */}
-                  <div className="space-y-3 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80 mt-4">
-                    <h4 className="text-xs font-bold text-indigo-400 tracking-wide uppercase flex items-center gap-1.5">
-                      <Tv className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Hiển thị trên màn hình của Streamer</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-400 leading-normal">
-                      Nếu bạn muốn tự nhìn thấy chat overlay này đè lên game hoặc màn hình chính khi đang chơi game/stream mà không cần mở OBS:
-                    </p>
-                    
-                    <div className="flex flex-col gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={togglePipMode}
-                        className="w-full bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-indigo-500/50 font-bold py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
-                      >
-                        <PictureInPicture className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
-                        <span>Mở Cửa sổ nổi Always-On-Top (PiP Overlay)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleOpenPopoutWindow}
-                        className="w-full bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-indigo-500/50 font-bold py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                        <span>Tách khung Chat Popout rời (Màn hình phụ)</span>
-                      </button>
-                    </div>
-                    <span className="text-[9px] text-slate-500 italic block mt-1 leading-normal">
-                      * Chức năng Always-On-Top PiP cho phép ghim trực tiếp khung chat trong suốt nổi bên trên game của bạn (yêu cầu Chromium như Chrome/Edge/Cốc Cốc).
-                    </span>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -2676,29 +2526,6 @@ export default function App() {
                     <Sliders className="w-4 h-4 text-indigo-400" />
                     <span>Tùy chỉnh Giao diện Overlay</span>
                   </h3>
-                </div>
-
-                {/* REAL-TIME HOT SYNC CONTROLLER BOARD (User Feature Request) */}
-                <div className="bg-indigo-950/40 border border-indigo-500/35 p-4 rounded-xl flex flex-col gap-3 shadow-lg shadow-indigo-950/40 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
-                  <div className="flex items-start gap-2.5">
-                    <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-pulse" />
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-100 tracking-wide">Đồng bộ OBS tức thì</h4>
-                      <p className="text-[11.5px] text-slate-300 leading-normal font-medium">
-                        Khi chỉnh sửa giao diện bên dưới, hãy nhấn nút này để cập nhật trực tiếp trong OBS Browser Source mà không cần đổi hay dán lại link!
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={syncSettingsWithObs}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-md shadow-indigo-950/80 border border-indigo-400/20"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span className="uppercase tracking-wider">LƯU THIẾT LẬP & ĐỒNG BỘ OBS</span>
-                  </button>
                 </div>
 
                 {/* Typography specs */}
@@ -2933,76 +2760,6 @@ export default function App() {
                     </select>
                   </div>
                 </div>
-
-                {/* Custom Code Customization Deck */}
-                <div className="space-y-4 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                      <Code className="w-4 h-4 text-indigo-400 shrink-0" />
-                      <span className="text-xs uppercase tracking-wider">Tự Thiết Kế Layout (Custom Code)</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.useCustomCode || false}
-                        onChange={(e) => updateSettings({ useCustomCode: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-605"></div>
-                      <span className="ml-2 text-xs font-bold text-slate-300">Bật</span>
-                    </label>
-                  </div>
-
-                  {settings.useCustomCode && (
-                    <div className="space-y-4 animate-in fade-in duration-200">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code HTML:</label>
-                        <textarea
-                          rows={6}
-                          value={settings.customHtml || ""}
-                          onChange={(e) => updateSettings({ customHtml: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y"
-                          placeholder="Nhập thẻ HTML để chứa dòng chat..."
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code CSS:</label>
-                        <textarea
-                          rows={8}
-                          value={settings.customCss || ""}
-                          onChange={(e) => updateSettings({ customCss: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y"
-                          placeholder="Kiểu dáng CSS của bạn..."
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code JavaScript (ES5/ES6):</label>
-                        <textarea
-                          rows={8}
-                          value={settings.customJs || ""}
-                          onChange={(e) => updateSettings({ customJs: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-555 custom-scrollbar resize-y"
-                          placeholder="Mã kịch bản JavaScript đồng bộ..."
-                        />
-                      </div>
-
-                      <div className="p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-xl text-[11px] text-indigo-300 space-y-1.5 leading-relaxed">
-                        <div className="font-bold flex items-center gap-1">
-                          <Info className="w-3.5 h-3.5 shrink-0" />
-                          <span>HƯỚNG DẪN VIẾT CUSTOM OVERLAY CODE</span>
-                        </div>
-                        <p>
-                          * Event <b>onChatUpdate</b> sẽ liên tục được kích hoạt trên <i>window</i> khi có tin nhắn mới.
-                        </p>
-                        <p>
-                          * Nhận danh sách tin nhắn chat thông qua <b>e.detail</b> và render ra giao diện của riêng bạn một cách tự do. Viết CSS và JavaScript mẫu được nạp sẵn cực kỳ dễ tùy biến!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -3113,14 +2870,14 @@ export default function App() {
         </div>
 
         {/* RIGHT COLUMN: HIGH-FIDELITY LIVE MONITOR DEVICE PREVIEW (US-02, Drag & Resize specs) */}
-        <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col justify-between overflow-hidden gap-4">
+        <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar max-h-[calc(100vh-100px)] lg:max-h-none">
           <div className="flex items-center justify-between shrink-0 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
             <div className="flex items-center gap-2">
               <Layout className="w-4 h-4 text-indigo-400" />
               <div>
                 <h3 className="text-xs font-bold text-slate-100">Cửa sổ màn hình xem trước Overlay (Live Setup Preview)</h3>
                 <p className="text-[10px] text-slate-400">
-                  Dùng chuột kéo thả tiêu đề để di chuyển, kéo cạnh góc phải để thay đổi kích thước. Phím ẩn nhanh: <kbd className="font-mono bg-slate-800 px-1 rounded text-[9px] border border-slate-700 text-slate-300">Ctrl+Shift+C</kbd>
+                  Kéo tiêu đề để di chuyển, kéo cạnh góc phải để chỉnh kích thước. Phím ẩn nhanh: <kbd className="font-mono bg-slate-800 px-1 rounded text-[9px] border border-slate-700 text-slate-300">Ctrl+Shift+C</kbd>
                 </p>
               </div>
             </div>
@@ -3131,7 +2888,7 @@ export default function App() {
               <select
                 value={backdropTheme}
                 onChange={(e) => setBackdropTheme(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-300 focus:outline-none"
+                className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-300 focus:outline-none cursor-pointer"
               >
                 <option value="game-backdrop-valo">🎮 Valorant Match</option>
                 <option value="game-backdrop-csgo">🔫 CS:GO Combat</option>
@@ -3144,7 +2901,7 @@ export default function App() {
           {/* VIRTUAL MONITOR BOUND SCREEN CONTAINER */}
           <div
             ref={viewportRef}
-            className={`flex-1 relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end min-h-[350px]`}
+            className={`relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end h-[240px] shrink-0`}
           >
             {/* Draggable & Resizable overlay frame */}
             {isOverlayVisible ? (
@@ -3173,7 +2930,7 @@ export default function App() {
                 </div>
 
                 {/* Inner actual Overlay Widget block */}
-                <div className="w-full h-[calc(100%-28px)] relative">
+                <div className="w-full h-[calc(100%-28px)] relative animate-in fade-in duration-300">
                   <OverlayWidget messages={messages} settings={settings} previewMode={true} />
 
                   {/* High fidelity diagonal resize handle point (Sprint 2 UX, AC-13) */}
@@ -3216,46 +2973,291 @@ export default function App() {
             </div>
           </div>
 
-          {/* CHAT MONITOR LOGGER SHEET (Sprint 1 DoD item, monitoring real feeds chronologically) */}
-          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-2 h-40 shrink-0">
-            <div className="flex items-center justify-between shrink-0">
-              <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wide flex items-center gap-1">
-                <Keyboard className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Nhật ký luồng Chat trực tiếp (Live Logs Monitor: {messages.length})</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setMessages([]);
-                  messagesSetRef.current.clear();
-                  showToast("🧹 Đã dọn sạch lịch sử dòng chat!");
-                }}
-                className="text-[10px] text-slate-500 hover:text-red-400 flex items-center gap-1 transition-all"
-              >
-                Clear log
-              </button>
-            </div>
+          {/* COMPACTED LOWER SECTION TABS SWITCHER (OBS browser link + Custom CSS/JS + Logs Side-by-side) */}
+          <div className="flex bg-slate-900 border border-slate-800/80 rounded-xl p-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setRightSubTab("obs")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rightSubTab === "obs"
+                  ? "bg-indigo-650 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/55"
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Kết nối OBS Source</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightSubTab("custom")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rightSubTab === "custom"
+                  ? "bg-indigo-650 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/55"
+              }`}
+            >
+              <Code className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Custom Layout (Code)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightSubTab("logs")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rightSubTab === "logs"
+                  ? "bg-indigo-650 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/55"
+              }`}
+            >
+              <Keyboard className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Nhật ký luồng Chat ({messages.length})</span>
+            </button>
+          </div>
 
-            {/* Raw chronologic scrolling list */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] text-slate-400 space-y-1 pl-1 bg-slate-950 p-2 rounded-lg border border-slate-900">
-              {messages.length === 0 ? (
-                <div className="text-slate-600 italic py-2">Dòng chat trống. Nhấp Giả lập chat ở cột bên trái để nạp tin nhắn thử nghiệm...</div>
-              ) : (
-                messages.map((m) => (
-                  <div key={`log-${m.id}`} className="truncate hover:text-slate-100 transition-colors">
-                    <span className="text-indigo-400">[{new Date(m.timestamp).toLocaleTimeString()}]</span>{" "}
-                    <span className="font-bold text-slate-300">{m.authorName}</span>:{" "}
-                    {m.isSuperChat ? (
-                      <span className="bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-bold">
-                        [DONATE {m.superChatAmountText}] {m.messageText}
-                      </span>
-                    ) : (
-                      <span>{m.messageText}</span>
-                    )}
+          {/* SUB-TAB CONTENTS CARD */}
+          <div className="space-y-4">
+            {rightSubTab === "obs" && (
+              <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/60 space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-indigo-400" />
+                    <span>Lấy Link hiển thị Browser Source</span>
+                  </h3>
+                  {isObsGeneratorRevealed && (
+                    <button
+                      type="button"
+                      onClick={() => setIsObsGeneratorRevealed(false)}
+                      className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-[10px] font-bold px-2 py-0.5 rounded transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
+                    >
+                      <EyeOff className="w-3 h-3" />
+                      <span>Che bảo mật</span>
+                    </button>
+                  )}
+                </div>
+
+                {!isObsGeneratorRevealed ? (
+                  <div className="relative overflow-hidden rounded-xl border border-dashed border-red-500/20 bg-slate-950 p-5 transition-all">
+                    <div className="flex flex-col items-center justify-center text-center py-2">
+                      <EyeOff className="w-8 h-8 text-rose-500 mb-2 animate-pulse" />
+                      <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider text-rose-400">
+                        OBS Generator ĐÃ BỊ CHE BẢO MẬT
+                      </h4>
+                      <p className="text-[10.5px] text-slate-400 max-w-[280px] mt-1 mb-4 leading-normal">
+                        Tránh vô tình để lộ Link OBS chứa API Key và ID livestream cá nhân của bạn khi đang trực tiếp.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsObsGeneratorRevealed(true)}
+                        className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[11px] font-bold px-4 py-2 rounded-lg transition-all border border-indigo-500/30 cursor-pointer shadow-lg flex items-center gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Hiển thị Link OBS</span>
+                      </button>
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Sau khi dán link vào nguồn Trình duyệt (Browser Source) trên OBS Studio, bạn không cần phải đổi link hay dán lại nữa.
+                    </p>
+
+                    <div className="bg-emerald-950/20 border border-emerald-500/25 p-3 rounded-xl text-[10.5px] text-emerald-400 leading-normal flex items-start gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Tính năng Đồng Bộ Sống:</strong> Mỗi khi tùy chỉnh hoặc thiết lập thêm từ khóa lọc, cấu hình của bạn sẽ tự động truyền đến OBS tức thì sau khi bấm <strong>LƯU THIẾT LẬP & ĐỒNG BỘ OBS</strong> ở góc phải dưới!
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
+                      <div className="font-mono text-[10.5px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
+                        {compileObsLink()}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyObsLink}
+                        className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Sao chép Link OBS Overlay</span>
+                      </button>
+                    </div>
+
+                    {/* Export/Import profiles */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleExportConfig}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Xuất File Cấu Hình</span>
+                      </button>
+                      
+                      <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 font-bold py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Nhập File Cấu Hình</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleImportConfig}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Picture in picture widgets */}
+                <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-3">
+                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <Tv className="w-3.5 h-3.5" />
+                    <span>Tiện ích đè màn hình game (Streamer Display Overlay)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 leading-normal">
+                    Nếu bạn muốn tự nhìn thấy chat overlay này đè nổi lên game hoặc màn hình chính khi đang chơi game/stream mà không cần mở OBS:
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={togglePipMode}
+                      className="flex-1 bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-indigo-500/50 font-bold py-2 px-3 rounded-lg text-[11px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+                    >
+                      <PictureInPicture className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                      <span>Mở Cửa sổ nổi Always-On-Top (PiP Overlay)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenPopoutWindow}
+                      className="flex-1 bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-indigo-500/50 font-bold py-2 px-3 rounded-lg text-[11px] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <span>Tách khung Chat Popout rời</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CUSTOM CODE OVERLAY EDITOR PANEL */}
+            {rightSubTab === "custom" && (
+              <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/60 space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                    <Code className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span className="text-xs uppercase tracking-wider">Tự Thiết Kế Layout (Custom Overlay)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.useCustomCode || false}
+                      onChange={(e) => updateSettings({ useCustomCode: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-300">Bật</span>
+                  </label>
+                </div>
+
+                {settings.useCustomCode ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code HTML:</label>
+                      <textarea
+                        rows={4}
+                        value={settings.customHtml || ""}
+                        onChange={(e) => updateSettings({ customHtml: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y max-h-[140px] overflow-y-auto block"
+                        placeholder="Nhập thẻ HTML để chứa dòng chat..."
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code CSS:</label>
+                      <textarea
+                        rows={6}
+                        value={settings.customCss || ""}
+                        onChange={(e) => updateSettings({ customCss: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y max-h-[180px] overflow-y-auto block"
+                        placeholder="Kiểu dáng CSS của bạn..."
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-slate-400 font-semibold block">Tự thêm code JavaScript (ES5/ES6):</label>
+                      <textarea
+                        rows={6}
+                        value={settings.customJs || ""}
+                        onChange={(e) => updateSettings({ customJs: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-805 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y max-h-[180px] overflow-y-auto block"
+                        placeholder="Mã kịch bản JavaScript đồng bộ..."
+                      />
+                    </div>
+
+                    <div className="p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-xl text-[11px] text-indigo-300 space-y-1.5 leading-relaxed">
+                      <div className="font-bold flex items-center gap-1">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span>HƯỚNG DẪN VIẾT CUSTOM OVERLAY CODE</span>
+                      </div>
+                      <p>
+                        * Event <b>onChatUpdate</b> sẽ liên tục được kích hoạt trên <i>window</i> khi có tin nhắn mới.
+                      </p>
+                      <p>
+                        * Nhận danh sách tin nhắn chat thông qua <b>e.detail</b> và render ra giao diện của riêng bạn một cách tự do. Viết CSS và JavaScript mẫu được nạp sẵn cực kỳ dễ tùy biến!
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-955 p-6 rounded-xl border border-dashed border-slate-800 text-center text-slate-400 text-xs">
+                    Hãy bật công tắc kích hoạt ở góc phải phía trên để tự viết HTML/CSS/JS mẫu và tự do thiết kế phong cách của riêng bạn.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CHAT MONITOR LOGGER SHEET PANEL */}
+            {rightSubTab === "logs" && (
+              <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/60 flex flex-col gap-2 h-80 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between shrink-0">
+                  <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wide flex items-center gap-1">
+                    <Keyboard className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Nhật ký luồng Chat trực tiếp (Live Logs: {messages.length})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessages([]);
+                      messagesSetRef.current.clear();
+                      showToast("🧹 Đã dọn sạch lịch sử dòng chat!");
+                    }}
+                    className="text-[10px] text-slate-500 hover:text-red-400 flex items-center gap-1 transition-all cursor-pointer"
+                  >
+                    Clear log
+                  </button>
+                </div>
+
+                {/* Raw chronologic scrolling list */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] text-slate-400 space-y-1 pl-1 bg-slate-950 p-2 rounded-lg border border-slate-900">
+                  {messages.length === 0 ? (
+                    <div className="text-slate-600 italic py-2">Dòng chat trống. Nhấp Giả lập chat ở cột bên trái để nạp tin nhắn thử nghiệm...</div>
+                  ) : (
+                    messages.map((m) => (
+                      <div key={`log-${m.id}`} className="truncate hover:text-slate-100 transition-colors py-0.5">
+                        <span className="text-indigo-400">[{new Date(m.timestamp).toLocaleTimeString()}]</span>{" "}
+                        <span className="font-bold text-slate-300">{m.authorName}</span>:{" "}
+                        {m.isSuperChat ? (
+                          <span className="bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-bold">
+                            [DONATE {m.superChatAmountText}] {m.messageText}
+                          </span>
+                        ) : (
+                          <span>{m.messageText}</span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

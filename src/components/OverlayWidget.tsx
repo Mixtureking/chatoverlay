@@ -70,13 +70,25 @@ export default function OverlayWidget({
   const safeFontSize = typeof settings.fontSize === "number" && !isNaN(settings.fontSize) && settings.fontSize > 0 ? settings.fontSize : 15;
   const safeBgOpacity = typeof settings.bgOpacity === "number" && !isNaN(settings.bgOpacity) ? settings.bgOpacity : 0.85;
 
-  const overlayScaleStyle = {
-    fontSize: `${safeFontSize}px`,
-    transform: `scale(${safeScale})`,
-    transformOrigin: "top left",
-    width: `${100 / safeScale}%`,
-    height: `${100 / safeScale}%`,
-  };
+  // We detect if CSS 'zoom' is natively supported. If it is, we prefer it as it scales fonts, paddings, and bounds naturally 
+  // without triggering flex containment/overflow bugs or dividing coordinates by the scale value.
+  const isZoomSupported = typeof document !== "undefined" && typeof document.documentElement !== "undefined" && "zoom" in document.documentElement.style;
+
+  const overlayScaleStyle = isZoomSupported
+    ? {
+        fontSize: `${safeFontSize}px`,
+        zoom: safeScale,
+        WebkitZoom: safeScale,
+        width: "100%",
+        height: "100%",
+      }
+    : {
+        fontSize: `${safeFontSize}px`,
+        transform: `scale(${safeScale})`,
+        transformOrigin: "top left",
+        width: `${100 / safeScale}%`,
+        height: `${100 / safeScale}%`,
+      };
 
   // Debounce state to avoid running customJs compiles on every single keystroke (avoid browser freezes/crashes when typing)
   const [debouncedCustomJs, setDebouncedCustomJs] = useState(settings.customJs || "");
