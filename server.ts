@@ -6,7 +6,13 @@ import fs from "fs";
 // Helper to log errors & transactions to console for runtime inspection
 function logToFile(message: string) {
   const timestamp = new Date().toISOString();
-  console.log(`[LOGGER][${timestamp}] ${message}`);
+  const logLine = `[LOGGER][${timestamp}] ${message}\n`;
+  console.log(logLine.trim());
+  try {
+    fs.appendFileSync(path.join(process.cwd(), "server_logs.txt"), logLine, "utf8");
+  } catch (err) {
+    // Ignore log-writing errors to prevent crash loop
+  }
 }
 
 // Ensure DNS resolution works correctly in sandboxed environments
@@ -60,24 +66,24 @@ function extractVideoId(input: string): string {
 
 // API Route 1: Get Active Live Chat ID & Broadcast Info from Video ID
 app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id", "/live-chat-id", "*/live-chat-id"], async (req, res): Promise<any> => {
-  const { videoUrlOrId, apiKey } = req.body;
-
-  logToFile(`Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "${videoUrlOrId}", API Key ẩn: "${apiKey ? apiKey.substring(0, 6) + '...' : 'Không có'}"`);
-
-  if (!videoUrlOrId) {
-    logToFile("Lỗi: Thiếu thông tin Video URL hoặc ID");
-    return res.status(400).json({ error: "Thiếu thông tin Video URL hoặc ID" });
-  }
-
-  if (!apiKey) {
-    logToFile("Lỗi: Thiếu YouTube API Key");
-    return res.status(400).json({ error: "Thiếu YouTube API Key" });
-  }
-
-  const videoId = extractVideoId(videoUrlOrId);
-  logToFile(`Trích xuất thành công Video ID: "${videoId}"`);
-
   try {
+    const { videoUrlOrId, apiKey } = req.body || {};
+
+    logToFile(`Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "${videoUrlOrId}", API Key ẩn: "${apiKey && typeof apiKey === 'string' ? apiKey.substring(0, 6) + '...' : 'Không có'}"`);
+
+    if (!videoUrlOrId) {
+      logToFile("Lỗi: Thiếu thông tin Video URL hoặc ID");
+      return res.status(400).json({ error: "Thiếu thông tin Video URL hoặc ID" });
+    }
+
+    if (!apiKey) {
+      logToFile("Lỗi: Thiếu YouTube API Key");
+      return res.status(400).json({ error: "Thiếu YouTube API Key" });
+    }
+
+    const videoId = extractVideoId(videoUrlOrId);
+    logToFile(`Trích xuất thành công Video ID: "${videoId}"`);
+
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,snippet&id=${videoId}&key=${apiKey}`;
     logToFile(`Bắt đầu fetch Google API: ${url.replace(apiKey, "HIDDEN")}`);
     const response = await fetch(url);
@@ -133,14 +139,13 @@ app.post(["/api/youtube/live-chat-id", "/youtube/live-chat-id", "/live-chat-id",
 });
 
 // API Route 2: Fetch Live Chat Messages and Stream Details
-app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res): Promise<any> => {
-  const { liveChatId, apiKey, pageToken } = req.query;
-
-  if (!liveChatId || !apiKey) {
-    return res.status(400).json({ error: "Thiếu tham số liveChatId hoặc apiKey" });
-  }
-
+app.get(["/api/youtube/messages", "/youtube/messages"], async (req, res): Promise<any> => {
   try {
+    const { liveChatId, apiKey, pageToken } = req.query || {};
+
+    if (!liveChatId || !apiKey) {
+      return res.status(400).json({ error: "Thiếu tham số liveChatId hoặc apiKey" });
+    }
     let url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=snippet,authorDetails&key=${apiKey}&maxResults=100`;
     if (pageToken) {
       url += `&pageToken=${pageToken}`;
@@ -230,14 +235,13 @@ app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"
 });
 
 // API Route 3: Fetch view count / info in parallel
-app.get(["/api/youtube/viewers", "/youtube/viewers", "/viewers", "*/viewers"], async (req, res): Promise<any> => {
-  const { videoId, apiKey } = req.query;
-
-  if (!videoId || !apiKey) {
-    return res.status(400).json({ error: "Thiếu Video ID hoặc API Key" });
-  }
-
+app.get(["/api/youtube/viewers", "/youtube/viewers"], async (req, res): Promise<any> => {
   try {
+    const { videoId, apiKey } = req.query || {};
+
+    if (!videoId || !apiKey) {
+      return res.status(400).json({ error: "Thiếu Video ID hoặc API Key" });
+    }
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}&key=${apiKey}`;
     const response = await fetch(url);
     if (!response.ok) {
@@ -258,17 +262,25 @@ app.get(["/api/youtube/viewers", "/youtube/viewers", "/viewers", "*/viewers"], a
 // Server-side settings cache to allow OBS and popouts to stay automatically in sync with the streamer control panel
 let cachedOverlaySettings: any = null;
 
-app.post(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync", "*/settings-sync"], (req, res) => {
-  const { settings } = req.body;
-  if (settings) {
-    cachedOverlaySettings = settings;
-    return res.json({ success: true, settings: cachedOverlaySettings });
+app.post(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
+  try {
+    const { settings } = req.body || {};
+    if (settings) {
+      cachedOverlaySettings = settings;
+      return res.json({ success: true, settings: cachedOverlaySettings });
+    }
+    res.status(400).json({ error: "Missing settings payload" });
+  } catch (error: any) {
+    res.status(500).json({ error: `Lỗi đồng bộ cấu hình: ${error.message}` });
   }
-  res.status(400).json({ error: "Missing settings payload" });
 });
 
-app.get(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync", "*/settings-sync"], (req, res) => {
-  res.json({ settings: cachedOverlaySettings });
+app.get(["/api/youtube/settings-sync", "/youtube/settings-sync"], (req, res) => {
+  try {
+    res.json({ settings: cachedOverlaySettings });
+  } catch (error: any) {
+    res.status(500).json({ error: `Lỗi đồng bộ cấu hình: ${error.message}` });
+  }
 });
 
 // APIs bridging requests to Electron Main Process for Discord-style always on top overlay
