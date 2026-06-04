@@ -4,7 +4,7 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
-## [1.0.3] - 2026-06-04
+## [1.0.2] - 2026-06-04
 
 ### 🚀 Tính năng mới & Bổ sung nổi bật (New Additions)
 - **Hình nền khung chat tùy biến (Background Images)**: Thêm khả năng cá nhân hóa hoàn toàn phông nền chatbox với 4 nguồn ảnh thông minh: họa tiết lưới/mưa chấm nhẹ, các dải màu gradient dốc sống động, liên kết URL hình ảnh ngoài hoặc tệp hình ảnh tải lên trực tiếp từ bộ nhớ máy tính. Streamer cũng có thể tinh chỉnh thanh trượt độ trong suốt (Opacity) và độ nhòe (Blur) để giữ nguyên độ tương phản dễ đọc cho chữ viết chat.
@@ -15,17 +15,16 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 - **Sửa lỗi Trắng màn hình do tràn bộ nhớ (QuotaExceeded error & Payload Limits)**: Sửa triệt để lỗi trắng màn hình (cột lỗi sập trang) mỗi khi đăng tải tệp tin âm thanh thông báo hoặc hình nền dung lượng lớn. Nguyên nhân đến từ việc tệp Base64 kích thước lớn vượt quá hạn mức 5MB khắt khe của LocalStorage. Hệ thống đã được nâng cấp lưu trữ Base64 hoàn toàn vào IndexedDB không giới hạn dung lượng, đồng thời nới rộng giới hạn phân tích dữ liệu Express Server lên 15MB, bảo đảm hoạt động thông suốt không bao giờ sập.
 - **Khử trùng lặp chuông & Giới hạn phát thử 5 giây**: Sửa lỗi nhạc chuông phát dài vô tận khi nghe thử bằng cách áp đặt cơ chế giới hạn phát tối đa 5 giây đầu tiên. Đồng thời, mỗi khi bấm phím nghe thử mới, hệ thống sẽ tự động dập tắt hoặc dừng ngay luồng âm của lần phát trước đó, chấm dứt hoàn toàn tình trạng chồng đè hỗn tạp tiếng chuông gây khó chịu cho tai người nghe.
 
----
+## [1.0.1] - 2026-06-03
 
-## [1.0.2] - 2026-06-03
+### 🚀 Triển khai & Phát hành (Deploy App)
+- **Triển khai ứng dụng lên môi trường điện toán đám mây**: Cấu hình hoàn chỉnh sản phẩm và phát hành phiên bản web tối ưu hóa tốc độ, sẵn sàng tích hợp thẳng vào nguồn trình duyệt (Browser Source) của OBS Studio.
 
 ### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
 - **Cơ chế ghim màn hình Always-On-Top đỉnh cao**: Đưa mức độ ưu tiên ghim của cửa sổ lên cấp độ `"screen-saver"` của Electron kết hợp với việc hiển thị trên mọi Workspace ảo. Giờ đây, overlay sẽ luôn nổi lên trên tất cả ứng dụng khác, kể cả các tựa game đồ họa DirectX/OpenGL hạng nặng chạy ở chế độ toàn màn hình không viền (như *Genshin Impact*), loại bỏ hoàn toàn hiện tượng bị game ẩn hoặc đè lên khi đang chơi.
 - **Cơ chế chống mất focus**: Tích hợp sự kiện xử lý `blur` trên Electron Main process để lập tức khôi phục trạng thái ghim Always-on-Top kể cả khi game giành quyền kiểm soát thiết bị.
 - **Launcher Atom cố định và tối ưu click-through thích ứng**: Nút hình tròn biểu tượng nguyên tử xoay được cố định vĩnh viễn ở góc trên cùng bên trái màn hình bất kể chế độ locked hay unlocked. Khi locked, ứng dụng sử dụng cờ đặc biệt `{ forward: true }` để theo dõi hover. Khi người dùng di chuột vào hình tròn, overlay tạm thời ngắt click-through để bạn bấm được nút mở giao diện; khi di chuột rời đi, quyền click xuyên thấu được trả lại ngay tức khắc cho game.
 - **Bảng điều khiển toàn màn hình đắm chìm**: Thay đổi giao diện cửa sổ tùy chỉnh từ dạng hộp thoại kích thước cố định ở trung tâm sang thiết kế toàn màn hình hoàn chỉnh, mượt mà và trực quan vô song.
-
-## [1.0.1] - 2026-06-03
 
 ### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
 - **Sửa lỗi cú pháp & biên dịch trong App.tsx**: Khắc phục hoàn toàn lỗi phân tách thẻ JSX và biến thể không hợp lệ (lỗi `rootDiv` không tồn tại, lỗi typo `roo if (isDesktopOverlay)`) xảy ra trong quá trình thiết lập Bảng điều khiển không viền.
