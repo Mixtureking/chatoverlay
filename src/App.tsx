@@ -1441,6 +1441,17 @@ export default function App() {
                         <Shield className="w-3.5 h-3.5" />
                         <span>Bộ lọc</span>
                       </button>
+                      <button
+                        onClick={() => setActiveTab("help")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          activeTab === "help"
+                            ? "bg-indigo-600/15 text-indigo-300 border border-indigo-500/20 shadow-inner"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                        }`}
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>Hướng dẫn</span>
+                      </button>
                     </div>
 
                     {/* Configuration Form scroll Container */}
@@ -1880,6 +1891,8 @@ export default function App() {
                         </div>
                       )}
 
+                      {activeTab === "help" && <HelpManual />}
+
                     </div>
                   </div>
 
@@ -2249,6 +2262,18 @@ export default function App() {
             >
               <Shield className="w-3.5 h-3.5" />
               <span>Bộ lọc</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("help")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "help"
+                  ? "bg-slate-800 text-indigo-400 shadow-inner"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+              }`}
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>Hướng dẫn</span>
             </button>
           </div>
 
@@ -2901,7 +2926,7 @@ export default function App() {
           {/* VIRTUAL MONITOR BOUND SCREEN CONTAINER */}
           <div
             ref={viewportRef}
-            className={`relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end h-[240px] shrink-0`}
+            className={`relative rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${backdropTheme} flex flex-col justify-end h-[420px] shrink-0`}
           >
             {/* Draggable & Resizable overlay frame */}
             {isOverlayVisible ? (
