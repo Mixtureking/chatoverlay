@@ -336,89 +336,34 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
   };
 
   const handlePresetClick = async (preset: { id: string; name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
-    // If clicking the currently active option, deactivate it immediately
-    if (selectedOptionId === preset.id && settings.transitionActive) {
-      stopTransitionGlobal();
+    // Nếu click lại vào option đang mở, chỉ cần đóng nó lại
+    if (selectedOptionId === preset.id) {
       setSelectedOptionId(null);
       return;
     }
 
-    // Clear any existing global transitions or timeouts
-    if (localSimTimeout) clearTimeout(localSimTimeout);
-    if (obsTransitionTimeoutRef.current) {
-      clearTimeout(obsTransitionTimeoutRef.current);
-      obsTransitionTimeoutRef.current = null;
-    }
-
-    // Otherwise, select and trigger this option
+    // Nếu chọn Option mới, chỉ fill dữ liệu vào Form, KHÔNG kích hoạt rèm ngay lập tức
     setSelectedOptionId(preset.id);
 
-    const nextActive = true; 
-    const updatedCount = (settings.transitionTriggerCount || 0) + 1;
-    const durationVal = preset.duration || 3;
-    const sustainTypeVal = preset.sustainType || "auto";
-
-    // Build the fully resolved settings block
     const updatedSettings = {
       ...settings,
       transitionTitle: preset.title || preset.name,
       transitionSubtitle: preset.subtitle || "Vui lòng chờ giây lát...",
-      transitionDuration: durationVal,
-      transitionSustainType: sustainTypeVal,
-      transitionActive: nextActive,
-      transitionTriggerCount: updatedCount
+      transitionDuration: preset.duration || 3,
+      transitionSustainType: preset.sustainType || "auto",
     };
 
     updateSettings(updatedSettings, true);
 
-    // Play chime sound locally
-    const soundType = settings.transitionSoundType || "bell";
-    playTransitionSound(soundType);
-
-    // Toggle simulated previews
-    setTriggerCount(c => c + 1);
-    setIsLocalSimulating(true);
-    
-    if (sustainTypeVal === "auto") {
-      const timeout = setTimeout(async () => {
-        setIsLocalSimulating(false);
-      }, durationVal * 1050); 
-      setLocalSimTimeout(timeout);
-    }
-
+    // Lưu âm thầm trạng thái form lên server để không bị mất dữ liệu khi f5
     try {
-      const { soundFileBase64, ...settingsToSave } = updatedSettings;
       await fetch("/api/youtube/settings-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: settingsToSave }),
+        body: JSON.stringify({ settings: updatedSettings }),
       });
-
-      showToast(
-        language === "vi"
-          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.name}" (${sustainTypeVal === "manual" ? "vô hạn" : `${durationVal} giây`})`
-          : `🚀 Direct transition preset triggered: "${preset.name}"`
-      );
-
-      // Auto clear timeout from server if it is auto close using the unified ref!
-      if (sustainTypeVal === "auto") {
-        obsTransitionTimeoutRef.current = setTimeout(async () => {
-          updateSettings({ transitionActive: false }, true);
-          try {
-            await fetch("/api/youtube/settings-sync", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
-                settings: { transitionActive: false } 
-              }),
-            });
-          } catch (e) {
-            console.error(e);
-          }
-        }, durationVal * 1000);
-      }
     } catch (err) {
-      console.warn("Failed to instantly sync preset trigger state:", err);
+      console.warn("Failed to instantly sync preset form state:", err);
     }
   };
 
@@ -733,6 +678,24 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
                 {language === "vi" ? "Đóng ✕" : "Close ✕"}
               </button>
             </div>
+
+            {/* Explicit Activation Button right inside the options form */}
+            <button
+              onClick={triggerGlobalTransition}
+              disabled={settings.transitionActive}
+              className={`w-full py-3 rounded-xl font-black text-[13px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 shadow-lg ${
+                settings.transitionActive 
+                  ? "bg-slate-800 text-slate-500 cursor-not-allowed shadow-none" 
+                  : "bg-gradient-to-r from-pink-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 text-white hover:scale-[1.02] hover:shadow-pink-500/25"
+              }`}
+              id="activate-overlay-details-btn"
+            >
+              {settings.transitionActive ? (
+                <><span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse"></span> Đang chạy rèm...</>
+              ) : (
+                <><Play className="w-4 h-4 fill-current" /> KÍCH HOẠT OVERLAY</>
+              )}
+            </button>
 
             {/* 2. Text Contents Card */}
             <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5" id="options-details-texts-card">
