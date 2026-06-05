@@ -768,23 +768,23 @@ export default function App() {
   const hasUnsavedChanges = useMemo(() => {
     if (isOverlayRoute) return false;
     
-    // Nút Lưu thay đổi chỉ ghi nhận các thay đổi ở giao diện App.tsx, không ảnh hưởng tới Settings hay Transition
-    const ignoredKeys = [
-      "language", "dashboardTheme", "dashboardAccentColor",
-      "soundEnabled", "soundType", "soundVolume", "soundUrl", "soundFileBase64", "soundFileName",
-      "transitionActive", "transitionTriggerCount", "transitionType", "transitionDuration",
-      "transitionText", "transitionTitle", "transitionIcon", "transitionImageUrl", "transitionAudioUrl",
-      "transitionBgColor", "transitionSoundType", "transitionSustainType", "transitionSubtitle", "transitionCustomPresets"
+    // Nút Lưu thay đổi chỉ ghi nhận các thay đổi ở giao diện App.tsx (Khung chat)
+    const watchedKeys: (keyof OverlaySettings)[] = [
+      "fontSize", "fontFamily", "textColor", "bgColor", "bgOpacity",
+      "authorColor", "moderatorColor", "sponsorColor", "superChatDuration",
+      "isTransparent", "scale", "chatDuration", "showAvatar", "showBadges", "animationType",
+      "useCustomCode", "customHtml", "customCss", "customJs",
+      "bgImageEnabled", "bgImageType", "bgImageUrl", "bgImageBase64",
+      "bgImageOpacity", "bgImageBlur", "bgImagePreset",
+      "decorativeIconEnabled", "decorativeIconType", "decorativeIconPosition"
     ];
     
-    const a = { ...settings };
-    const b = { ...savedSettingsBenchmark };
-    for (const key of ignoredKeys) {
-      delete a[key as keyof typeof a];
-      delete b[key as keyof typeof b];
+    for (const key of watchedKeys) {
+      if (settings[key] !== savedSettingsBenchmark[key]) {
+        return true;
+      }
     }
-    
-    return JSON.stringify(a) !== JSON.stringify(b);
+    return false;
   }, [settings, savedSettingsBenchmark, isOverlayRoute]);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
