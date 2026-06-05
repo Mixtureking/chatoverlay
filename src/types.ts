@@ -15,6 +15,7 @@ export interface ChatMessage {
 }
 
 export interface OverlaySettings {
+  themeMode?: "dark" | "light";
   fontSize: number;       // default 15
   fontFamily: string;     // default "Inter"
   textColor: string;      // hex: default "#ffffff"

@@ -7,6 +7,25 @@
   --font-grotesk: "Space Grotesk", sans-serif;
   --font-montserrat: "Montserrat", sans-serif;
   --font-nunito: "Nunito", sans-serif;
+
+  --color-slate-805: color-mix(in srgb, var(--color-slate-800) 50%, var(--color-slate-900));
+  --color-slate-850: color-mix(in srgb, var(--color-slate-800) 50%, var(--color-slate-900));
+}
+
+.theme-light {
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #f1f5f9;
+  --color-slate-850: #e2e8f0;
+  --color-slate-805: #cbd5e1;
+  --color-slate-800: #cbd5e1;
+  --color-slate-700: #94a3b8;
+  --color-slate-600: #64748b;
+  --color-slate-500: #475569;
+  --color-slate-400: #334155;
+  --color-slate-300: #1e293b;
+  --color-slate-200: #0f172a;
+  --color-slate-100: #020617;
+  --color-slate-50: #000000;
 }
 
 /* Custom overlay specific styles */

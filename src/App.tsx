@@ -45,6 +45,8 @@ import {
   Image,
   Menu,
   Languages,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 // Simple lightweight IndexedDB utility for large files (sounds & background images)
@@ -325,6 +327,7 @@ const playNotificationSound = (settings: OverlaySettings) => {
 
 // Default configuration settings for the overlay
 const DEFAULT_SETTINGS: OverlaySettings = {
+  themeMode: "dark",
   fontSize: 15,
   fontFamily: "Inter",
   textColor: "#ffffff",
@@ -613,8 +616,10 @@ export default function App() {
       const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
       const pShowBadges = decodedParams.showBadges !== undefined ? decodedParams.showBadges : (searchParams.get("showBadges") !== "false");
       const pAnimType = (decodedParams.animationType || searchParams.get("animationType") || "fade") as "fade" | "slide" | "bounce";
+      const pThemeMode = (decodedParams.themeMode || searchParams.get("themeMode") || "dark") as "dark" | "light";
 
       setObsSettings({
+        themeMode: pThemeMode,
         fontSize: pFontSize,
         fontFamily: pFontFamily,
         textColor: pTextColor,
@@ -1534,6 +1539,7 @@ export default function App() {
       showAvatar: settings.showAvatar,
       showBadges: settings.showBadges,
       animationType: settings.animationType,
+      themeMode: settings.themeMode,
     };
 
     try {
@@ -1569,6 +1575,7 @@ export default function App() {
       query.set("showAvatar", config.showAvatar ? "true" : "false");
       query.set("showBadges", config.showBadges ? "true" : "false");
       query.set("animationType", config.animationType);
+      query.set("themeMode", config.themeMode || "dark");
       return `${rootUrl}/?${query.toString()}`;
     }
   };
@@ -1699,7 +1706,7 @@ export default function App() {
       const shouldHideControls = isMouseDownOnHandle;
 
       return (
-        <div className="w-full h-screen bg-transparent overflow-hidden text-slate-100 flex flex-col relative font-sans select-none antialiased">
+        <div className={`w-full h-screen bg-transparent overflow-hidden text-slate-100 flex flex-col relative font-sans select-none antialiased ${obsSettings.themeMode === 'light' ? 'theme-light' : ''}`}>
           {/* Subtle dash outline when overlay is unlocked to show window borders */}
           {!isOverlayLocked && !shouldHideControls && !isEmbeddedDashboardOpen && (
             <div className="absolute inset-0 border-2 border-dashed border-indigo-500/60 pointer-events-none rounded-lg z-50 animate-pulse" />
@@ -1782,7 +1789,7 @@ export default function App() {
 
                     <button
                       onClick={handleToggleDashboardOpen}
-                      className="text-slate-400 hover:text-white font-bold text-xs bg-slate-805 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                      className="text-slate-400 hover:text-slate-100 font-bold text-xs bg-slate-805 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer"
                     >
                       Đóng Panel
                     </button>
@@ -1904,9 +1911,10 @@ export default function App() {
                               ) : (
                                 <div className="space-y-2">
                                   {streamStatus.error && (
-                                    <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg text-[10px] text-red-00 max-h-24 overflow-y-auto font-mono whitespace-pre-wrap">
-                                      {streamStatus.error}
-                                    </div>
+                                    <div 
+                                      className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg text-[10px] text-red-400 max-h-24 overflow-y-auto font-mono whitespace-pre-wrap [&>a]:text-blue-400 [&>a]:underline"
+                                      dangerouslySetInnerHTML={{ __html: streamStatus.error }}
+                                    />
                                   )}
                                   <button
                                     onClick={(e) => handleConnectStream(e)}
@@ -2525,7 +2533,7 @@ export default function App() {
 
     if (isTransitionOverlay) {
       return (
-        <div className="w-full h-screen bg-transparent overflow-hidden">
+        <div className={`w-full h-screen bg-transparent overflow-hidden ${obsSettings.themeMode === 'light' ? 'theme-light' : ''}`}>
           <Suspense fallback={null}>
             <ScreenTransitionOverlay settings={obsSettings} />
           </Suspense>
@@ -2534,7 +2542,7 @@ export default function App() {
     }
 
     return (
-      <div className="w-full h-screen bg-transparent overflow-hidden">
+      <div className={`w-full h-screen bg-transparent overflow-hidden ${obsSettings.themeMode === 'light' ? 'theme-light' : ''}`}>
         <OverlayWidget messages={messages} settings={obsSettings} />
       </div>
     );
@@ -2577,7 +2585,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.themeMode === 'light' ? 'theme-light' : ''}`}>
       {/* 🔴 Active Flash Indicator Toast */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600/95 text-white text-xs py-2 px-4 rounded-xl shadow-lg border border-indigo-400 font-bold backdrop-blur flex items-center gap-2">
@@ -2803,7 +2811,7 @@ export default function App() {
                     {streamStatus.error && (
                       <div className="bg-red-500/15 border border-red-500/30 p-2.5 rounded-xl text-[11px] text-red-400 flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>{streamStatus.error}</div>
+                        <div dangerouslySetInnerHTML={{ __html: streamStatus.error }} className="[&>a]:text-blue-400 [&>a]:underline" />
                       </div>
                     )}
 
@@ -3164,6 +3172,29 @@ export default function App() {
                 </div>
 
 
+
+                {/* Theme Mode selector */}
+                <div className="space-y-3.5 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80 mb-4">
+                  <h4 className="text-xs font-bold text-indigo-400 tracking-wide uppercase">Chế độ giao diện (Theme)</h4>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ themeMode: "dark" })}
+                      className={`flex-1 py-3 pl-3 pr-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all ${settings.themeMode !== "light" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/15" : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200"}`}
+                    >
+                      <Moon className="w-4 h-4" />
+                      Chế độ tối (Dark)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ themeMode: "light" })}
+                      className={`flex-1 py-3 pl-3 pr-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all ${settings.themeMode === "light" ? "bg-white text-slate-900 shadow-lg shadow-black/10 font-bold" : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200"}`}
+                    >
+                      <Sun className="w-4 h-4" />
+                      Chế độ sáng (Light)
+                    </button>
+                  </div>
+                </div>
 
                 {/* Typography specs */}
                 <div className="space-y-3.5 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
@@ -3784,7 +3815,7 @@ export default function App() {
                     <Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                     <span>LIVESTREAM CHAT OVERLAY PREVIEW ({overlaySize.width}x{overlaySize.height})</span>
                   </div>
-                  <div className="text-[9px] text-slate-400 font-mono bg-white/10 px-1.5 py-0.5 rounded uppercase">
+                  <div className="text-[9px] text-slate-400 font-mono bg-slate-100/10 px-1.5 py-0.5 rounded uppercase">
                     Kéo để di chuyển
                   </div>
                 </div>
@@ -3930,7 +3961,7 @@ export default function App() {
                     {/* Link OBS Chat Overlay */}
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
                       <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest pl-0.5">💬 Link OBS Chat Overlay</span>
-                      <div className="font-mono text-[10.5px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
+                      <div className="font-mono text-[10.5px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-slate-100/10 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
                         {compileObsLink()}
                       </div>
                       <button
@@ -3946,7 +3977,7 @@ export default function App() {
                     {/* Link OBS Screen Transition Overlay */}
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
                       <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest pl-0.5">🎬 Link OBS Screen Transition Overlay</span>
-                      <div className="font-mono text-[10.5px] text-pink-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
+                      <div className="font-mono text-[10.5px] text-pink-300 break-all select-all font-semibold p-1 hover:bg-slate-100/10 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
                         {compileObsTransitionLink()}
                       </div>
                       <button
