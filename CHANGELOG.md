@@ -13,6 +13,8 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 - **Phòng thí nghiệm Motion Sandbox thời gian thực**: Trải nghiệm thực tế ảo hóa WYSIWYG ngay góc bên phải Studio. Streamer dễ dàng kiểm chứng âm thanh, phông chữ, ảnh nền, logo và tốc độ chuyển đổi rèm trực tiếp trước khi áp dụng trên OBS live.
 
 ### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
+- **Tối ưu hiển thị đa thiết bị (Fully Responsive UI)**: Cấu trúc lại giao diện Bảng điều khiển (Control Panel) đảm bảo khả năng tương thích tuyệt vời trên mọi độ phân giải màn hình từ Điện thoại di động, Máy tính bảng (Tablet) cho đến Màn hình viền rộng (PC/Laptop). Các vùng chức năng thông minh tự động thay đổi cấu trúc lưới bento, ẩn/hiện bảng điều khiển phụ và hỗ trợ trượt mượt mà cho trải nghiệm vuốt chạm.
+- **Sửa triệt để lỗi chuyển cảnh lặp vòng trên OBS (Transition Loop & Hot-Reload Fix)**: Thiết kế lại toàn bộ luồng đồng bộ rèm cửa kỹ thuật số (Screen Transition Overlay). Loại bỏ hoàn toàn lỗi vòng lặp đệ quy nháy (flicker overlay) gây đơ Browser Source trên OBS. Tách bạch hoàn toàn biến đếm kích hoạt với luồng render React, giúp mọi hiệu ứng rèm khi bấm chạy mượt mà nguyên khối không độ trễ.
 - **Hợp nhất thiết lập & Khử trùng lặp màu điểm nhấn (UI Refactoring)**: Loại bỏ triệt để dải chọn màu điểm nhấn hệ thống trùng lặp trong tab 'Styler'. Thay thế bằng một chiếc Thẻ Điều Hướng Hệ Thống (System Redirect Bridge Card) thông minh hướng dẫn streamers tới 'Cài Đặt Tổng Thể' hoặc 'Studio Chuyển Cảnh', giữ cho giao diện tối giản tinh tế tối đa.
 - **Cải tiến sinh liên kết OBS độc lập (Dynamic URL Compiler)**: Tạo hai bộ sinh liên kết an toàn độc lập cho "OBS Chat Overlay" và "OBS Screen Transition Overlay", đi kèm phím sao chép một chạm tiện dụng và hướng dẫn chi tiết.
 
