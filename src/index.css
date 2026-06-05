@@ -23,7 +23,8 @@
 
 /* Base panels */
 .dashboard-light-theme .bg-slate-950,
-.dashboard-light-theme .bg-slate-955 {
+.dashboard-light-theme .bg-slate-955,
+.dashboard-light-theme .bg-slate-950\/95 {
   background-color: rgba(255, 255, 255, 0.65) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -99,6 +100,79 @@
 }
 .dashboard-light-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--app-accent, #6366f1) 50%, transparent) !important;
+}
+
+/* Other tinted backgrounds and specific text colors for Transition Workspace and App components */
+.dashboard-light-theme .bg-rose-950\/40 {
+  background-color: rgba(244, 63, 94, 0.08) !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+.dashboard-light-theme .text-rose-300 {
+  color: #e11d48 !important; /* rose-600 */
+}
+
+.dashboard-light-theme .bg-emerald-950\/30 {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+.dashboard-light-theme .text-emerald-400\/80,
+.dashboard-light-theme .text-emerald-400 {
+  color: #059669 !important; /* emerald-600 */
+}
+
+.dashboard-light-theme .bg-indigo-950\/20,
+.dashboard-light-theme .bg-indigo-950\/30,
+.dashboard-light-theme .bg-indigo-950\/15,
+.dashboard-light-theme .bg-indigo-900\/50,
+.dashboard-light-theme .bg-indigo-500\/5,
+.dashboard-light-theme .bg-indigo-500\/10,
+.dashboard-light-theme .bg-indigo-600\/20 {
+  background-color: color-mix(in srgb, var(--app-accent, #6366f1) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
+}
+
+.dashboard-light-theme .text-indigo-300,
+.dashboard-light-theme .text-indigo-400,
+.dashboard-light-theme .text-indigo-305 {
+  color: var(--app-accent, #4f46e5) !important; 
+}
+.dashboard-light-theme .border-indigo-500\/20,
+.dashboard-light-theme .border-indigo-500\/10,
+.dashboard-light-theme .border-indigo-500\/30,
+.dashboard-light-theme .border-indigo-500\/35,
+.dashboard-light-theme .border-indigo-500\/50 {
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 30%, transparent) !important;
+}
+
+.dashboard-light-theme .text-pink-400,
+.dashboard-light-theme .text-pink-450,
+.dashboard-light-theme .text-pink-500 {
+  color: #db2777 !important; /* pink-600 */
+}
+.dashboard-light-theme .border-pink-500\/80 {
+  border-color: #db2777 !important;
+}
+
+.dashboard-light-theme .text-amber-300,
+.dashboard-light-theme .text-amber-350,
+.dashboard-light-theme .text-amber-400 {
+  color: #d97706 !important; /* amber-600 */
+}
+.dashboard-light-theme .bg-amber-500\/10 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.dashboard-light-theme .text-teal-400 {
+  color: #0d9488 !important; /* teal-600 */
+}
+
+/* Gradients */
+.dashboard-light-theme .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, rgba(255,255,255,0.7), rgba(248,250,252,0.9)) !important;
+}
+.dashboard-light-theme .bg-gradient-to-tr {
+  background-image: linear-gradient(to top right, var(--app-accent, #6366f1), #ec4899) !important;
 }
 
 
