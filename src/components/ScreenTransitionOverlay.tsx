@@ -117,70 +117,29 @@ const ScreenTransitionOverlay = memo(function ScreenTransitionOverlay({
   
   // Track trigger increments strictly to prevent re-renders breaking things
   const lastTriggerCountRef = useRef<number>(settings.transitionTriggerCount || 0);
-  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor count increments
+  // Monitor count increments and strictly reflect server active state
   useEffect(() => {
     const isTransitionActive = !!settings.transitionActive;
-    const currentTriggerCount = settings.transitionTriggerCount || 0;
 
-    if (currentTriggerCount > lastTriggerCountRef.current) {
-      // It's a new trigger call!
-      lastTriggerCountRef.current = currentTriggerCount;
+    if (isTransitionActive && !isActive) {
+      setIsActive(true);
       
-      // Only play the transition if the backend explicitly flagged it as active
-      if (isTransitionActive) {
-        setIsActive(true);
-        
-        // Stop old timers
-        if (autoCloseTimerRef.current) {
-          clearTimeout(autoCloseTimerRef.current);
-        }
-        
-        // Play sound
+      // If trigger count increased, play sound (meaning it's a new trigger, not just a reload)
+      if ((settings.transitionTriggerCount || 0) > lastTriggerCountRef.current) {
+        lastTriggerCountRef.current = settings.transitionTriggerCount || 0;
         const soundType = settings.transitionSoundType || "bell";
         playTransitionSound(soundType);
-        
-        // Set new auto-close
-        const sustainType = settings.transitionSustainType || "auto";
-        if (sustainType === "auto") {
-          const duration = (settings.transitionDuration || 3) * 1000;
-          autoCloseTimerRef.current = setTimeout(() => {
-            setIsActive(false);
-            autoCloseTimerRef.current = null;
-            
-            // Fire-and-forget sync to off, using PATCH so we don't clobber layout settings
-            fetch("/api/youtube/settings-sync", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ settings: { transitionActive: false } })
-            }).catch(() => {});
-          }, duration);
-        }
       }
     } else if (!isTransitionActive && isActive) {
-      // Transition was turned off externally (e.g. from Dashboard manually clicking off)
       setIsActive(false);
-      if (autoCloseTimerRef.current) {
-        clearTimeout(autoCloseTimerRef.current);
-        autoCloseTimerRef.current = null;
-      }
     }
   }, [
-    settings.transitionActive, 
-    settings.transitionTriggerCount, 
-    settings.transitionSustainType, 
-    settings.transitionDuration, 
-    settings.transitionSoundType, 
+    settings.transitionActive,
+    settings.transitionTriggerCount,
+    settings.transitionSoundType,
     isActive
   ]);
-
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
-    };
-  }, []);
 
   // Determine Background stylings
   const getBackgroundStyle = () => {
