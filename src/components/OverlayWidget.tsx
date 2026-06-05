@@ -55,6 +55,63 @@ interface OverlayWidgetProps {
   previewMode?: boolean; // If true, rendering in the dashboard simulator frame
 }
 
+const ChatBackground = memo(({ settings }: { settings: OverlaySettings }) => {
+  if (!settings.bgImageEnabled) return null;
+
+  return (
+    <div 
+      className="absolute inset-0 -z-10 pointer-events-none select-none overflow-hidden"
+      style={{
+        opacity: typeof settings.bgImageOpacity === "number" ? settings.bgImageOpacity : 0.3,
+        filter: settings.bgImageBlur ? `blur(${settings.bgImageBlur}px)` : undefined,
+      }}
+    >
+      {settings.bgImageType === "pattern" && settings.bgImagePreset && (
+        <div 
+          className="w-full h-full opacity-60"
+          style={getPresetBackgroundStyle(settings.bgImagePreset)} 
+        />
+      )}
+
+      {settings.bgImageType === "gradient" && settings.bgImagePreset && (
+        <div 
+          className={`w-full h-full bg-gradient-to-tr ${
+            settings.bgImagePreset === "gradient-sunset" ? "from-pink-500 via-red-500 to-yellow-500" :
+            settings.bgImagePreset === "gradient-neon" ? "from-indigo-500 via-purple-500 to-pink-500" :
+            settings.bgImagePreset === "gradient-forest" ? "from-emerald-500 via-teal-500 to-cyan-500" : "from-slate-700 to-slate-900"
+          }`} 
+        />
+      )}
+
+      {settings.bgImageType === "custom_url" && settings.bgImageUrl && (
+        <img 
+          src={settings.bgImageUrl} 
+          alt="Chat background url" 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer"
+        />
+      )}
+
+      {settings.bgImageType === "upload" && settings.bgImageBase64 && (
+        <img 
+          src={settings.bgImageBase64} 
+          alt="Chat background uploaded" 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer"
+        />
+      )}
+    </div>
+  );
+}, (prev, next) => {
+  return prev.settings.bgImageEnabled === next.settings.bgImageEnabled &&
+         prev.settings.bgImageType === next.settings.bgImageType &&
+         prev.settings.bgImageOpacity === next.settings.bgImageOpacity &&
+         prev.settings.bgImageBlur === next.settings.bgImageBlur &&
+         prev.settings.bgImagePreset === next.settings.bgImagePreset &&
+         prev.settings.bgImageUrl === next.settings.bgImageUrl &&
+         prev.settings.bgImageBase64 === next.settings.bgImageBase64;
+});
+
 const OverlayWidget = memo(function OverlayWidget({
   messages,
   settings,
@@ -338,50 +395,7 @@ const OverlayWidget = memo(function OverlayWidget({
       } as React.CSSProperties}
     >
       {/* 🖼️ Chat Box Background Image Selection/Upload */}
-      {settings.bgImageEnabled && (
-        <div 
-          className="absolute inset-0 -z-10 pointer-events-none select-none overflow-hidden"
-          style={{
-            opacity: typeof settings.bgImageOpacity === "number" ? settings.bgImageOpacity : 0.3,
-            filter: settings.bgImageBlur ? `blur(${settings.bgImageBlur}px)` : undefined,
-          }}
-        >
-          {settings.bgImageType === "pattern" && settings.bgImagePreset && (
-            <div 
-              className="w-full h-full opacity-60"
-              style={getPresetBackgroundStyle(settings.bgImagePreset)} 
-            />
-          )}
-
-          {settings.bgImageType === "gradient" && settings.bgImagePreset && (
-            <div 
-              className={`w-full h-full bg-gradient-to-tr ${
-                settings.bgImagePreset === "gradient-sunset" ? "from-pink-500 via-red-500 to-yellow-500" :
-                settings.bgImagePreset === "gradient-neon" ? "from-indigo-500 via-purple-500 to-pink-500" :
-                settings.bgImagePreset === "gradient-forest" ? "from-emerald-500 via-teal-500 to-cyan-500" : "from-slate-700 to-slate-900"
-              }`} 
-            />
-          )}
-
-          {settings.bgImageType === "custom_url" && settings.bgImageUrl && (
-            <img 
-              src={settings.bgImageUrl} 
-              alt="Chat background url" 
-              className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer"
-            />
-          )}
-
-          {settings.bgImageType === "upload" && settings.bgImageBase64 && (
-            <img 
-              src={settings.bgImageBase64} 
-              alt="Chat background uploaded" 
-              className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer"
-            />
-          )}
-        </div>
-      )}
+      <ChatBackground settings={settings} />
 
       {/* 🔴 Transient Connected Standby Banner for first-time OBS source confirmations */}
       {messages.length === 0 && showInitialNotice && !previewMode && (
@@ -547,7 +561,7 @@ const OverlayWidget = memo(function OverlayWidget({
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
                   className="flex items-start gap-2 text-[1em] leading-relaxed p-1 shrink-0 rounded hover:bg-white/5 transition-all"
                 >
-                  {settings.showAvatar && (
+                  {settings.showAvatar && settings.messageLayout !== "inline" && (
                     <img
                       src={msg.authorPhotoUrl}
                       alt={msg.authorName}
@@ -566,6 +580,18 @@ const OverlayWidget = memo(function OverlayWidget({
                     {settings.messageLayout === "inline" ? (
                       <div className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight">
                         <span className="inline-flex items-center flex-wrap gap-1 align-baseline mr-1.5 relative top-0.5">
+                          {settings.showAvatar && (
+                            <img
+                              src={msg.authorPhotoUrl}
+                              alt={msg.authorName}
+                              className="w-5 h-5 rounded-full border border-white/10 shrink-0 object-cover inline-block align-middle mr-0.5"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80";
+                              }}
+                            />
+                          )}
                           {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
                             renderDecorativeIcon(settings.decorativeIconType)
                           )}
