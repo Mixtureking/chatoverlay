@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
