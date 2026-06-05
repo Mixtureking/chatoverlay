@@ -34,11 +34,15 @@
 
 /* Secondary Panels (Cards) */
 .dashboard-light-theme .bg-slate-900,
+.dashboard-light-theme .bg-slate-900\/60,
 .dashboard-light-theme .bg-slate-900\/50,
+.dashboard-light-theme .bg-slate-900\/45,
 .dashboard-light-theme .bg-slate-900\/40,
 .dashboard-light-theme .bg-slate-900\/30,
 .dashboard-light-theme .bg-slate-900\/25,
+.dashboard-light-theme .bg-slate-900\/20,
 .dashboard-light-theme .bg-slate-800,
+.dashboard-light-theme .bg-slate-800\/60,
 .dashboard-light-theme .bg-slate-850 {
   background-color: rgba(255, 255, 255, 0.5) !important;
   backdrop-filter: blur(12px) !important;
@@ -55,6 +59,13 @@
   color: #1e293b !important;
   border-color: color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important;
+}
+
+/* Custom Border Resets */
+.dashboard-light-theme .border-slate-800,
+.dashboard-light-theme .border-slate-800\/80,
+.dashboard-light-theme .border-slate-850 {
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 15%, transparent) !important;
 }
 
 .dashboard-light-theme input:focus,

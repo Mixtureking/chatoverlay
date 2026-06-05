@@ -156,24 +156,25 @@ const OverlayWidget = memo(function OverlayWidget({
     if (!previewMode) return settings.customCss;
 
     let css = settings.customCss;
-    const prefix = "#youtube-chat-overlay-preview";
+    const imports: string[] = [];
     
-    // Replace top-level selectors to target the scoped preview element
-    css = css.replace(/\bbody\b/g, prefix);
-    css = css.replace(/\bhtml\b/g, prefix);
-    css = css.replace(/\b:root\b/g, prefix);
-    
-    // Replace standalone asterisks that could leak
-    css = css.replace(/(^\s*|\s*,\s*)\*(?=\s*\{|\s*\,|\s+)/g, `$1${prefix} *`);
+    // Extract @import rules to keep them at the top level
+    css = css.replace(/@import\s+[^;]+;/g, (match) => {
+      imports.push(match);
+      return "";
+    });
 
-    // Force preview container boundary & scrolling safety
-    css += `
-      ${prefix} {
+    // Use native CSS nesting to perfectly sandbox all user CSS!
+    return `
+      ${imports.join("\n")}
+      #youtube-chat-overlay-preview {
         max-height: 100% !important;
         overflow: hidden !important;
+        
+        /* User Custom CSS Sandboxed */
+        ${css}
       }
     `;
-    return css;
   };
 
   // Helper to get font weights and colors
@@ -279,6 +280,11 @@ const OverlayWidget = memo(function OverlayWidget({
         sandboxSetInterval,
         sandboxSetTimeout
       );
+
+      // Trigger immediate re-render of existing messages so the newly compiled script isn't blank
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("onChatUpdate", { detail: visibleMessages }));
+      }, 50);
     } catch (err) {
       console.error("Custom JS execution error inside Sandbox:", err);
     }
