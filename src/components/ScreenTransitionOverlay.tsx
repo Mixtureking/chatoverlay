@@ -109,8 +109,9 @@ export default function ScreenTransitionOverlay({
     const triggerCount = settings.transitionTriggerCount || 0;
 
     // Trigger or fresh-restart the transition if it's active AND:
+    // - Not currently active in local state, OR
     // - The user switched transition presets (meaning trigger count changed)
-    const deservesActivation = isTransitionActive && (triggerCount !== lastTriggerCountRef.current);
+    const deservesActivation = isTransitionActive && (!isActiveRef.current || triggerCount !== lastTriggerCountRef.current);
 
     if (deservesActivation) {
       if (manualTurnOffTimerRef.current) {
@@ -124,6 +125,7 @@ export default function ScreenTransitionOverlay({
 
       setIsActive(true);
       setSessionCount(prev => prev + 1);
+      lastTriggerCountRef.current = triggerCount;
       
       // Play transition chime sound
       const soundType = settings.transitionSoundType || "bell";
@@ -136,18 +138,24 @@ export default function ScreenTransitionOverlay({
         autoCloseTimerRef.current = setTimeout(() => {
           setIsActive(false);
           autoCloseTimerRef.current = null;
-        }, duration);
+        }, duration + 500); // Pad +500ms to allow server state to comfortably reflect off via transitionWorkspace timeout
       }
-    } else if (!isTransitionActive) {
-      // If server transition turns false, we ONLY turn off immediately if sustainType is manual.
+    } else if (!isTransitionActive && isActiveRef.current) {
+      // If server transition turns false while active
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
       const sustainType = settings.transitionSustainType || "auto";
       if (sustainType === "manual") {
-        if (isActiveRef.current && !manualTurnOffTimerRef.current) {
+        if (!manualTurnOffTimerRef.current) {
           manualTurnOffTimerRef.current = setTimeout(() => {
             setIsActive(false);
             manualTurnOffTimerRef.current = null;
           }, 800);
         }
+      } else {
+        setIsActive(false);
       }
     } else if (isTransitionActive && manualTurnOffTimerRef.current) {
       // Cancel manual turn off if server turns active again during 800ms
@@ -155,7 +163,6 @@ export default function ScreenTransitionOverlay({
       manualTurnOffTimerRef.current = null;
     }
 
-    lastTriggerCountRef.current = triggerCount;
   }, [settings.transitionActive, settings.transitionTriggerCount, settings.transitionSustainType, settings.transitionDuration, settings.transitionSoundType]);
 
   // Clean up timers on unmount

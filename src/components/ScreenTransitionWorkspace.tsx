@@ -68,6 +68,14 @@ export default function ScreenTransitionWorkspace({
   const [newPresetDuration, setNewPresetDuration] = useState(5);
   const [newPresetSustain, setNewPresetSustain] = useState<"auto" | "manual">("auto");
 
+  // Run a quick cleanup on mount if transition was stuck Active
+  useEffect(() => {
+    if (settings.transitionActive) {
+      updateSettings({ transitionActive: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     return () => {
       if (localSimTimeout) clearTimeout(localSimTimeout);
@@ -371,9 +379,22 @@ export default function ScreenTransitionWorkspace({
     if (localSimTimeout) clearTimeout(localSimTimeout);
     
     if (sustainTypeVal === "auto") {
-      const timeout = setTimeout(() => {
+      const timeout = setTimeout(async () => {
         setIsLocalSimulating(false);
-      }, durationVal * 1050); 
+        updateSettings({ transitionActive: false });
+        try {
+          // Fire global transition off state via API
+          await fetch("/api/youtube/settings-sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              settings: { ...updatedSettings, transitionActive: false } 
+            }),
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }, durationVal * 1000); 
       setLocalSimTimeout(timeout);
     }
 
