@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useAnimationControls } from "motion/react";
 import { Sparkles, Tv } from "lucide-react";
 import { OverlaySettings } from "../types";
 
@@ -93,7 +93,15 @@ export default function ScreenTransitionOverlay({
 }: ScreenTransitionOverlayProps) {
   const [isActive, setIsActive] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
+  
   const lastTriggerCountRef = useRef<number>(settings.transitionTriggerCount || 0);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const manualTurnOffTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isActiveRef = useRef(isActive);
+  
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // Effect 1: Handle activation / preset switching trigger (listening to settings updates)
   useEffect(() => {
@@ -103,40 +111,61 @@ export default function ScreenTransitionOverlay({
     // Trigger or fresh-restart the transition if it's active AND:
     // - Not currently active in local state, OR
     // - The user switched transition presets (meaning trigger count changed)
-    const deservesActivation = isTransitionActive && (!isActive || triggerCount !== lastTriggerCountRef.current);
+    const deservesActivation = isTransitionActive && (!isActiveRef.current || triggerCount !== lastTriggerCountRef.current);
 
     if (deservesActivation) {
+      if (manualTurnOffTimerRef.current) {
+        clearTimeout(manualTurnOffTimerRef.current);
+        manualTurnOffTimerRef.current = null;
+      }
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
+
       setIsActive(true);
       setSessionCount(prev => prev + 1);
       
       // Play transition chime sound
       const soundType = settings.transitionSoundType || "bell";
       playTransitionSound(soundType);
-    } else if (!isTransitionActive && isActive) {
-      // If server transition turns false, we ONLY turn off immediately if sustainType is manual.
-      // If it is auto, we let the local timeout (Effect 2) run to completion to prevent cutoffs due to poll delays.
-      const sustainType = settings.transitionSustainType || "auto";
-      if (sustainType === "manual") {
-        setIsActive(false);
-      }
-    }
 
-    lastTriggerCountRef.current = triggerCount;
-  }, [settings.transitionActive, settings.transitionTriggerCount, settings.transitionSustainType, settings.transitionSoundType, isActive]);
-
-  // Effect 2: Handle local auto-close timeout separately (guaranteed to run for the exact duration without early cleanup)
-  useEffect(() => {
-    if (isActive) {
+      // Auto transition out timer if sustainType is "auto"
       const sustainType = settings.transitionSustainType || "auto";
       if (sustainType === "auto") {
         const duration = (settings.transitionDuration || 3) * 1000;
-        const timer = setTimeout(() => {
+        autoCloseTimerRef.current = setTimeout(() => {
           setIsActive(false);
+          autoCloseTimerRef.current = null;
         }, duration);
-        return () => clearTimeout(timer);
       }
+    } else if (!isTransitionActive) {
+      // If server transition turns false, we ONLY turn off immediately if sustainType is manual.
+      const sustainType = settings.transitionSustainType || "auto";
+      if (sustainType === "manual") {
+        if (isActiveRef.current && !manualTurnOffTimerRef.current) {
+          manualTurnOffTimerRef.current = setTimeout(() => {
+            setIsActive(false);
+            manualTurnOffTimerRef.current = null;
+          }, 800);
+        }
+      }
+    } else if (isTransitionActive && manualTurnOffTimerRef.current) {
+      // Cancel manual turn off if server turns active again during 800ms
+      clearTimeout(manualTurnOffTimerRef.current);
+      manualTurnOffTimerRef.current = null;
     }
-  }, [isActive, sessionCount, settings.transitionDuration, settings.transitionSustainType]);
+
+    lastTriggerCountRef.current = triggerCount;
+  }, [settings.transitionActive, settings.transitionTriggerCount, settings.transitionSustainType, settings.transitionDuration, settings.transitionSoundType]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+      if (manualTurnOffTimerRef.current) clearTimeout(manualTurnOffTimerRef.current);
+    };
+  }, []);
 
   // Determine Background stylings
   const getBackgroundStyle = () => {
@@ -159,6 +188,31 @@ export default function ScreenTransitionOverlay({
   const getVariants = () => {
     const type = settings.transitionType || "shutter";
     switch (type) {
+      /** Preset: curtain (màn rèm dọc) */
+      case "curtain":
+        return {
+          initial: { opacity: 1 },
+          animate: { opacity: 1, transition: { staggerChildren: 0.05 } },
+          exit: { opacity: 0, transition: { duration: 0.1, delay: 0.4 } }
+        };
+      /** Preset: glitch (hiệu ứng glitch kỹ thuật số) */
+      case "glitch":
+        return {
+          initial: { opacity: 0, x: -4 },
+          animate: { 
+            opacity: [0, 1, 0, 1], 
+            x: [0, -4, 4, -2, 0],
+            transition: { duration: 0.3, times: [0, 0.3, 0.6, 1] } 
+          },
+          exit: { scale: 0.8, opacity: 0, transition: { duration: 0.2 } }
+        };
+      /** Preset: morph (biến hình từ trung tâm) */
+      case "morph":
+        return {
+          initial: { clipPath: "circle(0% at 50% 50%)" },
+          animate: { clipPath: "circle(150% at 50% 50%)", transition: { duration: 0.6, ease: [0.76, 0, 0.24, 1] } },
+          exit: { clipPath: "circle(0% at 50% 50%)", transition: { duration: 0.45, ease: "easeInOut" } }
+        };
       case "slide":
         return {
           initial: { x: "100%", opacity: 0 },
@@ -195,79 +249,132 @@ export default function ScreenTransitionOverlay({
 
   const currentVariants = getVariants();
   const transitionImg = settings.transitionImageBase64 || settings.transitionImageUrl;
+  const type = settings.transitionType || "shutter";
+  const contentDelayOffset = type === "morph" ? 0.3 : 0;
+  
+  // Custom Glitch component logic encapsulation
+  const GlitchSubContainer = ({ children }: { children: React.ReactNode }) => {
+    const controls = useAnimationControls();
+    useEffect(() => {
+      if (type !== "glitch") return;
+      const timer = setInterval(() => {
+        controls.start({
+          x: [0, -3, 3, -1, 0],
+          transition: { duration: 0.15 }
+        });
+      }, 2500);
+      return () => clearInterval(timer);
+    }, [controls]);
+    
+    if (type !== "glitch") return <>{children}</>;
+    return (
+      <motion.div animate={controls} className="w-full h-full relative z-10 flex flex-col items-center justify-center">
+        {children}
+      </motion.div>
+    );
+  };
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative" id="obs-transition-layer-root">
       <AnimatePresence mode="wait">
         {isActive && (
           <motion.div
-            key={`overlay-session-${sessionCount}`}
+            key={`overlay-session-${sessionCount}-${type}`}
             initial="initial"
             animate="animate"
             exit="exit"
             variants={currentVariants}
-            style={getBackgroundStyle()}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-50 origin-center"
+            style={type === "curtain" ? {} : getBackgroundStyle()}
+            className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 z-50 origin-center"
             id={`transition-animation-overlay-${sessionCount}`}
           >
-            {/* Ambient Animated Grid backing */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
-
-            {/* Custom Logo Brand */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: -20 }}
-              animate={{ scale: 1, opacity: 1, y: 0, transition: { delay: 0.25, type: "spring" } }}
-              className="z-10 mb-6 shrink-0"
-              id="transition-logo-branding-wrapper"
-            >
-              {transitionImg ? (
-                <img
-                  src={transitionImg}
-                  alt="Stream Transition Brand"
-                  referrerPolicy="no-referrer"
-                  className="max-w-[140px] max-h-[140px] object-contain drop-shadow-[0_4px_12px_rgba(255,255,255,0.15)] rounded-xl border border-slate-700/30 p-2 bg-slate-900/40"
-                  id="transition-custom-brand-logo"
+            {type === "curtain" && (
+              <>
+                <motion.div 
+                  variants={{
+                    initial: { x: "-100%" },
+                    animate: { x: 0, transition: { type: "spring", stiffness: 120, damping: 20 } },
+                    exit: { x: "-100%", transition: { duration: 0.4, ease: "easeInOut" } }
+                  }}
+                  style={{ ...getBackgroundStyle(), backgroundSize: "200% 100%", backgroundPosition: "left center" }}
+                  className="absolute top-0 left-0 w-1/2 h-full z-0 overflow-hidden"
                 />
-              ) : (
-                <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold flex items-center justify-center animate-pulse shadow-[0_0_20px_rgba(99,102,241,0.2)]">
-                  <Tv className="w-10 h-10" />
-                </div>
-              )}
-            </motion.div>
+                <motion.div 
+                  variants={{
+                    initial: { x: "100%" },
+                    animate: { x: 0, transition: { type: "spring", stiffness: 120, damping: 20 } },
+                    exit: { x: "100%", transition: { duration: 0.4, ease: "easeInOut" } }
+                  }}
+                  style={{ ...getBackgroundStyle(), backgroundSize: "200% 100%", backgroundPosition: "right center" }}
+                  className="absolute top-0 right-0 w-1/2 h-full z-0 border-l border-white/5 overflow-hidden"
+                />
+              </>
+            )}
 
-            {/* Text Contents */}
-            <div className="z-10 space-y-3.5 max-w-xl">
-              <motion.h2
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1, transition: { delay: 0.35, duration: 0.4 } }}
-                className="text-3xl md:text-5xl font-black tracking-widest text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]"
-                id="transition-overlay-title"
-                style={{ fontFamily: settings.fontFamily || "Inter" }}
+            {type === "glitch" && (
+              <div className="absolute inset-0 z-0 bg-[repeating-linear-gradient(transparent,transparent_2px,rgba(0,0,0,0.1)_3px,rgba(0,0,0,0.1)_4px)] pointer-events-none" />
+            )}
+
+            <GlitchSubContainer>
+              {/* Ambient Animated Grid backing */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
+
+              {/* Custom Logo Brand */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0, y: -20 }}
+                animate={{ scale: 1, opacity: 1, y: 0, transition: { delay: 0.25 + contentDelayOffset, type: "spring" } }}
+                className="z-10 mb-6 shrink-0"
+                id="transition-logo-branding-wrapper"
               >
-                {settings.transitionTitle || "STREAMING SOON"}
-              </motion.h2>
+                {transitionImg ? (
+                  <img
+                    src={transitionImg}
+                    alt="Stream Transition Brand"
+                    referrerPolicy="no-referrer"
+                    className="max-w-[140px] max-h-[140px] object-contain drop-shadow-[0_4px_12px_rgba(255,255,255,0.15)] rounded-xl border border-slate-700/30 p-2 bg-slate-900/40"
+                    id="transition-custom-brand-logo"
+                  />
+                ) : (
+                  <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold flex items-center justify-center animate-pulse shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                    <Tv className="w-10 h-10" />
+                  </div>
+                )}
+              </motion.div>
 
-              <motion.p
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1, transition: { delay: 0.45, duration: 0.4 } }}
-                className="text-sm md:text-lg font-bold text-slate-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)] tracking-wide shrink-0 leading-relaxed max-w-lg mx-auto"
-                id="transition-overlay-subtitle"
-                style={{ fontFamily: settings.fontFamily || "Inter" }}
+              {/* Text Contents */}
+              <div className="z-10 space-y-3.5 max-w-xl">
+                <motion.h2
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1, transition: { delay: 0.35 + contentDelayOffset, duration: 0.4 } }}
+                  className="text-3xl md:text-5xl font-black tracking-widest text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]"
+                  id="transition-overlay-title"
+                  style={{ fontFamily: settings.fontFamily || "Inter" }}
+                >
+                  {settings.transitionTitle || "STREAMING SOON"}
+                </motion.h2>
+
+                <motion.p
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1, transition: { delay: 0.45 + contentDelayOffset, duration: 0.4 } }}
+                  className="text-sm md:text-lg font-bold text-slate-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)] tracking-wide shrink-0 leading-relaxed max-w-lg mx-auto"
+                  id="transition-overlay-subtitle"
+                  style={{ fontFamily: settings.fontFamily || "Inter" }}
+                >
+                  {settings.transitionSubtitle || "Chuẩn bị bắt đầu trong giây lát..."}
+                </motion.p>
+              </div>
+
+              {/* Micro loading details or sparkles decoration */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.4, transition: { delay: 0.6 + contentDelayOffset, duration: 0.5 } }}
+                className="absolute bottom-10 flex items-center gap-2 text-xs font-mono tracking-wider font-bold text-indigo-300 uppercase shrink-0"
+                id="transition-status-ticker"
               >
-                {settings.transitionSubtitle || "Chuẩn bị bắt đầu trong giây lát..."}
-              </motion.p>
-            </div>
-
-            {/* Micro loading details or sparkles decoration */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4, transition: { delay: 0.6, duration: 0.5 } }}
-              className="absolute bottom-10 flex items-center gap-2 text-xs font-mono tracking-wider font-bold text-indigo-300 uppercase shrink-0"
-              id="transition-status-ticker"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" style={{ animationDuration: "3s" }} />
-              <span>Chuyển cảnh hoạt ảnh đang tải...</span>
-            </motion.div>
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" style={{ animationDuration: "3s" }} />
+                <span>Chuyển cảnh hoạt ảnh đang tải...</span>
+              </motion.div>
+            </GlitchSubContainer>
           </motion.div>
         )}
       </AnimatePresence>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 interface ScreenTransitionProps {
   children: React.ReactNode;
   transitionKey: string; // The trigger key (e.g. activeTab)
-  type?: "fade" | "slide" | "zoom" | "rotate" | "shutter";
+  type?: "fade" | "slide" | "zoom" | "rotate" | "shutter" | "curtain" | "glitch" | "morph";
 }
 
 export default function ScreenTransition({
@@ -47,6 +47,24 @@ export default function ScreenTransition({
             scaleY: 0.95,
             transition: { duration: 0.2, ease: "easeInOut" } 
           },
+        };
+      case "curtain":
+        return {
+          initial: { opacity: 0, scale: 0.95 },
+          animate: { opacity: 1, scale: 1, transition: { duration: 0.35, ease: "easeOut" } },
+          exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
+        };
+      case "glitch":
+        return {
+          initial: { opacity: 0, x: -10 },
+          animate: { opacity: 1, x: 0, transition: { duration: 0.35, type: "spring", stiffness: 300, damping: 15 } },
+          exit: { opacity: 0, scale: 0.9, transition: { duration: 0.15 } },
+        };
+      case "morph":
+        return {
+          initial: { opacity: 0, clipPath: "circle(0% at 50% 50%)" },
+          animate: { opacity: 1, clipPath: "circle(150% at 50% 50%)", transition: { duration: 0.5, ease: [0.76, 0, 0.24, 1] } },
+          exit: { opacity: 0, clipPath: "circle(0% at 50% 50%)", transition: { duration: 0.3, ease: "easeInOut" } },
         };
       case "fade":
       default:

@@ -60,7 +60,7 @@ export interface OverlaySettings {
   // Application Language & Styling Accents Configuration (New)
   language?: "vi" | "en";
   accentColor?: string; // hex like #6366f1, #10b981 etc.
-  transitionType?: "fade" | "slide" | "zoom" | "rotate" | "shutter";
+  transitionType?: "fade" | "slide" | "zoom" | "rotate" | "shutter" | "curtain" | "glitch" | "morph";
 
   // Custom Screen Transition Overlay configurations
   transitionDuration?: number; // default 3 seconds
