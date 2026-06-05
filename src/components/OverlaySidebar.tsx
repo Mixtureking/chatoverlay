@@ -65,7 +65,7 @@ export default function OverlaySidebar({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -380, opacity: 0.95 }}
           transition={{ type: "spring", stiffness: 240, damping: 25 }}
-          className="w-[360px] h-full bg-slate-950/95 border-r border-slate-800/90 flex flex-col z-40 relative shadow-2xl select-none shrink-0"
+          className="w-full sm:w-[360px] h-full bg-slate-950/95 border-r border-slate-800/90 flex flex-col z-40 relative shadow-2xl select-none shrink-0 pointer-events-auto"
           id="overlay-chat-sidebar-frame"
         >
           {/* Header Board */}

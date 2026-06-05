@@ -496,9 +496,9 @@ export default function ScreenTransitionWorkspace({
   const activeBrandingImg = settings.transitionImageBase64 || settings.transitionImageUrl;
 
   return (
-    <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5 min-h-0 animate-in fade-in-50 duration-200" id="transition-studio-workspace">
+    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:grid lg:grid-cols-5 min-h-0 animate-in fade-in-50 duration-200" id="transition-studio-workspace">
       {/* LEFT COLUMN: CONTROLS CONFIGURATION */}
-      <div className="col-span-1 lg:col-span-2 bg-slate-900/40 border-r border-slate-800/80 flex flex-col overflow-y-auto custom-scrollbar p-5 space-y-6">
+      <div className="col-span-1 lg:col-span-2 bg-slate-900/40 lg:border-r border-slate-800/80 flex flex-col lg:overflow-y-auto custom-scrollbar p-5 space-y-6 shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-pink-500 animate-spin" style={{ animationDuration: "5s" }} />
@@ -961,7 +961,7 @@ export default function ScreenTransitionWorkspace({
       </div>
 
       {/* RIGHT COLUMN: MOTION SANBDX WORKSPACE */}
-      <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+      <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto lg:custom-scrollbar shrink-0 lg:shrink w-full">
         {/* Workspace Title Card */}
         <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
           <div className="flex items-center gap-2">

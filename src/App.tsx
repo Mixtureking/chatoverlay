@@ -2609,16 +2609,16 @@ export default function App() {
       {customDynamicStyleTag}
 
       {/* Primary Top Header Board */}
-      <header className="bg-slate-900 border-b border-slate-800 shrink-0 px-6 py-4 flex items-center justify-between">
+      <header className="bg-slate-900 border-b border-slate-800 shrink-0 px-4 md:px-6 py-3 md:py-4 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0">
         <div className="flex items-center gap-2.5">
-          <div className="bg-gradient-to-tr from-rose-600 to-indigo-600 p-2 rounded-xl text-white">
+          <div className="bg-gradient-to-tr from-rose-600 to-indigo-600 p-2 rounded-xl text-white shrink-0">
             <Tv className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold tracking-tight text-base text-slate-100 uppercase font-grotesk flex items-center gap-2">
+            <h1 className="font-bold tracking-tight text-sm md:text-base text-slate-100 uppercase font-grotesk flex items-center gap-2">
               <span>{t("appName")}</span>
             </h1>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[10px] md:text-[11px] text-slate-400 hidden sm:block">
               {activeLanguage === "vi" 
                 ? "Công cụ quản lý, tùy chỉnh bộ khung chat trong suốt gắn OBS Livestream"
                 : "Professional custom clear chatbox widget for your live stream software OBS"}
@@ -2627,7 +2627,7 @@ export default function App() {
         </div>
 
         {/* Sync Controls & Global state summary indicators */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2 md:gap-3 justify-between w-full md:w-auto">
           {/* Collapse/Expand Sidebar Menu trigger button */}
           <button
             type="button"
@@ -2639,21 +2639,21 @@ export default function App() {
             }`}
           >
             <Menu className="w-4 h-4 shrink-0" />
-            <span>{sidebarOpen ? t("sidebarCloseBtn") : t("sidebarOpenBtn")}</span>
+            <span className="hidden sm:inline">{sidebarOpen ? t("sidebarCloseBtn") : t("sidebarOpenBtn")}</span>
           </button>
 
           {isDesktopOverlay && isEmbeddedDashboardOpen && (
             <button
               onClick={handleToggleDashboardOpen}
-              className="bg-rose-650 hover:bg-rose-600 active:scale-95 text-white text-xs font-black px-4.5 py-2 rounded-xl transition-all border border-rose-500/30 cursor-pointer shadow-lg uppercase tracking-wider flex items-center gap-1.5 animate-pulse"
+              className="bg-rose-650 hover:bg-rose-600 active:scale-95 text-white text-[10px] sm:text-xs font-black px-3 sm:px-4.5 py-2 rounded-xl transition-all border border-rose-500/30 cursor-pointer shadow-lg uppercase tracking-wider flex items-center gap-1.5 animate-pulse shrink-0"
             >
-              ← Đóng Bảng Điều Khiển (Quay Lại Overlay)
+              ← <span className="hidden lg:inline">Đóng Bảng Điều Khiển (Quay Lại Overlay)</span><span className="lg:hidden">Đóng Bảng CĐ</span>
             </button>
           )}
 
-          <div className="flex items-center gap-1 bg-slate-800/60 px-3 py-1 text-xs rounded-full border border-slate-700">
-            <span className={`w-2.5 h-2.5 rounded-full ${streamStatus.isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-            <span className="text-slate-300 ml-1.5 text-[11px]">
+          <div className="flex items-center gap-1.5 bg-slate-800/60 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-[11px] rounded-full border border-slate-700 shrink-0">
+            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${streamStatus.isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+            <span className="text-slate-300 font-medium">
               {streamStatus.isConnected ? `🟢 ${t("connectedStatus")}` : `🔴 ${t("offlineStatus")}`}
             </span>
           </div>
@@ -2661,24 +2661,33 @@ export default function App() {
       </header>
 
       {/* Main split flex panel space carrying SidebarNavigator */}
-      <div className="flex-1 overflow-hidden flex min-w-0 bg-slate-950">
+      <div className="flex-1 overflow-hidden flex min-w-0 bg-slate-950 relative">
+        {/* Mobile Backdrop for Sidebar */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden pointer-events-auto"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         {/* PERSISTENT SIDEBAR NAVIGATION PANELS */}
-        <SidebarNavigator
-          activeRoute={activeMainRoute}
-          setActiveRoute={setActiveMainRoute}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          language={activeLanguage}
-          accentColor={currentAccent}
-        />
+        <div className="absolute top-0 bottom-0 left-0 z-50 lg:relative lg:z-auto pointer-events-none h-full flex flex-col">
+          <SidebarNavigator
+            activeRoute={activeMainRoute}
+            setActiveRoute={setActiveMainRoute}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            language={activeLanguage}
+            accentColor={currentAccent}
+          />
+        </div>
 
         {/* Main Routed Dashboard Area */}
         <div className="flex-1 overflow-hidden relative flex flex-col min-w-0" id="main-routed-dashboard-area">
           <ScreenTransition transitionKey={activeMainRoute} type={settings.transitionType || "shutter"}>
             {activeMainRoute === "chat_overlay" && (
-              <div className="w-full h-full overflow-hidden grid grid-cols-1 lg:grid-cols-5" id="chat-overlay-deck-grid">
+              <div className="w-full h-full overflow-y-auto lg:overflow-hidden flex flex-col lg:grid lg:grid-cols-5" id="chat-overlay-deck-grid">
           {/* LEFT COLUMN: CONTROL SU BOARD */}
-          <div className="col-span-1 lg:col-span-2 bg-slate-900/45 border-r border-slate-800/80 flex flex-col overflow-hidden">
+          <div className="col-span-1 lg:col-span-2 bg-slate-900/45 border-r border-slate-800/80 flex flex-col lg:overflow-hidden shrink-0">
             {/* Internal quick action tab buttons links */}
             <div className="flex bg-slate-900 border-b border-slate-800 shrink-0 p-1">
               <button
@@ -3715,7 +3724,7 @@ export default function App() {
           </div>
 
         {/* RIGHT COLUMN: HIGH-FIDELITY LIVE MONITOR DEVICE PREVIEW (US-02, Drag & Resize specs) */}
-        <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar max-h-[calc(100vh-100px)] lg:max-h-none">
+        <div className="col-span-1 lg:col-span-3 bg-slate-950 p-4 md:p-6 flex flex-col gap-4 overflow-y-auto lg:custom-scrollbar shrink-0 lg:shrink w-full">
           <div className="flex items-center justify-between shrink-0 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
             <div className="flex items-center gap-2">
               <Layout className="w-4 h-4 text-indigo-400" />

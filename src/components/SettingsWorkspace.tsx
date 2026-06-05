@@ -76,9 +76,9 @@ export default function SettingsWorkspace({
   };
 
   return (
-    <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5 min-h-0 animate-in fade-in-50 duration-200" id="settings-workspace-wrapper">
+    <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:grid lg:grid-cols-5 min-h-0 animate-in fade-in-50 duration-200" id="settings-workspace-wrapper">
       {/* LEFT COLUMN: INTERACTIVE CONTROLS */}
-      <div className="col-span-1 lg:col-span-2 bg-slate-900/40 border-r border-slate-800/80 flex flex-col overflow-y-auto custom-scrollbar p-5 space-y-6">
+      <div className="col-span-1 lg:col-span-2 bg-slate-900/40 lg:border-r border-slate-800/80 flex flex-col lg:overflow-y-auto custom-scrollbar p-5 space-y-6 shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Languages className="w-5 h-5 text-teal-400" />
@@ -264,7 +264,7 @@ export default function SettingsWorkspace({
       </div>
 
       {/* RIGHT COLUMN: TECHNICAL TELEMETRY PANEL */}
-      <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+      <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto lg:custom-scrollbar shrink-0 lg:shrink w-full">
         {/* Diagnostics Card */}
         <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800/80 space-y-4">
           <div className="flex items-center gap-2">

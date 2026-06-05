@@ -80,7 +80,7 @@ export default function SidebarNavigator({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -340, opacity: 0.95 }}
           transition={{ type: "spring", stiffness: 220, damping: 24 }}
-          className="w-[300px] h-full bg-slate-950 border-r border-slate-800/80 flex flex-col z-30 relative shadow-2xl shrink-0"
+          className="w-[280px] sm:w-[300px] h-full bg-slate-950 border-r border-slate-800/80 flex flex-col z-30 relative shadow-2xl shrink-0 pointer-events-auto"
           id="main-sidebar-navigation-bar"
         >
           {/* Header Panel */}
