@@ -93,35 +93,50 @@ export default function ScreenTransitionOverlay({
 }: ScreenTransitionOverlayProps) {
   const [isActive, setIsActive] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
-  const triggerRef = useRef<number | null>(null);
+  const lastTriggerCountRef = useRef<number>(settings.transitionTriggerCount || 0);
 
-  // Monitor the transitionActive and transitionTriggerCount
+  // Effect 1: Handle activation / preset switching trigger (listening to settings updates)
   useEffect(() => {
-    const isTransitionCurrentlyActive = !!settings.transitionActive;
-    
-    if (isTransitionCurrentlyActive !== isActive) {
-      if (isTransitionCurrentlyActive) {
-        setIsActive(true);
-        setSessionCount(prev => prev + 1);
-        
-        // Play transition chime sound
-        const soundType = settings.transitionSoundType || "bell";
-        playTransitionSound(soundType);
+    const isTransitionActive = !!settings.transitionActive;
+    const triggerCount = settings.transitionTriggerCount || 0;
 
-        // Auto transition out timer if sustainType is "auto"
-        const sustainType = settings.transitionSustainType || "auto";
-        if (sustainType === "auto") {
-          const duration = (settings.transitionDuration || 3) * 1000;
-          const timeout = setTimeout(() => {
-            setIsActive(false);
-          }, duration);
-          return () => clearTimeout(timeout);
-        }
-      } else {
+    // Trigger or fresh-restart the transition if it's active AND:
+    // - Not currently active in local state, OR
+    // - The user switched transition presets (meaning trigger count changed)
+    const deservesActivation = isTransitionActive && (!isActive || triggerCount !== lastTriggerCountRef.current);
+
+    if (deservesActivation) {
+      setIsActive(true);
+      setSessionCount(prev => prev + 1);
+      
+      // Play transition chime sound
+      const soundType = settings.transitionSoundType || "bell";
+      playTransitionSound(soundType);
+    } else if (!isTransitionActive && isActive) {
+      // If server transition turns false, we ONLY turn off immediately if sustainType is manual.
+      // If it is auto, we let the local timeout (Effect 2) run to completion to prevent cutoffs due to poll delays.
+      const sustainType = settings.transitionSustainType || "auto";
+      if (sustainType === "manual") {
         setIsActive(false);
       }
     }
-  }, [settings.transitionActive, settings.transitionSustainType, settings.transitionDuration, settings.transitionSoundType, isActive]);
+
+    lastTriggerCountRef.current = triggerCount;
+  }, [settings.transitionActive, settings.transitionTriggerCount, settings.transitionSustainType, settings.transitionSoundType, isActive]);
+
+  // Effect 2: Handle local auto-close timeout separately (guaranteed to run for the exact duration without early cleanup)
+  useEffect(() => {
+    if (isActive) {
+      const sustainType = settings.transitionSustainType || "auto";
+      if (sustainType === "auto") {
+        const duration = (settings.transitionDuration || 3) * 1000;
+        const timer = setTimeout(() => {
+          setIsActive(false);
+        }, duration);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isActive, sessionCount, settings.transitionDuration, settings.transitionSustainType]);
 
   // Determine Background stylings
   const getBackgroundStyle = () => {
