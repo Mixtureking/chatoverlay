@@ -1,0 +1,615 @@
+import React, { useState, useRef, useEffect } from "react";
+import { 
+  motion, 
+  AnimatePresence 
+} from "motion/react";
+import { 
+  Sparkles, 
+  Settings, 
+  Gauge, 
+  Columns, 
+  Eye, 
+  Play, 
+  HelpCircle,
+  Tv,
+  CheckCircle,
+  Volume2,
+  Type,
+  Image,
+  Sliders,
+  Music,
+  Trash2,
+  Clock,
+  Layers,
+  Copy,
+  ExternalLink,
+  Plus
+} from "lucide-react";
+import { OverlaySettings } from "../types";
+import ScreenTransition from "./ScreenTransition";
+import { playTransitionSound } from "./ScreenTransitionOverlay";
+
+interface ScreenTransitionWorkspaceProps {
+  settings: OverlaySettings;
+  updateSettings: (newSettings: Partial<OverlaySettings>) => void;
+  language: "vi" | "en";
+  showToast: (msg: string) => void;
+  accentColor: string;
+  obsTransitionLink: string;
+  onCopyObsTransitionLink: () => void;
+}
+
+export default function ScreenTransitionWorkspace({
+  settings,
+  updateSettings,
+  language = "vi",
+  showToast,
+  accentColor,
+  obsTransitionLink,
+  onCopyObsTransitionLink,
+}: ScreenTransitionWorkspaceProps) {
+  const [previewTab, setPreviewTab] = useState<"screen_a" | "screen_b">("screen_a");
+  const [triggerCount, setTriggerCount] = useState(0);
+  const [isLocalSimulating, setIsLocalSimulating] = useState(false);
+
+  const text = {
+    title: language === "vi" ? "Studio Chuyển Cảnh OBS" : "OBS Transition Studio",
+    subtitle: language === "vi" ? "Tự thiết kế màn hình chuyển cảnh hoạt ảnh chuyên nghiệp cho livestream" : "Self-design professional transition screens for your livestream",
+    presetLabel: language === "vi" ? "Kiểu hoạt ảnh chuyển tiếp" : "Active Transition Type",
+    presetDesc: language === "vi" ? "Chọn hiệu ứng hoạt ảnh chính khi bắt đầu chuyển cảnh" : "Select main motion effect of the screen transition screen",
+    speedLabel: language === "vi" ? "Thời gian hiển thị chuyển cảnh (giây)" : "Transition Duration Space (seconds)",
+    testBtn: language === "vi" ? "Kích Hoạt Thử Chuyển Cảnh" : "Trigger Sandbox Preview",
+    obsTriggerBtn: language === "vi" ? "🎬 KÍCH HOẠT CHUYỂN CẢNH OBS" : "🎬 TRIGGER OBS TRANSITION",
+    shutterOptions: language === "vi" ? "Cấu hình rèm kỹ thuật số" : "Digital Shutter Colors",
+    previewTitle: language === "vi" ? "Mô Phỏng Trực Quan Thời Gian Thực" : "Real-Time Visual Sandbox",
+    previewDesc: language === "vi" ? "Mô phỏng chính xác những gì người xem nhìn thấy trên OBS Studio" : "Wysiwyg simulator of your configured live brand scene",
+    toggleMock: language === "vi" ? "Đổi màn hình cơ sở" : "Toggle Base Panels",
+    physicsLabel: language === "vi" ? "Công nghệ gia tốc: SPRING PHYSICS" : "Acceleration Engine: SPRING PHYSICS",
+    shutter: language === "vi" ? "🚪 Cửa sập kỹ thuật số (Shutter Effect)" : "🚪 Digital Shutter Effect",
+    fade: language === "vi" ? "💨 Mờ dần cao cấp (Crossfade Theme)" : "💨 Premium Crossfade Theme",
+    slide: language === "vi" ? "➡️ Trượt ngang mượt mà (Spring Slide)" : "➡️ Smooth Spring Horizon Slide",
+    zoom: language === "vi" ? "🔍 Thu phòng êm ái (Zooming Out)" : "🔍 Ambient Depth Zoom Out",
+    rotate: language === "vi" ? "🔄 Xoay góc 3D (3D Spiral Card)" : "🔄 Elegant 3D Spiral Rotation",
+  };
+
+  const handleTriggerTest = () => {
+    // Play local chimes
+    const soundType = settings.transitionSoundType || "bell";
+    playTransitionSound(soundType);
+
+    // Swap simulated tabs
+    setTriggerCount(c => c + 1);
+    setPreviewTab(prev => prev === "screen_a" ? "screen_b" : "screen_a");
+
+    // Trigger local screen cover
+    setIsLocalSimulating(true);
+
+    const duration = (settings.transitionDuration || 3) * 1000;
+    const timeout = setTimeout(() => {
+      setIsLocalSimulating(false);
+    }, duration);
+
+    showToast(
+      language === "vi" 
+        ? `🎬 Đang chạy biểu diễn hiệu ứng: "${settings.transitionType || "shutter"}" (${settings.transitionDuration || 3} giây)` 
+        : `🎬 Interactive simulation activated: ${settings.transitionType || "shutter"} animation`
+    );
+
+    return () => clearTimeout(timeout);
+  };
+
+  const triggerObsTransitionGlobal = async () => {
+    const currentCount = settings.transitionTriggerCount || 0;
+    const updatedCount = currentCount + 1;
+    
+    // Save locally
+    updateSettings({
+      transitionTriggerCount: updatedCount
+    });
+
+    // Fire sound effect locally on Streamer controller panel
+    const soundType = settings.transitionSoundType || "bell";
+    playTransitionSound(soundType);
+
+    // Persist settings directly onto synchronized server JSON instantly
+    try {
+      const { soundFileBase64, ...settingsToSave } = { ...settings, transitionTriggerCount: updatedCount };
+      await fetch("/api/youtube/settings-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: settingsToSave }),
+      });
+      showToast(
+        language === "vi"
+          ? "🚀 Đã kích hoạt chuyển cảnh sang OBS thành công!"
+          : "🚀 Command fired! All connected OBS Transition Overlays are executing!"
+      );
+    } catch (err) {
+      console.warn("Failed to instantly sync trigger global transition to server:", err);
+      showToast(
+        language === "vi"
+          ? "⚠️ Đã kích hoạt chuyển cảnh local (kết nối máy chủ gặp gián đoạn)"
+          : "⚠️ Fired transition locally (server connection slow)"
+      );
+    }
+  };
+
+  // Logo file upload handler converting to Base64 store
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast(language === "vi" ? "⚠️ Kích thước logo phải nhỏ hơn 2MB!" : "⚠️ Logo must be under 2MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateSettings({
+        transitionImageBase64: reader.result as string,
+        transitionImageUrl: "" // Clear url since base64 is custom prioritized
+      });
+      showToast(language === "vi" ? "🎨 Đã tải ảnh Logo lên thành công!" : "🎨 Brand logo uploaded successfully!");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Preset Gradients options
+  const presetsGradients = [
+    { name: "Cosmic Lavender", value: "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)" },
+    { name: "Neon Emerald", value: "linear-gradient(135deg, #022c22 0%, #064e3b 50%, #020617 100%)" },
+    { name: "Twilight Crimson", value: "linear-gradient(135deg, #500724 0%, #2e1065 50%, #0f172a 100%)" },
+    { name: "Cyberpunk Sunrise", value: "linear-gradient(135deg, #450a0a 0%, #701a75 55%, #020617 100%)" },
+    { name: "Ice Deep Sea", value: "linear-gradient(135deg, #0f172a 0%, #0284c7 100%)" },
+  ];
+
+  const getPreviewBackgroundStyle = () => {
+    const bgType = settings.transitionBgType || "gradient";
+    if (bgType === "solid") {
+      return { backgroundColor: settings.transitionBgColor || "#0f172a" };
+    }
+    if (bgType === "gradient") {
+      return { background: settings.transitionBgGradient || "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)" };
+    }
+    return {
+      background: `linear-gradient(to bottom, rgba(15,23,42,0.85), rgba(3,7,18,0.95)), url(${settings.transitionImageUrl || ""})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center"
+    };
+  };
+
+  const activeBrandingImg = settings.transitionImageBase64 || settings.transitionImageUrl;
+
+  return (
+    <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5 min-h-0 animate-in fade-in-50 duration-200" id="transition-studio-workspace">
+      {/* LEFT COLUMN: CONTROLS CONFIGURATION */}
+      <div className="col-span-1 lg:col-span-2 bg-slate-900/40 border-r border-slate-800/80 flex flex-col overflow-y-auto custom-scrollbar p-5 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-pink-500 animate-spin" style={{ animationDuration: "5s" }} />
+            <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide">
+              {text.title}
+            </h3>
+          </div>
+          <p className="text-[11px] text-slate-450 leading-relaxed">
+            {text.subtitle}
+          </p>
+        </div>
+
+        {/* OBS TRANSITION OVERLAY LINK IMPORT CARD */}
+        <div className="bg-gradient-to-br from-indigo-950/40 to-slate-900/50 border border-indigo-500/20 p-4 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Tv className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Link OBS Transition Overlay độc lập</span>
+            </span>
+            <span className="bg-indigo-500/10 text-indigo-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono uppercase border border-indigo-500/20 shadow-sm animate-pulse">
+              OBS Link
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 leading-normal">
+            {language === "vi" 
+              ? "Sao chép liên kết chuyên biệt này và cài đặt vào OBS dưới dạng nguồn trình duyệt Browser Source riêng biệt." 
+              : "Copy this unique link and insert into OBS as a standalone browser source."}
+          </p>
+
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-850 p-1.5 pl-2.5 rounded-lg select-all">
+            <input 
+              type="text" 
+              readOnly 
+              value={obsTransitionLink} 
+              className="bg-transparent border-none text-[10px] font-mono text-indigo-305 w-full focus:outline-none select-all overflow-hidden truncate"
+            />
+            <button
+              type="button"
+              onClick={onCopyObsTransitionLink}
+              className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white p-1.5 rounded-md cursor-pointer transition-all flex items-center gap-1 shrink-0 px-2 text-[10px] font-bold uppercase shadow"
+            >
+              <Copy className="w-3 h-3" />
+              <span>Sao Chép</span>
+            </button>
+          </div>
+          <div className="text-[9px] text-slate-400 leading-normal bg-indigo-500/5 p-2 rounded border border-indigo-500/10">
+            💡 <strong>OBS Setup:</strong> Rộng: <b>1920</b>, Cao: <b>1080</b> (hoặc độ phân giải stream của bạn). Đừng quên tích chọn <i>"Refresh browser when scene becomes active"</i> để tối ưu phục hồi rèm!
+          </div>
+        </div>
+
+        {/* 2. Text Contents Card */}
+        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
+          <label className="text-[11.5px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Type className="w-3.5 h-3.5" />
+            <span>{language === "vi" ? "Chữ hiển thị (Texts)" : "Branding texts"}</span>
+          </label>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ chính (Tiêu đề)</span>
+              <input
+                type="text"
+                value={settings.transitionTitle || "STREAMING SOON"}
+                onChange={(e) => updateSettings({ transitionTitle: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
+                placeholder="e.g. LIVE STARTING SOON"
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ phụ (Mô tả ngắn)</span>
+              <textarea
+                value={settings.transitionSubtitle || "Chuẩn bị bắt đầu trong giây lát..."}
+                onChange={(e) => updateSettings({ transitionSubtitle: e.target.value })}
+                rows={2}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium custom-scrollbar"
+                placeholder="e.g. Vui lòng đợi trong khi streamer cài đặt thiết bị"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Color & Branding Card */}
+        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
+          <label className="text-[11.5px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5" />
+            <span>{language === "vi" ? "Nền & Thương hiệu (Branding)" : "Branding & Backdrop"}</span>
+          </label>
+
+          <div className="space-y-3">
+            {/* Background Style choice */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-450 block font-semibold">Kiểu nền giao diện</span>
+              <select
+                value={settings.transitionBgType || "gradient"}
+                onChange={(e) => updateSettings({ transitionBgType: e.target.value as any })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+              >
+                <option value="gradient">🎨 Nền dải màu (Linear Gradient Presets)</option>
+                <option value="solid">⬛ Nền màu đơn sắc (Solid Color Background)</option>
+                <option value="custom_image">🖼️ Ảnh nền tùy chỉnh (Custom Image Link)</option>
+              </select>
+            </div>
+
+            {/* Custom backgrounds context rendering */}
+            {settings.transitionBgType === "solid" && (
+              <div className="space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-850">
+                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Chọn màu đơn sắc</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={settings.transitionBgColor || "#0f172a"}
+                    onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                    className="w-7 h-7 border-0 bg-transparent cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    maxLength={7}
+                    value={settings.transitionBgColor || "#0f172a"}
+                    onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                    className="w-full bg-transparent border-0 text-xs font-mono font-bold text-slate-300 uppercase tracking-widest pl-1"
+                  />
+                </div>
+              </div>
+            )}
+
+            {settings.transitionBgType === "gradient" && (
+              <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
+                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Preset Gradient phối sọc</span>
+                <select
+                  value={settings.transitionBgGradient || "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)"}
+                  onChange={(e) => updateSettings({ transitionBgGradient: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-805 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none cursor-pointer"
+                >
+                  {presetsGradients.map((g) => (
+                    <option key={g.name} value={g.value}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {settings.transitionBgType === "custom_image" && (
+              <div className="space-y-1 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
+                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Đường dẫn URL ảnh nền</span>
+                <input
+                  type="text"
+                  value={settings.transitionImageUrl || ""}
+                  onChange={(e) => updateSettings({ transitionImageUrl: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-805 rounded-md px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500"
+                  placeholder="Paste direct .png/.jpg link"
+                />
+              </div>
+            )}
+
+            {/* Custom Logo Brand upload */}
+            <div className="space-y-1.5 border-t border-slate-800/40 pt-2">
+              <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1">
+                <Image className="w-3.5 h-3.5 text-slate-555" />
+                <span>Logo / Điểm nhấn trung tâm</span>
+              </span>
+
+              {activeBrandingImg ? (
+                <div className="flex items-center justify-between gap-3 bg-slate-950 p-2 rounded-lg border border-slate-850">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={activeBrandingImg}
+                      alt="Brand preview"
+                      className="w-9 h-9 object-contain rounded bg-slate-900 border border-slate-800 p-0.5"
+                    />
+                    <div className="text-left">
+                      <span className="text-[10px] font-bold text-slate-200 block truncate max-w-[120px]">Logo Đã Thiết Lập</span>
+                      <span className="text-[8px] font-mono text-emerald-400 block font-bold">BASE64 / URL</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateSettings({ transitionImageBase64: "", transitionImageUrl: "" })}
+                    className="p-1 px-1.5 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/20 text-rose-400 rounded transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <label className="flex-1 bg-slate-950 hover:bg-slate-900 text-slate-350 text-[11px] font-bold py-2 border border-slate-850 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                    <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Tải ảnh logo lên</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Speed & Sound Audio notification card */}
+        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
+          <label className="text-[11.5px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>{language === "vi" ? "Thời gian & Âm thanh (FXs)" : "Timing & FXs"}</span>
+          </label>
+
+          <div className="space-y-3">
+            {/* Speed duration */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">Thời lượng hiệu ứng dài</span>
+                <span className="font-bold text-pink-500 font-mono">{settings.transitionDuration || 3} giây</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                step="1"
+                value={settings.transitionDuration || 3}
+                onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
+                className="w-full accent-pink-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Sound Choice */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1 pl-0.5">
+                <Music className="w-3 h-3 text-slate-500" />
+                <span>Âm thanh đi kèm khi sập rèm</span>
+              </span>
+              <select
+                value={settings.transitionSoundType || "bell"}
+                onChange={(e) => updateSettings({ transitionSoundType: e.target.value as any })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
+              >
+                <option value="none">🔇 Không phát âm thanh (Silent)</option>
+                <option value="bell">🔔 Tiếng chuông bính bong thanh khiết (Bell Chime)</option>
+                <option value="pop">🍿 Tiếng nổ tách tinh nghịch (Organic Pop)</option>
+                <option value="synth">⚡ Rít vụt âm kĩ thuật số tối tân (Digital Sweep)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Shutter specific details */}
+        {(settings.transitionType || "shutter") === "shutter" && (
+          <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Columns className="w-3.5 h-3.5" />
+              <span>{text.shutterOptions}</span>
+            </h4>
+
+            <div className="space-y-3">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-400">Số lượng cột sọc sập xuôi</span>
+                <span className="font-mono text-cyan-400 font-bold">5 Cốt sọc (Default)</span>
+              </div>
+              <div className="flex justify-between text-[11px] border-t border-slate-850 pt-2.5">
+                <span className="text-slate-400">Màu rèm chắn kĩ thuật số</span>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: accentColor }} />
+                  <span className="text-slate-300 font-bold uppercase">{accentColor}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Triggers Grid */}
+        <div className="pt-2 space-y-2 flex flex-col">
+          {/* 1. Sandbox Test Button */}
+          <button
+            type="button"
+            onClick={handleTriggerTest}
+            className="w-full bg-slate-850 hover:bg-slate-800 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer shadow border border-slate-705 transition-all"
+            id="shutter-trigger-simulation-btn"
+          >
+            <Play className="w-3.5 h-3.5 text-pink-400 fill-current shrink-0" />
+            <span>{text.testBtn}</span>
+          </button>
+
+          {/* 2. Global Streamer Trigger Button */}
+          <button
+            type="button"
+            onClick={triggerObsTransitionGlobal}
+            className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:brightness-110 active:scale-95 text-white font-black py-4 px-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-600/20 hover:shadow-pink-600/35 border border-pink-500/20 transition-all"
+            id="obs-global-trigger-hotkey-btn"
+          >
+            <Sparkles className="w-4 h-4 fill-current shrink-0 animate-bounce" />
+            <span>{text.obsTriggerBtn}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: MOTION SANBDX WORKSPACE */}
+      <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+        {/* Workspace Title Card */}
+        <div className="flex items-center justify-between bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-pink-400 animate-pulse" />
+            <div>
+              <h3 className="text-xs font-bold text-slate-100">{text.previewTitle}</h3>
+              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                {text.previewDesc}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPreviewTab(prev => prev === "screen_a" ? "screen_b" : "screen_a")}
+            className="font-bold text-[9px] bg-slate-950 hover:bg-slate-900 text-pink-400 border border-slate-805 px-2 py-1 rounded transition-all cursor-pointer select-none uppercase active:scale-95"
+          >
+            {text.toggleMock}
+          </button>
+        </div>
+
+        {/* HIGH-END INTERACTIVE TELEMETRY SCREEN */}
+        <div 
+          className="flex-1 min-h-[480px] rounded-2xl bg-slate-980 border border-slate-900/90 relative overflow-hidden flex flex-col justify-between p-6 select-none shadow-inner"
+          id="simulation-telemetry-canvas"
+        >
+          {/* Top aesthetic grid line decorators */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35 animate-pulse" style={{ animationDuration: "10s" }} />
+
+          {/* Interactive Dynamic Transition viewport */}
+          <div className="flex-1 relative overflow-hidden flex items-center justify-center rounded-xl bg-slate-950/60 border border-slate-900/50 z-10 min-h-[360px]">
+            <ScreenTransition transitionKey={`${previewTab}-${triggerCount}`} type={settings.transitionType || "shutter"}>
+              {isLocalSimulating ? (
+                /* Renders 100% exact live simulated transition overlay cover! */
+                <div 
+                  className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-20"
+                  style={getPreviewBackgroundStyle()}
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
+                  
+                  {activeBrandingImg ? (
+                    <img 
+                      src={activeBrandingImg} 
+                      alt="Local Logo brand preview"
+                      className="max-w-[100px] max-h-[100px] object-contain mb-4 animate-bounce bg-slate-900/50 p-2 rounded-xl border border-slate-800"
+                    />
+                  ) : (
+                    <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-550/30 text-indigo-400 mb-4 animate-bounce">
+                      <Tv className="w-8 h-8" />
+                    </div>
+                  )}
+
+                  <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-wider" style={{ fontFamily: settings.fontFamily }}>
+                    {settings.transitionTitle || "STREAMING SOON"}
+                  </h3>
+                  
+                  <p className="text-xs text-slate-300 max-w-sm mt-2 font-medium" style={{ fontFamily: settings.fontFamily }}>
+                    {settings.transitionSubtitle || "Chuẩn bị bắt đầu trong giây lát..."}
+                  </p>
+
+                  <div className="absolute bottom-6 flex items-center gap-1.5 text-[9px] font-mono font-bold text-indigo-300 uppercase shrink-0 opacity-40">
+                    <Sparkles className="w-3 h-3 text-indigo-400 animate-spin" />
+                    <span>Sandbox Rendering...</span>
+                  </div>
+                </div>
+              ) : previewTab === "screen_a" ? (
+                <div className="text-center p-6 space-y-4 max-w-sm" key="screen_a_payload_key">
+                  <div className="inline-flex p-3 rounded-2xl bg-indigo-500/10 border border-indigo-555/20 text-indigo-400">
+                    <Tv className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-100 uppercase tracking-widest font-sans">
+                      MÀN HÌNH CHỜ LIVE (LỚP A)
+                    </h4>
+                    <p className="text-10px text-slate-500 mt-2 font-medium leading-relaxed">
+                      {language === "vi" 
+                        ? "Mô phỏng Streamer đang phát trò chơi hoặc giao lưu trực tuyến với người hâm mộ." 
+                        : "Simulating live gameplay streaming feed overlay mode to support dynamic context layers."}
+                    </p>
+                  </div>
+                  <div className="inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                    SCENE STATUS: ONLINE FEED A
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center p-6 space-y-4 max-w-sm" key="screen_b_payload_key">
+                  <div className="inline-flex p-3 rounded-2xl bg-pink-500/10 border border-pink-550/20 text-pink-400">
+                    <Sparkles className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-100 uppercase tracking-widest font-sans">
+                      MÀN HÌNH NGHỈ GIỮA HIỆP (LỚP B)
+                    </h4>
+                    <p className="text-10px text-slate-500 mt-2 font-medium leading-relaxed">
+                      {language === "vi" 
+                        ? "Mô phỏng Streamer vừa thực hiện thao tác chuyển tiếp rèm hoạt ảnh." 
+                        : "Harnessing spring curves to switch user views seamlessly inside control deck."}
+                    </p>
+                  </div>
+                  <div className="inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-pink-950/20 border border-pink-900/30 text-pink-400">
+                    SCENE STATUS: TRANSITED STATE B
+                  </div>
+                </div>
+              )}
+            </ScreenTransition>
+          </div>
+
+          {/* Acceleration Curve telemetry overlay */}
+          <div className="shrink-0 p-3 bg-slate-950/90 border border-slate-900 rounded-xl flex items-center justify-between gap-4 z-10 mt-4">
+            <div className="flex items-center gap-2">
+              <Gauge className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <div>
+                <span className="text-[10px] font-mono font-bold text-slate-350 block uppercase leading-none">
+                  {text.physicsLabel}
+                </span>
+                <span className="text-[8px] text-slate-500 font-semibold block uppercase leading-none mt-1">
+                  Duration: {settings.transitionDuration || 3}s • Type: {settings.transitionType || "shutter"} • Chime: {settings.transitionSoundType || "bell"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="text-[9px] font-sans font-bold text-slate-400 uppercase tracking-wide">
+                ACCEL CALIBRATED
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

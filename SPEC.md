@@ -151,3 +151,27 @@ const decodedParams = JSON.parse(decodedJsonStr);
 - **Bảo mật tối cao cho API Key**: Nhờ thuật toán mã hóa `ob`, không một ai có thể nhìn thấy API Key hoặc Chat ID của streamer bằng mắt thường khi liên kết hiển thị trên OBS hoặc lúc chụp ảnh màn hình, chống rò rỉ và lạm dụng API ngoài ý muốn.
 - **Cơ chế Chống XSS**: Sử dụng hàm thanh lọc tin nhắn đầu vào nhằm loại bỏ dấu hiệu của các thẻ HTML độc hại, bảo vệ bảng hiển thị của stream khỏi các sự cố chiếm quyền hay spam nội dung phá hoại.
 - **Tối ưu băng thông**: Polling được đồng bộ chặt chẽ ở chu kỳ 4 giây cho tin nhắn, và 3 giây cho cài đặt tự động cập nhật, bảo đảm tốc độ phản hồi tức thì mà vẫn giữ được sự ổn định cho máy chủ và nằm gọn trong phạm vi hạn ngạch miễn phí của YouTube API.
+
+---
+
+## 4. Các trường Cấu hình Chuyển Cảnh (Screen Transition Schema Specifications)
+
+Để lưu giữ dồi dào cấu hình cá nhân hóa và quản lý hoạt ảnh/âm thanh đồng bộ, mô hình dữ liệu `OverlaySettings` mở rộng thêm các trường điều chỉnh chuyển cảnh cụ thể sau đây:
+
+### 4.1 Cấu trúc Dữ liệu Chuyển Cảnh (Properties Models)
+- **transitionDuration** (`number`): Thời gian duy trì hiển thị rèm màn hình chuyển tiếp (mặc định: `3` giây, hỗ trợ điều chỉnh từ `1`đến `10` giây).
+- **transitionTitle** (`string`): Nhãn văn bản chính đóng vai trò làm Tiêu đề trung tâm (ví dụ: `LIVE STARTING SOON`, `BE RIGHT BACK`).
+- **transitionSubtitle** (`string`): Văn bản dòng phụ chú ý (ví dụ: `Chuẩn bị bắt đầu trong giây lát...`).
+- **transitionBgType** (`"gradient" | "solid" | "custom_image"`): Định nghĩa chế độ phủ hình nền của phòng chuyển cảnh.
+- **transitionBgColor** (`string`): Mã Hex màu đơn sắc được chọn nếu dòng `transitionBgType` sống ở trạng thái `"solid"`.
+- **transitionBgGradient** (`string`): Lệnh CSS phối Gradient đa sắc nếu dòng `transitionBgType` sống ở trạng thái `"gradient"`.
+- **transitionImageUrl** (`string`): URL liên kết ngoài ảnh nền của streamer.
+- **transitionImageBase64** (`string`): Dữ liệu Base64 ảnh Logo chính diện lưu trữ trực tiếp ngoại tuyến.
+- **transitionSoundType** (`"none" | "bell" | "pop" | "synth"`): Chỉ định tệp âm thanh phản hồi (bell bính bong, pop tách nghịch ngợm, hoặc sweep kỹ thuật số cao cấp) vang lên đồng thời khi sập rèm.
+- **transitionTriggerCount** (`number`): Số lần gia tăng kích phát lệnh. Đóng vai trò là khóa trị số gia tăng. Mỗi khi khóa này tăng lên 1 đơn vị, tất cả các máy Client OBS Overlay đang Long-Polling bắt được sự thay đổi sẽ phát lệnh trigger hoạt cảnh sập rèm và phát chớp Sound FX ngay lập tức.
+
+### 4.2 Nguyên lý Đồng bộ Tải Trọng Kích Phát OBS (Global Event Broadcast)
+Bảng điều khiển streamer và OBS Browser Source giao tiếp qua API đồng bộ cấu hình `/api/youtube/settings-sync`:
+1. **Lệnh Kích hoạt**: Khi nhấp chọn nút "Kích hoạt chuyển cảnh OBS", Controller sẽ cộng giá trị `transitionTriggerCount` lên `1` đơn vị rồi POST lên server.
+2. **OBS Phản xạ**: Overlay OBS chat / transition liên tục thăm dò chu kỳ lấy cấu hình mới. Ngay khi trị số `transitionTriggerCount` thay đổi so với trị số cục bộ hiện tại, OBS sập rèm che bóng toàn phần, phát chớp tín hiệu âm thanh tương ứng, và gỡ rèm sau khoảng thời gian `transitionDuration` giây hoàn toàn đồng bộ, mở ra cảnh game mới mẻ cực kỳ mượt mà.
+

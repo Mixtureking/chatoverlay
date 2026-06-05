@@ -4,6 +4,20 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.3] - 2026-06-05
+
+### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
+- **Studio Chuyển Cảnh OBS Chuyên Nghiệp (Screen Transition Overlay)**: Đưa tệp Screen Transition trở thành một dạng Overlay OBS Browser độc lập, cung cấp 5 hiệu ứng hoạt ảnh chuyển tiếp cao cấp (🚪 Cửa sập kỹ thuật số Shutter, 💨 Mờ dần Crossfade, ➡️ Trượt ngang Spring Slide, 🔍 Thu phòng Zoom Out, 🔄 Xoay góc 3D Spiral). Streamer hoàn toàn làm chủ thiết kế với tiêu đề, mô tả tùy chọn, và chọn kiểu nền linh hoạt (preset phối Gradient thời thượng, màu đơn sắc, hoặc URL hình ảnh ngoài).
+- **Bộ tải Logo thương hiệu Offline (Base64 Logo Uploader)**: Tích hợp trình tải lên logo thương hiệu trực tiếp từ máy tính cá nhân. Ảnh logo sẽ được tự động chuyển đổi sang chuỗi mã hóa Base64 siêu nhẹ gộp thẳng vào thiết lập, giúp OBS Overlay đọc mượt mà ngoại tuyến mà không chịu ảnh hưởng của mạng hay đường truyền ngoài.
+- **Bàn kích hoạt chuyển cảnh không dây (Trigger OBS Transition)**: Xây dựng bệ phóng kích hoạt chuyển cảnh theo phong cách Stream Deck. Streamer nhấp chọn "Kích hoạt chuyển cảnh OBS" trong bảng điều khiển và sự kiện đồng bộ sẽ được phát ngay lập tức tới mọi luồng Browser Source đang treo trên OBS, nháy phát âm thanh hiệu ứng (bính bong Chime, Pop vui nhộn, hoặc rít kĩ thuật số Sweep) và hoạt cảnh mượt mà trên stream tức thì.
+- **Phòng thí nghiệm Motion Sandbox thời gian thực**: Trải nghiệm thực tế ảo hóa WYSIWYG ngay góc bên phải Studio. Streamer dễ dàng kiểm chứng âm thanh, phông chữ, ảnh nền, logo và tốc độ chuyển đổi rèm trực tiếp trước khi áp dụng trên OBS live.
+
+### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
+- **Hợp nhất thiết lập & Khử trùng lặp màu điểm nhấn (UI Refactoring)**: Loại bỏ triệt để dải chọn màu điểm nhấn hệ thống trùng lặp trong tab 'Styler'. Thay thế bằng một chiếc Thẻ Điều Hướng Hệ Thống (System Redirect Bridge Card) thông minh hướng dẫn streamers tới 'Cài Đặt Tổng Thể' hoặc 'Studio Chuyển Cảnh', giữ cho giao diện tối giản tinh tế tối đa.
+- **Cải tiến sinh liên kết OBS độc lập (Dynamic URL Compiler)**: Tạo hai bộ sinh liên kết an toàn độc lập cho "OBS Chat Overlay" và "OBS Screen Transition Overlay", đi kèm phím sao chép một chạm tiện dụng và hướng dẫn chi tiết.
+
+---
+
 ## [1.0.2] - 2026-06-04
 
 ### 🚀 Tính năng mới & Bổ sung nổi bật (New Additions)

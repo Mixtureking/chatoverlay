@@ -56,6 +56,23 @@ export interface OverlaySettings {
   decorativeIconEnabled?: boolean;
   decorativeIconType?: "star" | "heart" | "fire" | "sparkles" | "crown" | "controller" | "bolt" | "coffee";
   decorativeIconPosition?: "before_name" | "after_name" | "before_msg";
+
+  // Application Language & Styling Accents Configuration (New)
+  language?: "vi" | "en";
+  accentColor?: string; // hex like #6366f1, #10b981 etc.
+  transitionType?: "fade" | "slide" | "zoom" | "rotate" | "shutter";
+
+  // Custom Screen Transition Overlay configurations
+  transitionDuration?: number; // default 3 seconds
+  transitionTitle?: string;
+  transitionSubtitle?: string;
+  transitionImageBase64?: string;
+  transitionImageUrl?: string;
+  transitionBgType?: "solid" | "gradient" | "custom_image";
+  transitionBgColor?: string;
+  transitionBgGradient?: string;
+  transitionSoundType?: "none" | "bell" | "pop" | "synth";
+  transitionTriggerCount?: number;
 }
 
 export interface FilterKeyword {

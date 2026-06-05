@@ -66,6 +66,12 @@ Hệ thống được vận hành dựa trên thiết kế **Full-Stack lai ghé
 - **Công nghệ**: Electron.
 - **Tương tác**: Kích hoạt máy chủ Express cục bộ thông qua file bundle `/dist/server.cjs` và duy trì cửa sổ Always-On-Top với cơ chế xuyên thấu chuột (Click-through) thông minh cho streamer khi chơi game.
 
+### 2.6 Tầng Chuyển Cảnh Hoạt Ảnh Kịch Tính (OBS Screen Transition Layer)
+- **Công nghệ**: React v18, Framer Motion (`motion/react`), HTML5 Web Audio.
+- **Nội dung & Cách vận hành**:
+  - **Khung overlay chuyển cảnh độc lập**: Được thiết lập qua đường dẫn an toàn Base64 với tham số `mode=transition` hoặc `/transition-overlay`, hoạt động hệt như một thẻ rèm động trên OBS Browser Source.
+  - **Kích phát & Đồng bộ vô tuyến**: Khi một sự thay đổi tăng trị số `transitionTriggerCount` được đẩy lên qua proxy, Client OBS Overlay bắt tín hiệu ngay lập tức, tự động sập rèm kỹ thuật số, phát Sound FX tương thích (tiếng chuông dập dốc, organic pop hoặc rít kỹ thuật số) và hiển thị tiêu đề, mô tả thương hiệu lớn kèm logo Base64 sắc nét. Hoạt ảnh gỡ rèm tự động kích hoạt sau `transitionDuration` giây, mở lộ toàn bộ cảnh game phía dưới.
+
 ---
 
 ## 3. Cấu trúc Thư mục Dự án và Định dạng Sắp xếp

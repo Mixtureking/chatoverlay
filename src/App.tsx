@@ -3,6 +3,12 @@ import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
 import HelpManual from "./components/HelpManual";
+import SidebarNavigator from "./components/SidebarNavigator";
+import ScreenTransition from "./components/ScreenTransition";
+import ScreenTransitionWorkspace from "./components/ScreenTransitionWorkspace";
+import ScreenTransitionOverlay from "./components/ScreenTransitionOverlay";
+import SettingsWorkspace from "./components/SettingsWorkspace";
+import { TRANSLATIONS } from "./translations";
 import {
   Tv,
   Key,
@@ -36,6 +42,8 @@ import {
   Save,
   Volume2,
   Image,
+  Menu,
+  Languages,
 } from "lucide-react";
 
 // Simple lightweight IndexedDB utility for large files (sounds & background images)
@@ -348,6 +356,19 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   decorativeIconEnabled: false,
   decorativeIconType: "star",
   decorativeIconPosition: "before_name",
+  language: "vi",
+  accentColor: "#6366f1",
+  transitionType: "shutter",
+  transitionDuration: 3,
+  transitionTitle: "STREAMING SOON",
+  transitionSubtitle: "Chuẩn bị bắt đầu trong giây lát...",
+  transitionImageBase64: "",
+  transitionImageUrl: "",
+  transitionBgType: "gradient",
+  transitionBgColor: "#0f172a",
+  transitionBgGradient: "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)",
+  transitionSoundType: "bell",
+  transitionTriggerCount: 0,
   customHtml: `<div id="custom-chat-box" class="custom-scroll">
   <!-- Tin nhắn mới sẽ được biểu diễn tự động tại đây -->
 </div>`,
@@ -450,6 +471,7 @@ export default function App() {
   // 1. DYNAMIC ROUTING CHECK - OBS Browser Source Detection
   const [isOverlayRoute, setIsOverlayRoute] = useState(false);
   const [isDesktopOverlay, setIsDesktopOverlay] = useState(false);
+  const [isTransitionOverlay, setIsTransitionOverlay] = useState(false);
   const [isOverlayLocked, setIsOverlayLocked] = useState(false);
   const [isElectronEnv, setIsElectronEnv] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
@@ -548,11 +570,15 @@ export default function App() {
 
     const hasOverlayParam = searchParams.get("mode") === "overlay" || decodedParams.liveChatId !== undefined;
     const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay" || decodedParams.mode === "desktop-overlay";
+    const hasTransitionParam = searchParams.get("mode") === "transition" || decodedParams.mode === "transition" || path === "/transition-overlay";
     
-    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || !!obParam) {
+    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) {
       setIsOverlayRoute(true);
       if (hasDesktopOverlayParam) {
         setIsDesktopOverlay(true);
+      }
+      if (hasTransitionParam || decodedParams.mode === "transition") {
+        setIsTransitionOverlay(true);
       }
       
       // Parse settings from URL or decoded params with logical fallbacks
@@ -719,6 +745,13 @@ export default function App() {
 
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [rightSubTab, setRightSubTab] = useState<"obs" | "custom" | "logs">("obs");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Translation helpers
+  const activeLanguage = settings.language || "vi";
+  const t = (key: keyof typeof TRANSLATIONS.vi) => {
+    return TRANSLATIONS[activeLanguage]?.[key] || TRANSLATIONS.vi[key];
+  };
 
   const [blacklist, setBlacklist] = useState<FilterKeyword[]>(() => {
     const saved = localStorage.getItem("yt_overlay_blacklist");
@@ -749,6 +782,7 @@ export default function App() {
   });
 
   // UI Tabs & Configurations
+  const [activeMainRoute, setActiveMainRoute] = useState<"chat_overlay" | "screen_transition" | "settings">("chat_overlay");
   const [activeTab, setActiveTab] = useState<string>("connect");
   const [newKeyword, setNewKeyword] = useState("");
   const [newKeywordIsRegex, setNewKeywordIsRegex] = useState(false);
@@ -1499,6 +1533,33 @@ export default function App() {
       query.set("animationType", config.animationType);
       return `${rootUrl}/?${query.toString()}`;
     }
+  };
+
+  const compileObsTransitionLink = (): string => {
+    const rootUrl = window.location.origin;
+    const config = {
+      mode: "transition",
+      apiKey: apiKey || "SANDBOX_MOCK_DRIVEN",
+      transitionType: settings.transitionType || "shutter",
+      fontFamily: settings.fontFamily,
+    };
+    try {
+      const jsonStr = JSON.stringify(config);
+      const utf8String = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      });
+      const base64 = btoa(utf8String);
+      const urlSafeBase64 = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      return `${rootUrl}/?ob=${urlSafeBase64}`;
+    } catch (e) {
+      return `${rootUrl}/?mode=transition`;
+    }
+  };
+
+  const handleCopyObsTransitionLink = () => {
+    const linkStr = compileObsTransitionLink();
+    navigator.clipboard.writeText(linkStr);
+    showToast("📋 Đã sao chép link OBS Screen Transition Overlay!");
   };
 
   const handleCopyObsLink = () => {
@@ -2424,6 +2485,14 @@ export default function App() {
       );
     }
 
+    if (isTransitionOverlay) {
+      return (
+        <div className="w-full h-screen bg-transparent overflow-hidden">
+          <ScreenTransitionOverlay settings={obsSettings} />
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-screen bg-transparent overflow-hidden">
         <OverlayWidget messages={messages} settings={obsSettings} />
@@ -2432,6 +2501,41 @@ export default function App() {
   }
 
   // 8. RENDER BEAUTIFUL STREAMER CONTROL PANEL HUB
+  const currentAccent = settings.accentColor || "#6366f1";
+  const customDynamicStyleTag = (
+    <style dangerouslySetInnerHTML={{ __html: `
+      .bg-indigo-650 {
+        background-color: ${currentAccent} !important;
+      }
+      .hover\\:bg-indigo-650:hover {
+        background-color: ${currentAccent}e0 !important;
+      }
+      .text-indigo-400 {
+        color: ${currentAccent} !important;
+      }
+      .border-indigo-500 {
+        border-color: ${currentAccent} !important;
+      }
+      .focus\\:border-indigo-500:focus {
+        border-color: ${currentAccent} !important;
+      }
+      .accent-indigo-500 {
+        accent-color: ${currentAccent} !important;
+      }
+      .shadow-indigo-600\\/15 {
+        box-shadow: 0 10px 15px -3px ${currentAccent}26, 0 4px 6px -4px ${currentAccent}26 !important;
+      }
+      .shadow-indigo-600\\/20 {
+        box-shadow: 0 10px 15px -3px ${currentAccent}33, 0 4px 6px -4px ${currentAccent}33 !important;
+      }
+    `}} />
+  );
+
+  const handleAddSampleMessage = () => {
+    const randomIndex = Math.floor(Math.random() * SAMPLE_MESSAGES_TEMPLATES.length);
+    handleInjectMessage(SAMPLE_MESSAGES_TEMPLATES[randomIndex]);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* 🔴 Active Flash Indicator Toast */}
@@ -2465,6 +2569,8 @@ export default function App() {
         </div>
       )}
 
+      {customDynamicStyleTag}
+
       {/* Primary Top Header Board */}
       <header className="bg-slate-900 border-b border-slate-800 shrink-0 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -2473,16 +2579,32 @@ export default function App() {
           </div>
           <div>
             <h1 className="font-bold tracking-tight text-base text-slate-100 uppercase font-grotesk flex items-center gap-2">
-              <span>YouTube Chat Overlay</span>
+              <span>{t("appName")}</span>
             </h1>
             <p className="text-[11px] text-slate-400">
-              Công cụ quản lý, tùy chỉnh bộ khung chat trong suốt gắn OBS Livestream
+              {activeLanguage === "vi" 
+                ? "Công cụ quản lý, tùy chỉnh bộ khung chat trong suốt gắn OBS Livestream"
+                : "Professional custom clear chatbox widget for your live stream software OBS"}
             </p>
           </div>
         </div>
 
         {/* Sync Controls & Global state summary indicators */}
         <div className="flex items-center gap-3">
+          {/* Collapse/Expand Sidebar Menu trigger button */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 ${
+              sidebarOpen 
+                ? "bg-slate-850 border-indigo-500/50 text-indigo-400" 
+                : "bg-indigo-650 hover:bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/15"
+            }`}
+          >
+            <Menu className="w-4 h-4 shrink-0" />
+            <span>{sidebarOpen ? t("sidebarCloseBtn") : t("sidebarOpenBtn")}</span>
+          </button>
+
           {isDesktopOverlay && isEmbeddedDashboardOpen && (
             <button
               onClick={handleToggleDashboardOpen}
@@ -2495,79 +2617,103 @@ export default function App() {
           <div className="flex items-center gap-1 bg-slate-800/60 px-3 py-1 text-xs rounded-full border border-slate-700">
             <span className={`w-2.5 h-2.5 rounded-full ${streamStatus.isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
             <span className="text-slate-300 ml-1.5 text-[11px]">
-              {streamStatus.isConnected ? "🟢 Connected / Hoạt động" : "🔴 Offline / Ngoại tuyến"}
+              {streamStatus.isConnected ? `🟢 ${t("connectedStatus")}` : `🔴 ${t("offlineStatus")}`}
             </span>
           </div>
         </div>
       </header>
 
-      {/* Main split grid panel space */}
-      <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5">
-        {/* LEFT COLUMN: CONTROL SU BOARD */}
-        <div className="col-span-1 lg:col-span-2 bg-slate-900/45 border-r border-slate-800/80 flex flex-col overflow-hidden">
-          {/* Internal quick action tab buttons links */}
-          <div className="flex bg-slate-900 border-b border-slate-800 shrink-0 p-1">
-            <button
-              onClick={() => setActiveTab("connect")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "connect"
-                  ? "bg-slate-800 text-indigo-400 shadow-inner"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-              }`}
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>Kết nối</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("styler")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "styler"
-                  ? "bg-slate-800 text-indigo-400 shadow-inner"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Giao diện</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("filters")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "filters"
-                  ? "bg-slate-800 text-indigo-400 shadow-inner"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Bộ lọc</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("help")}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "help"
-                  ? "bg-slate-800 text-indigo-400 shadow-inner"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-              }`}
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>Hướng dẫn</span>
-            </button>
-          </div>
+      {/* Main split flex panel space carrying SidebarNavigator */}
+      <div className="flex-1 overflow-hidden flex min-w-0 bg-slate-950">
+        {/* PERSISTENT SIDEBAR NAVIGATION PANELS */}
+        <SidebarNavigator
+          activeRoute={activeMainRoute}
+          setActiveRoute={setActiveMainRoute}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          language={activeLanguage}
+          accentColor={currentAccent}
+        />
 
-          {/* DYNAMIC SCROLL CONTAINER TAB VIEWPORTS */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar bg-slate-900/20">
-            {/* TAB 1: CONNECT & SIMULATION ACTIONS */}
-            {activeTab === "connect" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 mb-3">
-                    <Video className="w-4 h-4 text-rose-500" />
-                    <span>Cấu hình kết nối YouTube Live API</span>
-                  </h3>
+        {/* Main Routed Dashboard Area */}
+        <div className="flex-1 overflow-hidden relative flex flex-col min-w-0" id="main-routed-dashboard-area">
+          <ScreenTransition transitionKey={activeMainRoute} type={settings.transitionType || "shutter"}>
+            {activeMainRoute === "chat_overlay" && (
+              <div className="w-full h-full overflow-hidden grid grid-cols-1 lg:grid-cols-5" id="chat-overlay-deck-grid">
+          {/* LEFT COLUMN: CONTROL SU BOARD */}
+          <div className="col-span-1 lg:col-span-2 bg-slate-900/45 border-r border-slate-800/80 flex flex-col overflow-hidden">
+            {/* Internal quick action tab buttons links */}
+            <div className="flex bg-slate-900 border-b border-slate-800 shrink-0 p-1">
+              <button
+                key="connect-tab-btn"
+                type="button"
+                onClick={() => setActiveTab("connect")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "connect"
+                    ? "bg-slate-800 text-indigo-400 shadow-inner border-b-2 border-indigo-500"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                }`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>{t("connectTab")}</span>
+              </button>
+              <button
+                key="styler-tab-btn"
+                type="button"
+                onClick={() => setActiveTab("styler")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "styler"
+                    ? "bg-slate-800 text-indigo-400 shadow-inner border-b-2 border-indigo-500"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>{t("stylerTab")}</span>
+              </button>
+              <button
+                key="filters-tab-btn"
+                type="button"
+                onClick={() => setActiveTab("filters")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "filters"
+                    ? "bg-slate-800 text-indigo-400 shadow-inner border-b-2 border-indigo-500"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>{t("filtersTab")}</span>
+              </button>
+              <button
+                key="help-tab-btn"
+                type="button"
+                onClick={() => setActiveTab("help")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  activeTab === "help"
+                    ? "bg-slate-800 text-indigo-400 shadow-inner border-b-2 border-indigo-500"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>{t("helpTab")}</span>
+              </button>
+            </div>
 
-                  <form onSubmit={handleConnectStream} className="space-y-4">
-                    {/* YouTube API Key container */}
-                    <div className="space-y-1">
+            {/* DYNAMIC SCROLL CONTAINER TAB VIEWPORTS */}
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-slate-900/20">
+              <ScreenTransition transitionKey={activeTab} type={settings.transitionType || "shutter"}>
+                <div className="space-y-6">
+                  {/* TAB 1: CONNECT & SIMULATION ACTIONS */}
+                  {activeTab === "connect" && (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 mb-3">
+                          <Video className="w-4 h-4 text-rose-500" />
+                          <span>{t("connectHeader")}</span>
+                        </h3>
+
+                        <form onSubmit={handleConnectStream} className="space-y-4">
+                          {/* YouTube API Key container */}
+                          <div className="space-y-1">
                       <label className="text-[11px] text-slate-400 uppercase font-semibold flex justify-between tracking-wide">
                         <span>API Key Cá nhân (YouTube Data v3)</span>
                         <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Lấy Key ↗</a>
@@ -2961,9 +3107,11 @@ export default function App() {
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     <Sliders className="w-4 h-4 text-indigo-400" />
-                    <span>Tùy chỉnh Giao diện Overlay</span>
+                    <span>{t("stylerHeader")}</span>
                   </h3>
                 </div>
+
+
 
                 {/* Typography specs */}
                 <div className="space-y-3.5 bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
@@ -3524,8 +3672,10 @@ export default function App() {
 
             {/* TAB 4: COMPREHENSIVE DETAILED MANUAL */}
             {activeTab === "help" && <HelpManual />}
+                </div>
+              </ScreenTransition>
+            </div>
           </div>
-        </div>
 
         {/* RIGHT COLUMN: HIGH-FIDELITY LIVE MONITOR DEVICE PREVIEW (US-02, Drag & Resize specs) */}
         <div className="col-span-1 lg:col-span-3 bg-slate-950 p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar max-h-[calc(100vh-100px)] lg:max-h-none">
@@ -3725,7 +3875,9 @@ export default function App() {
                       </span>
                     </div>
 
+                    {/* Link OBS Chat Overlay */}
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest pl-0.5">💬 Link OBS Chat Overlay</span>
                       <div className="font-mono text-[10.5px] text-indigo-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
                         {compileObsLink()}
                       </div>
@@ -3735,7 +3887,23 @@ export default function App() {
                         className="w-full bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Copy className="w-3.5 h-3.5" />
-                        <span>Sao chép Link OBS Overlay</span>
+                        <span>Sao chép Link OBS Chat Overlay</span>
+                      </button>
+                    </div>
+
+                    {/* Link OBS Screen Transition Overlay */}
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
+                      <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest pl-0.5">🎬 Link OBS Screen Transition Overlay</span>
+                      <div className="font-mono text-[10.5px] text-pink-300 break-all select-all font-semibold p-1 hover:bg-white/5 rounded max-h-[80px] overflow-y-auto custom-scrollbar">
+                        {compileObsTransitionLink()}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyObsTransitionLink}
+                        className="w-full bg-pink-600/90 hover:bg-pink-650 text-white font-bold py-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Sao chép Link OBS Transition Overlay</span>
                       </button>
                     </div>
 
@@ -3919,6 +4087,32 @@ export default function App() {
           </div>
         </div>
       </div>
+    )}
+
+      {activeMainRoute === "screen_transition" && (
+        <ScreenTransitionWorkspace
+          settings={settings}
+          updateSettings={updateSettings}
+          language={activeLanguage}
+          showToast={showToast}
+          accentColor={currentAccent}
+          obsTransitionLink={compileObsTransitionLink()}
+          onCopyObsTransitionLink={handleCopyObsTransitionLink}
+        />
+      )}
+
+      {activeMainRoute === "settings" && (
+        <SettingsWorkspace
+          settings={settings}
+          updateSettings={updateSettings}
+          language={activeLanguage}
+          showToast={showToast}
+          accentColor={currentAccent}
+        />
+      )}
+    </ScreenTransition>
+  </div>
+</div>
       {pipContainer && createPortal(
         <div className="w-full h-full bg-transparent overflow-hidden">
           <OverlayWidget messages={messages} settings={settings} />
