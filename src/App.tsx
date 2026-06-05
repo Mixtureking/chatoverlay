@@ -477,6 +477,8 @@ const isSettingsEqual = (a: OverlaySettings, b: OverlaySettings, ignoreTransitio
   const cloneB = { ...b };
   delete cloneA.transitionActive;
   delete cloneB.transitionActive;
+  delete cloneA.transitionTriggerCount;
+  delete cloneB.transitionTriggerCount;
   return JSON.stringify(cloneA) === JSON.stringify(cloneB);
 };
 
@@ -762,6 +764,10 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
+  const hasUnsavedChanges = useMemo(() => {
+    return !isOverlayRoute && !isSettingsEqual(settings, savedSettingsBenchmark, true);
+  }, [settings, savedSettingsBenchmark, isOverlayRoute]);
+
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [rightSubTab, setRightSubTab] = useState<"obs" | "custom" | "logs">("obs");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -831,10 +837,13 @@ export default function App() {
   const [pipContainer, setPipContainer] = useState<HTMLElement | null>(null);
 
   // Update local settings securely and silently for real-time local feedback
-  const updateSettings = (newSettings: Partial<OverlaySettings>) => {
+  const updateSettings = (newSettings: Partial<OverlaySettings>, saveBenchmark: boolean = false) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       safeSaveSettingsToLocalStorage(updated);
+      if (saveBenchmark) {
+        setSavedSettingsBenchmark(updated);
+      }
       return updated;
     });
   };
@@ -2575,7 +2584,7 @@ export default function App() {
       )}
 
       {/* 💾 Globally Floating Unsaved Changes Card (Gần góc dưới bên phải màn hình, chạy theo thanh cuộn) */}
-      {!isOverlayRoute && !isSettingsEqual(settings, savedSettingsBenchmark, true) && (
+      {hasUnsavedChanges && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 p-4 rounded-xl flex flex-col sm:flex-row items-center gap-4.5 shadow-2xl shadow-indigo-500/20 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-xs sm:max-w-md pointer-events-auto">
           <div className="text-left flex-1 select-none">
             <div className="text-xs font-bold text-indigo-400 flex items-center gap-1.5 leading-none">

@@ -31,7 +31,7 @@ import { playTransitionSound } from "./ScreenTransitionOverlay";
 
 interface ScreenTransitionWorkspaceProps {
   settings: OverlaySettings;
-  updateSettings: (newSettings: Partial<OverlaySettings>) => void;
+  updateSettings: (newSettings: Partial<OverlaySettings>, saveBenchmark?: boolean) => void;
   language: "vi" | "en";
   showToast: (msg: string) => void;
   accentColor: string;
@@ -139,7 +139,7 @@ export default function ScreenTransitionWorkspace({
       setLocalSimTimeout(null);
     }
     
-    updateSettings(mergedUpdate);
+    updateSettings(mergedUpdate, true);
     
     fetch("/api/youtube/settings-sync", {
       method: "POST",
@@ -246,7 +246,7 @@ export default function ScreenTransitionWorkspace({
     updateSettings({
       transitionActive: nextActive,
       transitionTriggerCount: updatedCount
-    });
+    }, true);
 
     if (nextActive) {
       // Fire sound effect locally on Streamer controller panel
@@ -257,7 +257,7 @@ export default function ScreenTransitionWorkspace({
       const sustainType = settings.transitionSustainType || "auto";
       if (sustainType === "auto") {
         setTimeout(async () => {
-          updateSettings({ transitionActive: false });
+          updateSettings({ transitionActive: false }, true);
           try {
             await fetch("/api/youtube/settings-sync", {
               method: "POST",
@@ -316,7 +316,7 @@ export default function ScreenTransitionWorkspace({
         transitionActive: false,
       };
 
-      updateSettings(updatedSettings);
+      updateSettings(updatedSettings, true);
 
       try {
         const { soundFileBase64, ...settingsToSave } = updatedSettings;
@@ -355,7 +355,7 @@ export default function ScreenTransitionWorkspace({
       transitionTriggerCount: updatedCount
     };
 
-    updateSettings(updatedSettings);
+    updateSettings(updatedSettings, true);
 
     // Play chime sound locally
     const soundType = settings.transitionSoundType || "bell";
@@ -370,7 +370,7 @@ export default function ScreenTransitionWorkspace({
     if (sustainTypeVal === "auto") {
       const timeout = setTimeout(async () => {
         setIsLocalSimulating(false);
-        updateSettings({ transitionActive: false });
+        updateSettings({ transitionActive: false }, true);
         try {
           // Fire global transition off state via API
           await fetch("/api/youtube/settings-sync", {
@@ -404,7 +404,7 @@ export default function ScreenTransitionWorkspace({
       // Auto clear timeout from server if it is auto close
       if (sustainTypeVal === "auto") {
         setTimeout(async () => {
-          updateSettings({ transitionActive: false });
+          updateSettings({ transitionActive: false }, true);
           try {
             await fetch("/api/youtube/settings-sync", {
               method: "POST",
@@ -439,7 +439,7 @@ export default function ScreenTransitionWorkspace({
     const nextCustomList = [...currentCustom, created];
     updateSettings({
       transitionCustomPresets: nextCustomList
-    });
+    }, true);
     
     // Save to server
     fetch("/api/youtube/settings-sync", {
@@ -632,7 +632,7 @@ export default function ScreenTransitionWorkspace({
                   onClick={(e) => {
                     e.stopPropagation();
                     const nextList = (settings.transitionCustomPresets || []).filter(p => p.id !== preset.id);
-                    updateSettings({ transitionCustomPresets: nextList });
+                    updateSettings({ transitionCustomPresets: nextList }, true);
                     fetch("/api/youtube/settings-sync", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
