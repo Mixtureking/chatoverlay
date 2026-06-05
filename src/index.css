@@ -142,6 +142,19 @@
   border-color: color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
 }
 
+/* Fix Active Transition Animation Selection Button in Light Mode */
+.dashboard-light-theme #settings-transition-preset-selector .bg-slate-950.text-white {
+  background-color: rgba(20, 184, 166, 0.1) !important; /* teal-500/10 */
+  border-color: rgba(20, 184, 166, 0.4) !important;
+  color: #0f172a !important; /* slate-900 */
+}
+.dashboard-light-theme #settings-transition-preset-selector .text-white {
+  color: #0f172a !important;
+}
+.dashboard-light-theme #settings-transition-preset-selector .text-slate-400 {
+  color: #475569 !important; /* slate-600 */
+}
+
 .dashboard-light-theme .text-indigo-300,
 .dashboard-light-theme .text-indigo-400,
 .dashboard-light-theme .text-indigo-305 {
