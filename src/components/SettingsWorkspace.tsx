@@ -73,6 +73,10 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
     slide: language === "vi" ? "➡️ Trượt ngang mượt mà (Spring Slide)" : "➡️ Smooth Spring Horizon Slide",
     zoom: language === "vi" ? "🔍 Thu phòng êm ái (Zooming Out)" : "🔍 Ambient Depth Zoom Out",
     rotate: language === "vi" ? "🔄 Xoay góc 3D (3D Spiral Card)" : "🔄 Elegant 3D Spiral Rotation",
+    themeHeader: language === "vi" ? "Giao diện màu sắc" : "Color Theme Presets",
+    themeDesc: language === "vi" ? "Chuyển đổi nhanh giữa chủ đề Sáng và Tối cho khung Chat" : "Quickly switch between Light and Dark themes for the Chat Overlay",
+    themeDark: language === "vi" ? "🌙 Nền Tối (Dark)" : "🌙 Dark Theme",
+    themeLight: language === "vi" ? "☀️ Nền Sáng (White)" : "☀️ Light Theme",
   };
 
   return (
@@ -130,6 +134,59 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
             >
               <span className="text-sm">🇺🇸</span>
               <span>English</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Global Theme select */}
+        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
+          <div className="space-y-0.5">
+            <h4 className="text-xs font-bold text-slate-205 uppercase tracking-wide flex items-center gap-1.5">
+              <span>{text.themeHeader}</span>
+            </h4>
+            <p className="text-[10px] text-slate-500">{text.themeDesc}</p>
+          </div>
+
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                updateSettings({
+                  textColor: "#ffffff",
+                  bgColor: "#0f172a",
+                  authorColor: "#bae6fd",
+                  moderatorColor: "#34d399",
+                  sponsorColor: "#fbbf24"
+                });
+                showToast(language === "vi" ? "🌙 Đã áp dụng giao diện Tối" : "🌙 Applied Dark Theme");
+              }}
+              className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                settings.bgColor?.toLowerCase() === "#0f172a"
+                  ? "bg-slate-950 border-teal-500/40 text-teal-400 shadow-md"
+                  : "bg-transparent border-transparent hover:bg-slate-900/40 text-slate-450"
+              }`}
+            >
+              <span>{text.themeDark}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updateSettings({
+                  textColor: "#0f172a",
+                  bgColor: "#ffffff",
+                  authorColor: "#0284c7",
+                  moderatorColor: "#059669",
+                  sponsorColor: "#d97706"
+                });
+                showToast(language === "vi" ? "☀️ Đã áp dụng giao diện Sáng" : "☀️ Applied Light Theme");
+              }}
+              className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                settings.bgColor?.toLowerCase() === "#ffffff"
+                  ? "bg-slate-100 border-teal-500/40 text-teal-600 shadow-md"
+                  : "bg-slate-100/10 border-transparent hover:bg-white/20 text-slate-300"
+              }`}
+            >
+              <span>{text.themeLight}</span>
             </button>
           </div>
         </div>
