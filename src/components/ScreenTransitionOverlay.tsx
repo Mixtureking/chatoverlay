@@ -92,45 +92,31 @@ export default function ScreenTransitionOverlay({
   settings,
 }: ScreenTransitionOverlayProps) {
   const [isActive, setIsActive] = useState(false);
-  const [sessionCount, setSessionCount] = useState(0);
   
+  // Track trigger increments strictly to prevent re-renders breaking things
   const lastTriggerCountRef = useRef<number>(settings.transitionTriggerCount || 0);
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const manualTurnOffTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isActiveRef = useRef(isActive);
-  
-  useEffect(() => {
-    isActiveRef.current = isActive;
-  }, [isActive]);
 
-  // Effect 1: Handle activation / preset switching trigger (listening to settings updates)
+  // Monitor count increments
   useEffect(() => {
     const isTransitionActive = !!settings.transitionActive;
-    const triggerCount = settings.transitionTriggerCount || 0;
+    const currentTriggerCount = settings.transitionTriggerCount || 0;
 
-    // Trigger or fresh-restart the transition if it's active AND:
-    // - The user switched transition presets (meaning trigger count changed)
-    const deservesActivation = isTransitionActive && (triggerCount !== lastTriggerCountRef.current);
-
-    if (deservesActivation) {
-      if (manualTurnOffTimerRef.current) {
-        clearTimeout(manualTurnOffTimerRef.current);
-        manualTurnOffTimerRef.current = null;
-      }
+    if (currentTriggerCount > lastTriggerCountRef.current) {
+      // It's a new trigger call! Turn on.
+      lastTriggerCountRef.current = currentTriggerCount;
+      setIsActive(true);
+      
+      // Stop old timers
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
-        autoCloseTimerRef.current = null;
       }
-
-      setIsActive(true);
-      setSessionCount(prev => prev + 1);
-      lastTriggerCountRef.current = triggerCount;
       
-      // Play transition chime sound
+      // Play sound
       const soundType = settings.transitionSoundType || "bell";
       playTransitionSound(soundType);
-
-      // Auto transition out timer if sustainType is "auto"
+      
+      // Set new auto-close
       const sustainType = settings.transitionSustainType || "auto";
       if (sustainType === "auto") {
         const duration = (settings.transitionDuration || 3) * 1000;
@@ -138,49 +124,35 @@ export default function ScreenTransitionOverlay({
           setIsActive(false);
           autoCloseTimerRef.current = null;
           
-          // Auto sync the OFF state to the server to prevent getting stuck if dashboard is closed
+          // Fire-and-forget sync to off, using PATCH so we don't clobber layout settings
           fetch("/api/youtube/settings-sync", {
-            method: "POST",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ settings: { ...settings, transitionActive: false } })
+            body: JSON.stringify({ settings: { transitionActive: false } })
           }).catch(() => {});
-
-        }, duration + 500); // Pad +500ms to allow server state to comfortably reflect off via transitionWorkspace timeout
+        }, duration);
       }
-    } else if (!isTransitionActive && isActiveRef.current) {
-      // If server transition turns false while active
+    } else if (!isTransitionActive && isActive) {
+      // Transition was turned off externally (e.g. from Dashboard manually clicking off)
+      setIsActive(false);
       if (autoCloseTimerRef.current) {
         clearTimeout(autoCloseTimerRef.current);
         autoCloseTimerRef.current = null;
       }
-      const sustainType = settings.transitionSustainType || "auto";
-      if (sustainType === "manual") {
-        if (!manualTurnOffTimerRef.current) {
-          manualTurnOffTimerRef.current = setTimeout(() => {
-            setIsActive(false);
-            manualTurnOffTimerRef.current = null;
-          }, 800);
-        }
-      } else {
-        setIsActive(false);
-      }
-    } else if (isTransitionActive && settings.transitionSustainType === "manual" && autoCloseTimerRef.current) {
-      // If changed to manual mode while auto-close timer is running, clear it!
-      clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    } else if (isTransitionActive && manualTurnOffTimerRef.current) {
-      // Cancel manual turn off if server turns active again during 800ms
-      clearTimeout(manualTurnOffTimerRef.current);
-      manualTurnOffTimerRef.current = null;
     }
-
-  }, [settings.transitionActive, settings.transitionTriggerCount, settings.transitionSustainType, settings.transitionDuration, settings.transitionSoundType]);
+  }, [
+    settings.transitionActive, 
+    settings.transitionTriggerCount, 
+    settings.transitionSustainType, 
+    settings.transitionDuration, 
+    settings.transitionSoundType, 
+    isActive
+  ]);
 
   // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
-      if (manualTurnOffTimerRef.current) clearTimeout(manualTurnOffTimerRef.current);
     };
   }, []);
 
@@ -296,14 +268,14 @@ export default function ScreenTransitionOverlay({
       <AnimatePresence mode="wait">
         {isActive && (
           <motion.div
-            key={`overlay-session-${sessionCount}-${type}`}
+            key={`overlay-session-${settings.transitionTriggerCount}-${type}`}
             initial="initial"
             animate="animate"
             exit="exit"
             variants={currentVariants}
             style={type === "curtain" ? {} : getBackgroundStyle()}
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 z-50 origin-center"
-            id={`transition-animation-overlay-${sessionCount}`}
+            id={`transition-animation-overlay-${settings.transitionTriggerCount}`}
           >
             {type === "curtain" && (
               <>

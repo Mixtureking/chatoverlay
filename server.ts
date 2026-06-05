@@ -306,6 +306,22 @@ app.get(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync
   }
 });
 
+app.patch(["/api/youtube/settings-sync", "/youtube/settings-sync", "/settings-sync", "*/settings-sync"], (req, res) => {
+  try {
+    const { settings } = req.body || {};
+    if (settings && cachedOverlaySettings) {
+      cachedOverlaySettings = { ...cachedOverlaySettings, ...settings };
+      return res.json({ success: true, settings: cachedOverlaySettings });
+    } else if (settings) {
+      cachedOverlaySettings = settings;
+      return res.json({ success: true, settings: cachedOverlaySettings });
+    }
+    res.status(400).json({ error: "Missing settings payload" });
+  } catch (error: any) {
+    res.status(500).json({ error: `Lỗi đồng bộ cấu hình: ${error.message}` });
+  }
+});
+
 // APIs bridging requests to Electron Main Process for Discord-style always on top overlay
 app.get(["/api/desktop-overlay/status", "/desktop-overlay/status", "/status", "*/status"], (req, res) => {
   const control = (global as any).electronOverlayControl;

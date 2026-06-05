@@ -260,13 +260,10 @@ export default function ScreenTransitionWorkspace({
           updateSettings({ transitionActive: false }, true);
           try {
             await fetch("/api/youtube/settings-sync", {
-              method: "POST",
+              method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ 
-                settings: { 
-                  ...settings, 
-                  transitionActive: false 
-                } 
+                settings: { transitionActive: false } 
               }),
             });
           } catch (e) {
@@ -374,10 +371,10 @@ export default function ScreenTransitionWorkspace({
         try {
           // Fire global transition off state via API
           await fetch("/api/youtube/settings-sync", {
-            method: "POST",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-              settings: { ...updatedSettings, transitionActive: false } 
+              settings: { transitionActive: false } 
             }),
           });
         } catch (e) {
@@ -407,13 +404,10 @@ export default function ScreenTransitionWorkspace({
           updateSettings({ transitionActive: false }, true);
           try {
             await fetch("/api/youtube/settings-sync", {
-              method: "POST",
+              method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ 
-                settings: { 
-                  ...updatedSettings, 
-                  transitionActive: false 
-                } 
+                settings: { transitionActive: false } 
               }),
             });
           } catch (e) {
