@@ -39,6 +39,12 @@ interface ScreenTransitionWorkspaceProps {
   onCopyObsTransitionLink: () => void;
 }
 
+const defaultPresets = [
+  { id: "preset_soon", name: "Streaming Soon ⏳", title: "STREAMING SOON", subtitle: "Chuẩn bị bắt đầu trong vài phút nữa...", duration: 5, sustainType: "auto" as const },
+  { id: "preset_changing", name: "Changing Screen 🔄", title: "CHANGING SCENE", subtitle: "Streamer đang chuyển cảnh, vui lòng chờ...", duration: 3, sustainType: "auto" as const },
+  { id: "preset_waiting", name: "Be Right Back ☕", title: "BE RIGHT BACK", subtitle: "Streamer đang bận một chút, sẽ quay lại ngay!", duration: 5, sustainType: "auto" as const },
+];
+
 export default function ScreenTransitionWorkspace({
   settings,
   updateSettings,
@@ -52,6 +58,7 @@ export default function ScreenTransitionWorkspace({
   const [triggerCount, setTriggerCount] = useState(0);
   const [isLocalSimulating, setIsLocalSimulating] = useState(false);
   const [localSimTimeout, setLocalSimTimeout] = useState<any>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
 
   // Custom Preset Option states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -66,6 +73,20 @@ export default function ScreenTransitionWorkspace({
       if (localSimTimeout) clearTimeout(localSimTimeout);
     };
   }, [localSimTimeout]);
+
+  const allPresets = [
+    ...defaultPresets,
+    ...(settings.transitionCustomPresets || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      title: p.title || p.name,
+      subtitle: p.subtitle || "Vui lòng chờ giây lát...",
+      duration: p.duration || 3,
+      sustainType: "auto" as const
+    }))
+  ];
+  const selectedPreset = allPresets.find(p => p.id === selectedOptionId);
+  const selectedOptionName = selectedPreset ? selectedPreset.name : "";
 
   const text = {
     title: language === "vi" ? "Studio Chuyển Cảnh OBS" : "OBS Transition Studio",
@@ -189,17 +210,21 @@ export default function ScreenTransitionWorkspace({
     }
   };
 
-  const handlePresetClick = async (preset: { title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
+  const handlePresetClick = async (preset: { id: string; name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
+    // Select this option
+    setSelectedOptionId(preset.id);
+
     const nextActive = true; 
     const updatedCount = (settings.transitionTriggerCount || 0) + 1;
+    const durationVal = preset.duration || settings.transitionDuration || 3;
 
     // Build the fully resolved settings block
     const updatedSettings = {
       ...settings,
-      transitionTitle: preset.title,
-      transitionSubtitle: preset.subtitle,
-      transitionDuration: preset.duration,
-      transitionSustainType: preset.sustainType,
+      transitionTitle: preset.title || preset.name,
+      transitionSubtitle: preset.subtitle || "Vui lòng chờ giây lát...",
+      transitionDuration: durationVal,
+      transitionSustainType: "auto" as const, // Force auto-sustain closing
       transitionActive: nextActive,
       transitionTriggerCount: updatedCount
     };
@@ -214,13 +239,11 @@ export default function ScreenTransitionWorkspace({
     setTriggerCount(c => c + 1);
     setIsLocalSimulating(true);
 
-    if (preset.sustainType === "auto") {
-      if (localSimTimeout) clearTimeout(localSimTimeout);
-      const timeout = setTimeout(() => {
-        setIsLocalSimulating(false);
-      }, preset.duration * 1050); 
-      setLocalSimTimeout(timeout);
-    }
+    if (localSimTimeout) clearTimeout(localSimTimeout);
+    const timeout = setTimeout(() => {
+      setIsLocalSimulating(false);
+    }, durationVal * 1050); 
+    setLocalSimTimeout(timeout);
 
     try {
       const { soundFileBase64, ...settingsToSave } = updatedSettings;
@@ -232,40 +255,42 @@ export default function ScreenTransitionWorkspace({
 
       showToast(
         language === "vi"
-          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.title}" (${preset.sustainType === "manual" ? "thủ công" : `${preset.duration} giây`})`
-          : `🚀 Direct transition preset triggered: "${preset.title}"`
+          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.name}" (${durationVal} giây)`
+          : `🚀 Direct transition preset triggered: "${preset.name}"`
       );
 
-      // Auto clear timeout from server if it is auto
-      if (preset.sustainType === "auto") {
-        setTimeout(async () => {
-          updateSettings({ transitionActive: false });
-          try {
-            await fetch("/api/youtube/settings-sync", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
-                settings: { 
-                  ...updatedSettings, 
-                  transitionActive: false 
-                } 
-              }),
-            });
-          } catch (e) {
-            console.error(e);
-          }
-        }, preset.duration * 1000);
-      }
+      // Auto clear timeout from server
+      setTimeout(async () => {
+        updateSettings({ transitionActive: false });
+        try {
+          await fetch("/api/youtube/settings-sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              settings: { 
+                ...updatedSettings, 
+                transitionActive: false 
+              } 
+            }),
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }, durationVal * 1000);
     } catch (err) {
       console.warn("Failed to instantly sync preset trigger state:", err);
     }
   };
 
-  const handleAddNewPreset = (newPreset: { name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
+  const handleAddNewPreset = (name: string) => {
     const currentCustom = settings.transitionCustomPresets || [];
     const created = {
       id: "custom_" + Date.now(),
-      ...newPreset
+      name: name,
+      title: name,
+      subtitle: "Vui lòng chờ giây lát...",
+      duration: settings.transitionDuration || 3,
+      sustainType: "auto" as const
     };
     const nextCustomList = [...currentCustom, created];
     updateSettings({
@@ -284,7 +309,7 @@ export default function ScreenTransitionWorkspace({
       }),
     });
 
-    showToast(language === "vi" ? `✨ Đã lưu tùy chọn chuyển cảnh: ${newPreset.name}` : `✨ Transition preset saved: ${newPreset.name}`);
+    showToast(language === "vi" ? `✨ Đã lưu tùy chọn chuyển cảnh: ${name}` : `✨ Transition preset saved: ${name}`);
   };
 
   // Logo file upload handler converting to Base64 store
@@ -404,28 +429,25 @@ export default function ScreenTransitionWorkspace({
             </button>
           </div>
           <p className="text-[10px] text-slate-400 leading-normal">
-            Bấm nút dưới đây để thiết lập nhanh nội dung chữ, thời gian duy trì và sập rèm OBS tức thì.
+            Bấm các tùy chọn dưới đây để tự động kích hoạt chuyển cảnh tương ứng trên màn hình livestream và OBS.
           </p>
 
           {/* Preset Buttons Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" id="presets-buttons-grid">
             {/* Render defaults */}
-            {[
-              { id: "preset_soon", name: "Streaming Soon ⏳", title: "STREAMING SOON", subtitle: "Chuẩn bị bắt đầu trong vài phút nữa...", duration: 5, sustainType: "manual" as const },
-              { id: "preset_changing", name: "Changing Screen 🔄", title: "CHANGING SCENE", subtitle: "Streamer đang chuyển cảnh, vui lòng chờ...", duration: 3, sustainType: "auto" as const },
-              { id: "preset_waiting", name: "Be Right Back ☕", title: "BE RIGHT BACK", subtitle: "Streamer đang bận một chút, sẽ quay lại ngay!", duration: 10, sustainType: "manual" as const },
-            ].map(preset => (
+            {defaultPresets.map(preset => (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => handlePresetClick(preset)}
-                className="bg-slate-950/90 hover:bg-indigo-950/30 active:scale-95 text-slate-200 border border-slate-850 hover:border-indigo-500/35 p-2 rounded-lg text-[11px] font-medium leading-tight text-left flex flex-col justify-between cursor-pointer transition-all space-y-1 group"
+                className={`w-full bg-slate-950 p-3 rounded-xl text-xs font-bold transition-all text-center cursor-pointer border ${
+                  selectedOptionId === preset.id 
+                    ? "border-pink-500/80 text-pink-450 bg-indigo-950/30 shadow-indigo-505/10" 
+                    : "border-slate-800 text-slate-200 hover:border-indigo-500/35 hover:bg-indigo-950/15"
+                }`}
                 id={`preset-btn-${preset.id}`}
               >
-                <span className="font-bold text-slate-200 group-hover:text-indigo-300 transition-colors">{preset.name}</span>
-                <span className="text-[9px] text-slate-500 truncate font-mono block">
-                  {preset.sustainType === "manual" ? "Duy trì: Thủ công 🔗" : `Tự tắt: ${preset.duration}s ⏱️`}
-                </span>
+                {preset.name}
               </button>
             ))}
 
@@ -433,23 +455,30 @@ export default function ScreenTransitionWorkspace({
             {(settings.transitionCustomPresets || []).map(preset => (
               <div 
                 key={preset.id}
-                className="bg-slate-950/90 border border-slate-850 hover:border-pink-500/30 p-2 rounded-lg flex items-center justify-between gap-1.5 transition-all text-left relative group/custom"
+                className={`border rounded-xl flex items-center justify-between gap-1.5 transition-all text-left relative group/custom ${
+                  selectedOptionId === preset.id
+                    ? "border-pink-500/80 bg-indigo-950/30"
+                    : "border-slate-800 bg-slate-950 hover:border-indigo-500/35 hover:bg-indigo-950/10"
+                }`}
                 id={`custom-preset-container-${preset.id}`}
               >
                 <button
                   type="button"
                   onClick={() => handlePresetClick({
-                    title: preset.title,
-                    subtitle: preset.subtitle,
-                    duration: preset.duration,
-                    sustainType: preset.sustainType
+                    id: preset.id,
+                    name: preset.name,
+                    title: preset.title || preset.name,
+                    subtitle: preset.subtitle || "Vui lòng chờ giây lát...",
+                    duration: preset.duration || 3,
+                    sustainType: "auto" as const
                   })}
-                  className="flex-1 flex flex-col justify-between cursor-pointer space-y-1 min-w-0"
+                  className="flex-1 text-left p-2.5 cursor-pointer font-bold text-xs truncate min-w-0"
                   id={`custom-preset-btn-${preset.id}`}
                 >
-                  <span className="font-bold text-slate-200 text-[11px] truncate block group-hover/custom:text-pink-400 transition-colors">{preset.name}</span>
-                  <span className="text-[9px] text-slate-500 font-mono block">
-                    {preset.sustainType === "manual" ? "Duy trì: Thủ công 🔗" : `Tự tắt: ${preset.duration}s ⏱️`}
+                  <span className={`${
+                    selectedOptionId === preset.id ? "text-pink-450" : "text-slate-200 group-hover/custom:text-pink-400"
+                  } transition-colors block truncate`}>
+                    {preset.name}
                   </span>
                 </button>
                 <button
@@ -463,9 +492,12 @@ export default function ScreenTransitionWorkspace({
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ settings: { ...settings, transitionCustomPresets: nextList } }),
                     });
+                    if (selectedOptionId === preset.id) {
+                      setSelectedOptionId(null);
+                    }
                     showToast(language === "vi" ? `🗑️ Đã xóa tùy chọn: ${preset.name}` : `🗑️ Deleted option: ${preset.name}`);
                   }}
-                  className="hover:bg-rose-950/40 text-slate-500 hover:text-rose-450 p-1 rounded cursor-pointer transition-all shrink-0"
+                  className="hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 p-1.5 rounded-lg cursor-pointer transition-all shrink-0 mr-1.5"
                   title="Xóa tùy chọn này"
                   id={`delete-custom-preset-btn-${preset.id}`}
                 >
@@ -478,96 +510,34 @@ export default function ScreenTransitionWorkspace({
           {/* New Option creation inline form */}
           {showAddForm && (
             <div className="bg-slate-950 border border-slate-850 p-3 rounded-lg space-y-2.5 animate-in slide-in-from-top-2 duration-200" id="add-preset-inline-form">
-              <span className="text-[9.5px] font-bold text-indigo-400 uppercase tracking-widest pl-0.5 block">Cài đặt nút chuyển cảnh mới</span>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest pl-0.5 block">Thêm tùy chọn mới</span>
               
               <div className="space-y-1">
-                <span className="text-[9px] text-slate-500 block font-semibold">Tên Nút (Hiển thị)</span>
+                <span className="text-[9px] text-slate-500 block font-semibold">Tên Tùy Chọn</span>
                 <input
                   type="text"
                   maxLength={20}
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
                   placeholder="e.g. Giải Lao 🍿"
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-550 font-bold"
                   id="new-preset-display-name-input"
                 />
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[9px] text-slate-500 block font-semibold">Dòng Tiêu Đề Rèm (Title)</span>
-                <input
-                  type="text"
-                  value={newPresetTitle}
-                  onChange={(e) => setNewPresetTitle(e.target.value)}
-                  placeholder="e.g. BE RIGHT BACK"
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
-                  id="new-preset-headline-input"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[9px] text-slate-500 block font-semibold">Mô Tả Phụ Nhỏ (Subtitle)</span>
-                <input
-                  type="text"
-                  value={newPresetSubtitle}
-                  onChange={(e) => setNewPresetSubtitle(e.target.value)}
-                  placeholder="e.g. Streamer có chút việc bận..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
-                  id="new-preset-desc-input"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <span className="text-[9px] text-slate-500 block font-semibold">Kiểu Duy Trì</span>
-                  <select
-                    value={newPresetSustain}
-                    onChange={(e) => setNewPresetSustain(e.target.value as any)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none cursor-pointer"
-                    id="new-preset-sustain-select"
-                  >
-                    <option value="auto">⏱️ Tự tắt sau s</option>
-                    <option value="manual">🔗 Bấm thủ công</option>
-                  </select>
-                </div>
-
-                {newPresetSustain === "auto" && (
-                  <div className="space-y-1">
-                    <span className="text-[9px] text-slate-500 block font-semibold">Thời Gian (giây)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={newPresetDuration}
-                      onChange={(e) => setNewPresetDuration(Math.max(1, parseInt(e.target.value) || 5))}
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none"
-                      id="new-preset-duration-input"
-                    />
-                  </div>
-                )}
               </div>
 
               <button
                 type="button"
                 onClick={() => {
-                  if (!newPresetName.trim() || !newPresetTitle.trim()) {
-                    showToast(language === "vi" ? "⚠️ Hãy điền Tên Nút và Dòng Tiêu Đề Rèm!" : "⚠️ Fill name and title fields!");
+                  if (!newPresetName.trim()) {
+                    showToast(language === "vi" ? "⚠️ Hãy nhập Tên Nút chuyển cảnh mới!" : "⚠️ Fill name field!");
                     return;
                   }
-                  handleAddNewPreset({
-                    name: newPresetName,
-                    title: newPresetTitle,
-                    subtitle: newPresetSubtitle || "Vui lòng chờ trong giây lát...",
-                    duration: newPresetDuration,
-                    sustainType: newPresetSustain
-                  });
+                  handleAddNewPreset(newPresetName);
                   // Reset form
                   setNewPresetName("");
-                  setNewPresetTitle("");
-                  setNewPresetSubtitle("");
                   setShowAddForm(false);
                 }}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white py-2 px-2 rounded-lg text-[11px] font-bold uppercase transition-all shadow cursor-pointer"
+                className="w-full bg-indigo-650 hover:bg-indigo-600 active:scale-95 text-white py-2 px-2 rounded-lg text-[11px] font-bold uppercase transition-all shadow cursor-pointer mt-1"
                 id="save-new-preset-btn"
               >
                 💾 Lưu Tùy Chọn Mới
@@ -576,276 +546,258 @@ export default function ScreenTransitionWorkspace({
           )}
         </div>
 
-        {/* 2. Text Contents Card */}
-        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
-          <label className="text-[11.5px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Type className="w-3.5 h-3.5" />
-            <span>{language === "vi" ? "Chữ hiển thị (Texts)" : "Branding texts"}</span>
-          </label>
-
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ chính (Tiêu đề)</span>
-              <input
-                type="text"
-                value={settings.transitionTitle || "STREAMING SOON"}
-                onChange={(e) => updateSettings({ transitionTitle: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
-                placeholder="e.g. LIVE STARTING SOON"
-              />
-            </div>
-            
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ phụ (Mô tả ngắn)</span>
-              <textarea
-                value={settings.transitionSubtitle || "Chuẩn bị bắt đầu trong giây lát..."}
-                onChange={(e) => updateSettings({ transitionSubtitle: e.target.value })}
-                rows={2}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium custom-scrollbar"
-                placeholder="e.g. Vui lòng đợi trong khi streamer cài đặt thiết bị"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Color & Branding Card */}
-        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
-          <label className="text-[11.5px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5" />
-            <span>{language === "vi" ? "Nền & Thương hiệu (Branding)" : "Branding & Backdrop"}</span>
-          </label>
-
-          <div className="space-y-3">
-            {/* Background Style choice */}
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-450 block font-semibold">Kiểu nền giao diện</span>
-              <select
-                value={settings.transitionBgType || "gradient"}
-                onChange={(e) => updateSettings({ transitionBgType: e.target.value as any })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+        {/* DETAILS SECTION: ONLY RENDERS WHEN AN OPTION BUTTON IS CLICKED/SELECTED */}
+        {selectedOptionId && (
+          <div className="space-y-3.5 animate-in fade-in slide-in-from-top-1 duration-300" id="options-details-group">
+            {/* Active Selected Option Indicator */}
+            <div className="bg-slate-900/40 border border-pink-500/15 p-3 rounded-xl flex items-center justify-between">
+              <span className="text-[11px] font-bold text-pink-400 flex items-center gap-1.5 uppercase">
+                <Settings className="w-3.5 h-3.5 text-pink-400 animate-spin" style={{ animationDuration: "12s" }} />
+                <span>Cấu hình rèm: <strong className="text-white hover:text-pink-300 transition-colors ml-1">{selectedOptionName}</strong></span>
+              </span>
+              <button 
+                type="button" 
+                onClick={() => setSelectedOptionId(null)}
+                className="text-[10px] text-slate-500 hover:text-slate-300 cursor-pointer bg-slate-950 px-2 py-0.5 rounded border border-slate-800 hover:border-slate-700 transition"
+                id="close-options-details-btn"
               >
-                <option value="gradient">🎨 Nền dải màu (Linear Gradient Presets)</option>
-                <option value="solid">⬛ Nền màu đơn sắc (Solid Color Background)</option>
-                <option value="custom_image">🖼️ Ảnh nền tùy chỉnh (Custom Image Link)</option>
-              </select>
+                {language === "vi" ? "Đóng ✕" : "Close ✕"}
+              </button>
             </div>
 
-            {/* Custom backgrounds context rendering */}
-            {settings.transitionBgType === "solid" && (
-              <div className="space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-850">
-                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Chọn màu đơn sắc</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="color"
-                    value={settings.transitionBgColor || "#0f172a"}
-                    onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
-                    className="w-7 h-7 border-0 bg-transparent cursor-pointer shrink-0"
-                  />
+            {/* 2. Text Contents Card */}
+            <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5" id="options-details-texts-card">
+              <label className="text-[11.5px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Type className="w-3.5 h-3.5" />
+                <span>{language === "vi" ? "Chữ hiển thị (Texts)" : "Branding texts"}</span>
+              </label>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ chính (Tiêu đề rèm)</span>
                   <input
                     type="text"
-                    maxLength={7}
-                    value={settings.transitionBgColor || "#0f172a"}
-                    onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
-                    className="w-full bg-transparent border-0 text-xs font-mono font-bold text-slate-300 uppercase tracking-widest pl-1"
+                    value={settings.transitionTitle || ""}
+                    onChange={(e) => updateSettings({ transitionTitle: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
+                    placeholder="e.g. LIVE STARTING SOON"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ phụ (Mô tả rèm)</span>
+                  <textarea
+                    value={settings.transitionSubtitle || ""}
+                    onChange={(e) => updateSettings({ transitionSubtitle: e.target.value })}
+                    rows={2}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium custom-scrollbar"
+                    placeholder="e.g. Vui lòng đợi trong giây lát..."
                   />
                 </div>
               </div>
-            )}
+            </div>
 
-            {settings.transitionBgType === "gradient" && (
-              <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Preset Gradient phối sọc</span>
-                <select
-                  value={settings.transitionBgGradient || "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)"}
-                  onChange={(e) => updateSettings({ transitionBgGradient: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-805 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none cursor-pointer"
-                >
-                  {presetsGradients.map((g) => (
-                    <option key={g.name} value={g.value}>{g.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* 3. Color & Branding Card */}
+            <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5" id="options-details-branding-card">
+              <label className="text-[11.5px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5" />
+                <span>{language === "vi" ? "Nền & Thương hiệu (Branding)" : "Branding & Backdrop"}</span>
+              </label>
 
-            {settings.transitionBgType === "custom_image" && (
-              <div className="space-y-1 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Đường dẫn URL ảnh nền</span>
-                <input
-                  type="text"
-                  value={settings.transitionImageUrl || ""}
-                  onChange={(e) => updateSettings({ transitionImageUrl: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-805 rounded-md px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500"
-                  placeholder="Paste direct .png/.jpg link"
-                />
-              </div>
-            )}
+              <div className="space-y-3">
+                {/* Background Style choice */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-450 block font-semibold">Kiểu nền giao diện</span>
+                  <select
+                    value={settings.transitionBgType || "gradient"}
+                    onChange={(e) => updateSettings({ transitionBgType: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                  >
+                    <option value="gradient">🎨 Nền dải màu (Linear Gradient Presets)</option>
+                    <option value="solid">⬛ Nền màu đơn sắc (Solid Color Background)</option>
+                    <option value="custom_image">🖼️ Ảnh nền tùy chỉnh (Custom Image Link)</option>
+                  </select>
+                </div>
 
-            {/* Custom Logo Brand upload */}
-            <div className="space-y-1.5 border-t border-slate-800/40 pt-2">
-              <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1">
-                <Image className="w-3.5 h-3.5 text-slate-555" />
-                <span>Logo / Điểm nhấn trung tâm</span>
-              </span>
-
-              {activeBrandingImg ? (
-                <div className="flex items-center justify-between gap-3 bg-slate-950 p-2 rounded-lg border border-slate-850">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={activeBrandingImg}
-                      alt="Brand preview"
-                      className="w-9 h-9 object-contain rounded bg-slate-900 border border-slate-800 p-0.5"
-                    />
-                    <div className="text-left">
-                      <span className="text-[10px] font-bold text-slate-200 block truncate max-w-[120px]">Logo Đã Thiết Lập</span>
-                      <span className="text-[8px] font-mono text-emerald-400 block font-bold">BASE64 / URL</span>
+                {/* Custom backgrounds context rendering */}
+                {settings.transitionBgType === "solid" && (
+                  <div className="space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-850">
+                    <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Chọn màu đơn sắc</span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={settings.transitionBgColor || "#0f172a"}
+                        onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                        className="w-7 h-7 border-0 bg-transparent cursor-pointer shrink-0"
+                      />
+                      <input
+                        type="text"
+                        maxLength={7}
+                        value={settings.transitionBgColor || "#0f172a"}
+                        onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                        className="w-full bg-transparent border-0 text-xs font-mono font-bold text-slate-300 uppercase tracking-widest pl-1"
+                      />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => updateSettings({ transitionImageBase64: "", transitionImageUrl: "" })}
-                    className="p-1 px-1.5 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/20 text-rose-400 rounded transition-all cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <label className="flex-1 bg-slate-950 hover:bg-slate-900 text-slate-350 text-[11px] font-bold py-2 border border-slate-850 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
-                    <Plus className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Tải ảnh logo lên</span>
+                )}
+
+                {settings.transitionBgType === "gradient" && (
+                  <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
+                    <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Preset Gradient phối sọc</span>
+                    <select
+                      value={settings.transitionBgGradient || "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)"}
+                      onChange={(e) => updateSettings({ transitionBgGradient: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-805 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      {presetsGradients.map((g) => (
+                        <option key={g.name} value={g.value}>{g.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {settings.transitionBgType === "custom_image" && (
+                  <div className="space-y-1 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
+                    <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Đường dẫn URL ảnh nền</span>
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
+                      type="text"
+                      value={settings.transitionImageUrl || ""}
+                      onChange={(e) => updateSettings({ transitionImageUrl: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-805 rounded-md px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500"
+                      placeholder="Paste direct .png/.jpg link"
                     />
-                  </label>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+                  </div>
+                )}
 
-        {/* 4. Speed & Sound Audio notification card */}
-        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
-          <label className="text-[11.5px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>{language === "vi" ? "Thời gian & Âm thanh (FXs)" : "Timing & FXs"}</span>
-          </label>
+                {/* Custom Logo Brand upload */}
+                <div className="space-y-1.5 border-t border-slate-800/40 pt-2">
+                  <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1">
+                    <Image className="w-3.5 h-3.5 text-slate-555" />
+                    <span>Logo / Điểm nhấn trung tâm</span>
+                  </span>
 
-          <div className="space-y-3">
-            {/* Speed duration */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">Thời lượng hiệu ứng dài</span>
-                <span className="font-bold text-pink-500 font-mono">{settings.transitionDuration || 3} giây</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                step="1"
-                value={settings.transitionDuration || 3}
-                onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
-                className="w-full accent-pink-500 cursor-pointer"
-              />
-            </div>
-
-            {/* Sustain type */}
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 block font-semibold pl-0.5">Thời lượng duy trì sập rèm</span>
-              <select
-                value={settings.transitionSustainType || "auto"}
-                onChange={(e) => updateSettings({ transitionSustainType: e.target.value as any })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
-                id="transition-sustain-type-select"
-              >
-                <option value="auto">⏱️ Tự động biến mất sau {settings.transitionDuration || 3} giây</option>
-                <option value="manual">🔗 Thủ công (Bấm lại nút Kích hoạt để mở khoá sập rèm)</option>
-              </select>
-            </div>
-
-            {/* Sound Choice */}
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1 pl-0.5">
-                <Music className="w-3 h-3 text-slate-500" />
-                <span>Âm thanh đi kèm khi sập rèm</span>
-              </span>
-              <select
-                value={settings.transitionSoundType || "bell"}
-                onChange={(e) => updateSettings({ transitionSoundType: e.target.value as any })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
-              >
-                <option value="none">🔇 Không phát âm thanh (Silent)</option>
-                <option value="bell">🔔 Tiếng chuông bính bong thanh khiết (Bell Chime)</option>
-                <option value="pop">🍿 Tiếng nổ tách tinh nghịch (Organic Pop)</option>
-                <option value="synth">⚡ Rít vụt âm kĩ thuật số tối tân (Digital Sweep)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Shutter specific details */}
-        {(settings.transitionType || "shutter") === "shutter" && (
-          <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-            <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Columns className="w-3.5 h-3.5" />
-              <span>{text.shutterOptions}</span>
-            </h4>
-
-            <div className="space-y-3">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">Số lượng cột sọc sập xuôi</span>
-                <span className="font-mono text-cyan-400 font-bold">5 Cốt sọc (Default)</span>
-              </div>
-              <div className="flex justify-between text-[11px] border-t border-slate-850 pt-2.5">
-                <span className="text-slate-400">Màu rèm chắn kĩ thuật số</span>
-                <div className="flex items-center gap-1.5 font-mono">
-                  <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: accentColor }} />
-                  <span className="text-slate-300 font-bold uppercase">{accentColor}</span>
+                  {activeBrandingImg ? (
+                    <div className="flex items-center justify-between gap-3 bg-slate-950 p-2 rounded-lg border border-slate-850">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={activeBrandingImg}
+                          alt="Brand preview"
+                          className="w-9 h-9 object-contain rounded bg-slate-900 border border-slate-800 p-0.5"
+                        />
+                        <div className="text-left">
+                          <span className="text-[10px] font-bold text-slate-200 block truncate max-w-[120px]">Logo Đã Thiết Lập</span>
+                          <span className="text-[8px] font-mono text-emerald-400 block font-bold">BASE64 / URL</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateSettings({ transitionImageBase64: "", transitionImageUrl: "" })}
+                        className="p-1 px-1.5 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/20 text-rose-400 rounded transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <label className="flex-1 bg-slate-950 hover:bg-slate-900 text-slate-350 text-[11px] font-bold py-2 border border-slate-850 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                        <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Tải ảnh logo lên</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
+
+            {/* 4. Speed & Sound Audio notification card */}
+            <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5" id="options-details-fx-card">
+              <label className="text-[11.5px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{language === "vi" ? "Thời gian & Âm thanh (FXs)" : "Timing & FXs"}</span>
+              </label>
+
+              <div className="space-y-3">
+                {/* Speed duration */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-400">Thời lượng hiệu ứng rèm</span>
+                    <span className="font-bold text-pink-500 font-mono">{settings.transitionDuration || 3} giây</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={settings.transitionDuration || 3}
+                    onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
+                    className="w-full accent-pink-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Sound Choice */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1 pl-0.5">
+                    <Music className="w-3 h-3 text-slate-500" />
+                    <span>Âm thanh đi kèm khi sập rèm</span>
+                  </span>
+                  <select
+                    value={settings.transitionSoundType || "bell"}
+                    onChange={(e) => updateSettings({ transitionSoundType: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
+                  >
+                    <option value="none">🔇 Không phát âm thanh (Silent)</option>
+                    <option value="bell">🔔 Tiếng chuông bính bong thanh khiết (Bell Chime)</option>
+                    <option value="pop">🍿 Tiếng nổ tách tinh nghịch (Organic Pop)</option>
+                    <option value="synth">⚡ Rít vụt âm kĩ thuật số tối tân (Digital Sweep)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Shutter specific details */}
+            {(settings.transitionType || "shutter") === "shutter" && (
+              <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-200" id="options-details-shutter-card">
+                <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Columns className="w-3.5 h-3.5" />
+                  <span>{text.shutterOptions}</span>
+                </h4>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-400">Số lượng cột sọc sập xuôi</span>
+                    <span className="font-mono text-cyan-400 font-bold">5 Cốt sọc (Default)</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] border-t border-slate-850 pt-2.5">
+                    <span className="text-slate-400">Màu rèm chắn kĩ thuật số</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: accentColor }} />
+                      <span className="text-slate-300 font-bold uppercase">{accentColor}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sandbox Local Testing Controls */}
+            <div className="pt-1.5" id="options-details-sandbox-run">
+              <button
+                type="button"
+                onClick={handleTriggerTest}
+                className="w-full bg-slate-850 hover:bg-slate-800 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer shadow border border-slate-705 transition-all"
+                id="shutter-trigger-simulation-btn"
+              >
+                <Play className="w-3.5 h-3.5 text-pink-400 fill-current shrink-0" />
+                <span>{text.testBtn}</span>
+              </button>
             </div>
           </div>
         )}
-
-        {/* Action Triggers Grid */}
-        <div className="pt-2 space-y-2 flex flex-col">
-          {/* 1. Sandbox Test Button */}
-          <button
-            type="button"
-            onClick={handleTriggerTest}
-            className="w-full bg-slate-850 hover:bg-slate-800 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer shadow border border-slate-705 transition-all"
-            id="shutter-trigger-simulation-btn"
-          >
-            <Play className="w-3.5 h-3.5 text-pink-400 fill-current shrink-0" />
-            <span>{text.testBtn}</span>
-          </button>
-
-          {/* 2. Global Streamer Trigger Button */}
-          <button
-            type="button"
-            onClick={triggerObsTransitionGlobal}
-            className={`w-full hover:brightness-110 active:scale-95 text-white font-black py-4 px-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer shadow-lg border transition-all ${
-              settings.transitionActive 
-                ? "bg-gradient-to-r from-red-650 to-rose-700 shadow-rose-600/35 border-rose-500/30 animate-pulse"
-                : "bg-gradient-to-r from-pink-600 to-pink-700 shadow-pink-600/20 hover:shadow-pink-600/35 border-pink-500/20"
-            }`}
-            id="obs-global-trigger-hotkey-btn"
-          >
-            {settings.transitionActive ? (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
-                <span>⏹️ ĐÓNG CHUYỂN CẢNH OBS (ACTIVE)</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 fill-current shrink-0 animate-bounce" />
-                <span>{text.obsTriggerBtn}</span>
-              </>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* RIGHT COLUMN: MOTION SANBDX WORKSPACE */}
