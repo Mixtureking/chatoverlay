@@ -433,21 +433,37 @@ window.addEventListener('onChatUpdate', (e) => {
   const container = document.getElementById('custom-chat-box');
   if (!container) return;
   
-  // Render danh sách tin nhắn của bạn
-  container.innerHTML = messages.map(msg => {
-    // Xác định màu sắc người gửi cực kỳ trực quan
-    let nameColor = "#3ea6ff"; // Người xem thông thường
-    if (msg.isOwner) nameColor = "#ff3e3e"; // Streamer Chủ Kênh
-    else if (msg.isModerator) nameColor = "#1ae0a0"; // Quản trị viên
-    else if (msg.isSponsor) nameColor = "#ffd700"; // Nhà tài trợ hội viên
-    
-    return \`
-      <div class="custom-msg" style="border-left-color: \${nameColor}">
+  // Lấy danh sách ID hiện tại
+  const currentIds = messages.map(m => 'msg-' + m.id);
+  
+  // Xóa các tin nhắn cũ đã hết hạn (chống giật/refresh liên tục)
+  Array.from(container.children).forEach(child => {
+    if (!currentIds.includes(child.id)) {
+      child.remove();
+    }
+  });
+
+  // Render danh sách tin nhắn của bạn bằng cách chỉ thêm tin nhắn MỚI
+  messages.forEach(msg => {
+    if (!document.getElementById('msg-' + msg.id)) {
+      let nameColor = "#3ea6ff"; // Người xem thông thường
+      if (msg.isOwner) nameColor = "#ff3e3e"; // Streamer Chủ Kênh
+      else if (msg.isModerator) nameColor = "#1ae0a0"; // Quản trị viên
+      else if (msg.isSponsor) nameColor = "#ffd700"; // Nhà tài trợ hội viên
+      
+      const div = document.createElement('div');
+      div.id = 'msg-' + msg.id;
+      div.className = 'custom-msg';
+      div.style.borderLeftColor = nameColor;
+      
+      div.innerHTML = \`
         <span class="custom-author" style="color: \${nameColor}">\${msg.authorName || 'Anonymous'}:</span>
         <span class="custom-text">\${msg.messageText || ''}</span>
-      </div>
-    \`;
-  }).join('');
+      \`;
+      
+      container.appendChild(div);
+    }
+  });
   
   // Tự động cuộn mượt xuống phía dưới khi có tin nhắn mới xuôi dòng
   container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
@@ -747,7 +763,11 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved); 
+        const parsed = JSON.parse(saved);
+        // Migration: Fix innerHTML constant refresh bug in legacy custom JS
+        if (parsed.customJs && parsed.customJs.includes("container.innerHTML = messages.map(")) {
+          parsed.customJs = DEFAULT_SETTINGS.customJs;
+        }
         return { ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
@@ -758,7 +778,11 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved); 
+        const parsed = JSON.parse(saved);
+        // Migration: Fix innerHTML constant refresh bug in legacy custom JS
+        if (parsed.customJs && parsed.customJs.includes("container.innerHTML = messages.map(")) {
+          parsed.customJs = DEFAULT_SETTINGS.customJs;
+        }
         return { ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
