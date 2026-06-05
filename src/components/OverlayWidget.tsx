@@ -149,8 +149,7 @@ const OverlayWidget = memo(function OverlayWidget({
   // Target ID mapping based on context
   const containerId = previewMode ? "youtube-chat-overlay-preview" : "youtube-chat-overlay";
 
-  // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage (e.g. body { overflow: hidden; })
-  // from hijacking the scrollbars/layout of the main website dashboard.
+  // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage
   const getCleanedCss = () => {
     if (!settings.customCss) return "";
     if (!previewMode) return settings.customCss;
@@ -164,16 +163,16 @@ const OverlayWidget = memo(function OverlayWidget({
       return "";
     });
 
-    // Use native CSS nesting to perfectly sandbox all user CSS!
+    // Provide base wrapper styles without native CSS nesting,
+    // relying on the user's specific IDs/classes for their own sandboxing.
     return `
       ${imports.join("\n")}
       #youtube-chat-overlay-preview {
         max-height: 100% !important;
         overflow: hidden !important;
-        
-        /* User Custom CSS Sandboxed */
-        ${css}
       }
+      /* User Custom CSS */
+      ${css}
     `;
   };
 
