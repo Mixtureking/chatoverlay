@@ -74,16 +74,155 @@ export default function ScreenTransitionWorkspace({
     };
   }, [localSimTimeout]);
 
+  // Turn off Option focus when the transition is no longer active (finished/closed)
+  useEffect(() => {
+    if (!settings.transitionActive) {
+      setSelectedOptionId(null);
+    }
+  }, [settings.transitionActive]);
+
+  // Ref for tracking the last selectedOptionId to avoid race conditions on preset switch
+  const prevSelectedOptionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    prevSelectedOptionIdRef.current = selectedOptionId;
+  }, [selectedOptionId]);
+
+  const prevSelectedOptionId = prevSelectedOptionIdRef.current;
+
+  // Synchronize transition configuration when Option preset options are changed
+  useEffect(() => {
+    if (!selectedOptionId) return;
+    
+    // Only synchronize once selectedOptionId has stabilized (prev and current match)
+    // to avoid overwriting a newly selected preset's values with the prior preset's values
+    if (prevSelectedOptionId !== selectedOptionId) return;
+
+    const customList = settings.transitionCustomPresets || [];
+    const existing = customList.find(p => p.id === selectedOptionId);
+    const defaultPreset = defaultPresets.find(p => p.id === selectedOptionId);
+
+    const currentTitle = settings.transitionTitle || "";
+    const currentSubtitle = settings.transitionSubtitle || "";
+    const currentDuration = settings.transitionDuration || 3;
+    const currentSustainType = settings.transitionSustainType || "auto";
+
+    let shouldUpdatePrs = false;
+    let nextCustomList = [...customList];
+
+    if (existing) {
+      if (
+        existing.title !== currentTitle ||
+        existing.subtitle !== currentSubtitle ||
+        existing.duration !== currentDuration ||
+        existing.sustainType !== currentSustainType
+      ) {
+        shouldUpdatePrs = true;
+        nextCustomList = customList.map(p => {
+          if (p.id === selectedOptionId) {
+            return {
+              ...p,
+              title: currentTitle,
+              subtitle: currentSubtitle,
+              duration: currentDuration,
+              sustainType: currentSustainType as "auto" | "manual"
+            };
+          }
+          return p;
+        });
+      }
+    } else if (defaultPreset) {
+      // It's a default preset, we can create an override in customList with its same ID
+      const titleDiverged = currentTitle !== defaultPreset.title;
+      const subtitleDiverged = currentSubtitle !== defaultPreset.subtitle;
+      const durationDiverged = currentDuration !== defaultPreset.duration;
+      const sustainTypeDiverged = currentSustainType !== defaultPreset.sustainType;
+
+      if (titleDiverged || subtitleDiverged || durationDiverged || sustainTypeDiverged) {
+        shouldUpdatePrs = true;
+        
+        // Check if there is an override already in custom list to update
+        const alreadyHasOverride = customList.some(p => p.id === selectedOptionId);
+        if (alreadyHasOverride) {
+          nextCustomList = customList.map(p => {
+            if (p.id === selectedOptionId) {
+              return {
+                ...p,
+                title: currentTitle,
+                subtitle: currentSubtitle,
+                duration: currentDuration,
+                sustainType: currentSustainType as "auto" | "manual"
+              };
+            }
+            return p;
+          });
+        } else {
+          nextCustomList = [
+            ...customList,
+            {
+              id: defaultPreset.id,
+              name: defaultPreset.name,
+              title: currentTitle,
+              subtitle: currentSubtitle,
+              duration: currentDuration,
+              sustainType: currentSustainType as "auto" | "manual"
+            }
+          ];
+        }
+      }
+    }
+
+    if (shouldUpdatePrs) {
+      updateSettings({
+        transitionCustomPresets: nextCustomList
+      });
+
+      // Also persist to server database instantly
+      fetch("/api/youtube/settings-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: {
+            ...settings,
+            transitionCustomPresets: nextCustomList
+          }
+        })
+      }).catch(err => console.warn("Failed to sync updated presets on edit:", err));
+    }
+  }, [
+    selectedOptionId,
+    prevSelectedOptionId,
+    settings.transitionTitle,
+    settings.transitionSubtitle,
+    settings.transitionDuration,
+    settings.transitionSustainType,
+    settings.transitionCustomPresets,
+  ]);
+
   const allPresets = [
-    ...defaultPresets,
-    ...(settings.transitionCustomPresets || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      title: p.title || p.name,
-      subtitle: p.subtitle || "Vui lòng chờ giây lát...",
-      duration: p.duration || 3,
-      sustainType: "auto" as const
-    }))
+    ...defaultPresets.map(dp => {
+      const override = (settings.transitionCustomPresets || []).find(p => p.id === dp.id);
+      if (override) {
+        return {
+          ...dp,
+          title: override.title,
+          subtitle: override.subtitle,
+          duration: override.duration,
+          sustainType: override.sustainType
+        };
+      }
+      return dp;
+    }),
+    ...(settings.transitionCustomPresets || [])
+      .filter(p => !p.id.startsWith("preset_"))
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        title: p.title || p.name,
+        subtitle: p.subtitle || "Vui lòng chờ giây lát...",
+        duration: p.duration || 3,
+        sustainType: p.sustainType || "auto"
+      }))
   ];
   const selectedPreset = allPresets.find(p => p.id === selectedOptionId);
   const selectedOptionName = selectedPreset ? selectedPreset.name : "";
@@ -489,7 +628,9 @@ export default function ScreenTransitionWorkspace({
             ))}
 
             {/* Render custom presets */}
-            {(settings.transitionCustomPresets || []).map(preset => (
+            {(settings.transitionCustomPresets || [])
+              .filter(p => !p.id.startsWith("preset_"))
+              .map(preset => (
               <div 
                 key={preset.id}
                 className={`border rounded-xl flex items-center justify-between gap-1.5 transition-all text-left relative group/custom ${
@@ -500,15 +641,15 @@ export default function ScreenTransitionWorkspace({
                 id={`custom-preset-container-${preset.id}`}
               >
                 <button
-                  type="button"
-                  onClick={() => handlePresetClick({
-                    id: preset.id,
-                    name: preset.name,
-                    title: preset.title || preset.name,
-                    subtitle: preset.subtitle || "Vui lòng chờ giây lát...",
-                    duration: preset.duration || 3,
-                    sustainType: "auto" as const
-                  })}
+                   type="button"
+                   onClick={() => handlePresetClick({
+                     id: preset.id,
+                     name: preset.name,
+                     title: preset.title || preset.name,
+                     subtitle: preset.subtitle || "Vui lòng chờ giây lát...",
+                     duration: preset.duration || 3,
+                     sustainType: preset.sustainType || "auto"
+                   })}
                   className="flex-1 text-left p-2.5 cursor-pointer font-bold text-xs truncate min-w-0"
                   id={`custom-preset-btn-${preset.id}`}
                 >
