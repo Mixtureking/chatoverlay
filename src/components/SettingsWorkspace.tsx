@@ -73,10 +73,10 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
     slide: language === "vi" ? "➡️ Trượt ngang mượt mà (Spring Slide)" : "➡️ Smooth Spring Horizon Slide",
     zoom: language === "vi" ? "🔍 Thu phòng êm ái (Zooming Out)" : "🔍 Ambient Depth Zoom Out",
     rotate: language === "vi" ? "🔄 Xoay góc 3D (3D Spiral Card)" : "🔄 Elegant 3D Spiral Rotation",
-    themeHeader: language === "vi" ? "Giao diện màu sắc" : "Color Theme Presets",
-    themeDesc: language === "vi" ? "Chuyển đổi nhanh giữa chủ đề Sáng và Tối cho khung Chat" : "Quickly switch between Light and Dark themes for the Chat Overlay",
-    themeDark: language === "vi" ? "🌙 Nền Tối (Dark)" : "🌙 Dark Theme",
-    themeLight: language === "vi" ? "☀️ Nền Sáng (White)" : "☀️ Light Theme",
+    themeHeader: language === "vi" ? "Giao diện màn hình điều khiển (Dashboard)" : "Dashboard Interface Theme",
+    themeDesc: language === "vi" ? "Chuyển đổi giao diện Sáng/Tối cho bảng điều khiển Web của bạn" : "Quickly switch your Web Dashboard between Light and Dark mode",
+    themeDark: language === "vi" ? "🌙 Giao diện Tối" : "🌙 Dark Dashboard",
+    themeLight: language === "vi" ? "☀️ Giao diện Sáng" : "☀️ Light Dashboard",
   };
 
   return (
@@ -152,16 +152,12 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
               type="button"
               onClick={() => {
                 updateSettings({
-                  textColor: "#ffffff",
-                  bgColor: "#0f172a",
-                  authorColor: "#bae6fd",
-                  moderatorColor: "#34d399",
-                  sponsorColor: "#fbbf24"
+                  dashboardTheme: "dark"
                 });
-                showToast(language === "vi" ? "🌙 Đã áp dụng giao diện Tối" : "🌙 Applied Dark Theme");
+                showToast(language === "vi" ? "🌙 Đã áp dụng giao diện Web Tối" : "🌙 Applied Dark Dashboard Theme");
               }}
               className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                settings.bgColor?.toLowerCase() === "#0f172a"
+                settings.dashboardTheme !== "light"
                   ? "bg-slate-950 border-teal-500/40 text-teal-400 shadow-md"
                   : "bg-transparent border-transparent hover:bg-slate-900/40 text-slate-450"
               }`}
@@ -172,16 +168,12 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
               type="button"
               onClick={() => {
                 updateSettings({
-                  textColor: "#0f172a",
-                  bgColor: "#ffffff",
-                  authorColor: "#0284c7",
-                  moderatorColor: "#059669",
-                  sponsorColor: "#d97706"
+                  dashboardTheme: "light"
                 });
-                showToast(language === "vi" ? "☀️ Đã áp dụng giao diện Sáng" : "☀️ Applied Light Theme");
+                showToast(language === "vi" ? "☀️ Đã áp dụng giao diện Web Sáng" : "☀️ Applied Light Dashboard Theme");
               }}
               className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                settings.bgColor?.toLowerCase() === "#ffffff"
+                settings.dashboardTheme === "light"
                   ? "bg-slate-100 border-teal-500/40 text-teal-600 shadow-md"
                   : "bg-slate-100/10 border-transparent hover:bg-white/20 text-slate-300"
               }`}

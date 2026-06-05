@@ -2577,7 +2577,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.dashboardTheme === 'light' ? 'dashboard-light-theme' : ''}`}>
       {/* 🔴 Active Flash Indicator Toast */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600/95 text-white text-xs py-2 px-4 rounded-xl shadow-lg border border-indigo-400 font-bold backdrop-blur flex items-center gap-2">

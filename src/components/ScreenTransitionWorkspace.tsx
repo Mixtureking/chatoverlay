@@ -59,6 +59,7 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
   const [isLocalSimulating, setIsLocalSimulating] = useState(false);
   const [localSimTimeout, setLocalSimTimeout] = useState<any>(null);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const obsTransitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Custom Preset Option states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -203,6 +204,31 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
     rotate: language === "vi" ? "🔄 Xoay góc 3D (3D Spiral Card)" : "🔄 Elegant 3D Spiral Rotation",
   };
 
+  const stopTransitionGlobal = async () => {
+    if (localSimTimeout) {
+      clearTimeout(localSimTimeout);
+      setLocalSimTimeout(null);
+    }
+    if (obsTransitionTimeoutRef.current) {
+      clearTimeout(obsTransitionTimeoutRef.current);
+      obsTransitionTimeoutRef.current = null;
+    }
+    
+    setIsLocalSimulating(false);
+    updateSettings({ transitionActive: false }, true);
+    
+    try {
+      await fetch("/api/youtube/settings-sync", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { transitionActive: false } }),
+      });
+      showToast(language === "vi" ? "🛑 Đã buộc dừng mọi chuyển cảnh!" : "🛑 Forced stop all transitions!");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleTriggerTest = () => {
     if (isLocalSimulating) {
       if (localSimTimeout) clearTimeout(localSimTimeout);
@@ -240,6 +266,17 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
 
   const triggerObsTransitionGlobal = async () => {
     const nextActive = !settings.transitionActive;
+    
+    if (!nextActive) {
+      stopTransitionGlobal();
+      return;
+    }
+
+    if (obsTransitionTimeoutRef.current) {
+      clearTimeout(obsTransitionTimeoutRef.current);
+      obsTransitionTimeoutRef.current = null;
+    }
+
     const updatedCount = (settings.transitionTriggerCount || 0) + 1;
 
     // Save locally
@@ -248,29 +285,27 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
       transitionTriggerCount: updatedCount
     }, true);
 
-    if (nextActive) {
-      // Fire sound effect locally on Streamer controller panel
-      const soundType = settings.transitionSoundType || "bell";
-      playTransitionSound(soundType);
+    // Fire sound effect locally on Streamer controller panel
+    const soundType = settings.transitionSoundType || "bell";
+    playTransitionSound(soundType);
 
-      // Handle controller auto shutoff in auto sustain type
-      const sustainType = settings.transitionSustainType || "auto";
-      if (sustainType === "auto") {
-        setTimeout(async () => {
-          updateSettings({ transitionActive: false }, true);
-          try {
-            await fetch("/api/youtube/settings-sync", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
-                settings: { transitionActive: false } 
-              }),
-            });
-          } catch (e) {
-            console.error(e);
-          }
-        }, (settings.transitionDuration || 3) * 1000);
-      }
+    // Handle controller auto shutoff in auto sustain type
+    const sustainType = settings.transitionSustainType || "auto";
+    if (sustainType === "auto") {
+      obsTransitionTimeoutRef.current = setTimeout(async () => {
+        updateSettings({ transitionActive: false }, true);
+        try {
+          await fetch("/api/youtube/settings-sync", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              settings: { transitionActive: false } 
+            }),
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }, (settings.transitionDuration || 3) * 1000);
     }
 
     // Persist settings directly onto synchronized server JSON instantly
@@ -287,10 +322,8 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
       });
       showToast(
         language === "vi"
-          ? (nextActive 
-              ? `🚀 Đã kích hoạt sập rèm OBS (${settings.transitionSustainType === "manual" ? "thủ công, bấm lại để đóng" : `${settings.transitionDuration || 3} giây`})!` 
-              : "🚪 Đã mở rèm, kết thúc chuyển cảnh OBS!")
-          : (nextActive ? "🚀 OBS Transition overlay activated!" : "🚪 OBS Transition closed!")
+          ? `🚀 Đã kích hoạt sập rèm OBS (${settings.transitionSustainType === "manual" ? "thủ công, bấm lại để đóng" : `${settings.transitionDuration || 3} giây`})!` 
+          : "🚀 OBS Transition overlay activated!"
       );
     } catch (err) {
       console.warn("Failed to instantly sync trigger global transition to server:", err);
@@ -305,32 +338,16 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
   const handlePresetClick = async (preset: { id: string; name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
     // If clicking the currently active option, deactivate it immediately
     if (selectedOptionId === preset.id && settings.transitionActive) {
-      setIsLocalSimulating(false);
-      if (localSimTimeout) clearTimeout(localSimTimeout);
-
-      const updatedSettings = {
-        ...settings,
-        transitionActive: false,
-      };
-
-      updateSettings(updatedSettings, true);
-
-      try {
-        const { soundFileBase64, ...settingsToSave } = updatedSettings;
-        await fetch("/api/youtube/settings-sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ settings: settingsToSave }),
-        });
-        showToast(
-          language === "vi"
-            ? `🚪 Đã hủy chuyển cảnh: "${preset.name}"`
-            : `🚪 Cancelled transition: "${preset.name}"`
-        );
-      } catch (err) {
-        console.warn("Failed to cancel preset transition:", err);
-      }
+      stopTransitionGlobal();
+      setSelectedOptionId(null);
       return;
+    }
+
+    // Clear any existing global transitions or timeouts
+    if (localSimTimeout) clearTimeout(localSimTimeout);
+    if (obsTransitionTimeoutRef.current) {
+      clearTimeout(obsTransitionTimeoutRef.current);
+      obsTransitionTimeoutRef.current = null;
     }
 
     // Otherwise, select and trigger this option
@@ -361,26 +378,11 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
     // Toggle simulated previews
     setTriggerCount(c => c + 1);
     setIsLocalSimulating(true);
-
-    if (localSimTimeout) clearTimeout(localSimTimeout);
     
     if (sustainTypeVal === "auto") {
       const timeout = setTimeout(async () => {
         setIsLocalSimulating(false);
-        updateSettings({ transitionActive: false }, true);
-        try {
-          // Fire global transition off state via API
-          await fetch("/api/youtube/settings-sync", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              settings: { transitionActive: false } 
-            }),
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }, durationVal * 1000); 
+      }, durationVal * 1050); 
       setLocalSimTimeout(timeout);
     }
 
@@ -398,9 +400,9 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
           : `🚀 Direct transition preset triggered: "${preset.name}"`
       );
 
-      // Auto clear timeout from server if it is auto close
+      // Auto clear timeout from server if it is auto close using the unified ref!
       if (sustainTypeVal === "auto") {
-        setTimeout(async () => {
+        obsTransitionTimeoutRef.current = setTimeout(async () => {
           updateSettings({ transitionActive: false }, true);
           try {
             await fetch("/api/youtube/settings-sync", {
@@ -548,6 +550,33 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
             💡 <strong>OBS Setup:</strong> Rộng: <b>1920</b>, Cao: <b>1080</b> (hoặc độ phân giải stream của bạn). Đừng quên tích chọn <i>"Refresh browser when scene becomes active"</i> để tối ưu phục hồi rèm!
           </div>
         </div>
+
+        {/* CURRENT STATUS PANEL */}
+        {settings.transitionActive ? (
+          <div className="bg-rose-950/40 border border-rose-500/50 p-3 rounded-xl flex items-center justify-between animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2">
+               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+               <span className="text-rose-300 font-bold text-xs uppercase truncate max-w-[150px] sm:max-w-[200px]">
+                 {language === "vi" ? "Đang phát Transition Overlay" : "Transition Active"}
+               </span>
+            </div>
+            <button 
+              onClick={() => { stopTransitionGlobal(); setSelectedOptionId(null); }} 
+              className="bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition-all shadow flex items-center gap-1.5 shrink-0"
+              title="Buộc đóng ngay lập tức tất cả các tùy chọn đang chạy"
+            >
+              <span className="w-2 h-2 bg-white block rounded-sm shrink-0"></span>
+              {language === "vi" ? "DỪNG LẠI (STOP)" : "STOP"}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-emerald-950/30 border border-emerald-500/30 p-3 rounded-xl flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+            <span className="text-emerald-400/80 font-bold text-[10px] uppercase">
+              {language === "vi" ? "Hệ thống chuyển cảnh đang nghỉ (Standby)" : "Transition system in standby"}
+            </span>
+          </div>
+        )}
 
         {/* TRANSITION PRESETS DECK */}
         <div className="bg-slate-900/50 border border-indigo-500/10 p-4 rounded-xl space-y-3" id="transition-quick-presets-deck-card">
