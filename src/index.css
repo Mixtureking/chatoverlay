@@ -13,28 +13,92 @@
 
 .dashboard-light-theme {
   background-color: #f8fafc !important;
+  background-image: 
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--app-accent, #6366f1) 12%, transparent), transparent 40%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--app-accent, #6366f1) 12%, transparent), transparent 40%),
+    linear-gradient(135deg, rgba(255,255,255,0.7), rgba(248,250,252,0.9)) !important;
+  background-attachment: fixed !important;
   color: #0f172a !important;
 }
+
+/* Base panels */
 .dashboard-light-theme .bg-slate-950,
+.dashboard-light-theme .bg-slate-955 {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--app-accent, #6366f1) 8%, transparent), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Secondary Panels (Cards) */
 .dashboard-light-theme .bg-slate-900,
-.dashboard-light-theme .bg-slate-955,
+.dashboard-light-theme .bg-slate-900\/50,
+.dashboard-light-theme .bg-slate-900\/40,
+.dashboard-light-theme .bg-slate-900\/30,
+.dashboard-light-theme .bg-slate-900\/25,
 .dashboard-light-theme .bg-slate-800,
 .dashboard-light-theme .bg-slate-850 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  background-color: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 15%, transparent) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0,0,0,0.02) !important;
 }
+
+/* Inputs and Forms */
+.dashboard-light-theme input:not([type="color"]),
+.dashboard-light-theme textarea,
+.dashboard-light-theme select {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #1e293b !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important;
+}
+
+.dashboard-light-theme input:focus,
+.dashboard-light-theme textarea:focus,
+.dashboard-light-theme select:focus {
+  background-color: #ffffff !important;
+  border-color: var(--app-accent, #6366f1) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
+}
+
+/* Text Overrides */
 .dashboard-light-theme .text-slate-100,
 .dashboard-light-theme .text-slate-200,
-.dashboard-light-theme .text-slate-205,
-.dashboard-light-theme .text-slate-300,
-.dashboard-light-theme .text-slate-400,
-.dashboard-light-theme .text-slate-450,
-.dashboard-light-theme .text-slate-500 {
-  color: #334155 !important;
+.dashboard-light-theme .text-slate-205 {
+  color: #0f172a !important; /* Primary Text */
 }
-.dashboard-light-theme .border-slate-800,
-.dashboard-light-theme .border-slate-850 {
-  border-color: #cbd5e1 !important;
+
+.dashboard-light-theme .text-slate-300,
+.dashboard-light-theme .text-slate-350,
+.dashboard-light-theme .text-slate-400,
+.dashboard-light-theme .text-slate-450 {
+  color: #475569 !important; /* Secondary text */
+}
+
+.dashboard-light-theme .text-slate-500 {
+  color: #64748b !important; /* Muted text */
+}
+
+.dashboard-light-theme .text-slate-600 {
+  color: #94a3b8 !important; /* Muted text */
+}
+
+/* Specifically style the headers to look premium using the accent color */
+.dashboard-light-theme h1,
+.dashboard-light-theme h2,
+.dashboard-light-theme h3 {
+  color: #0f172a !important;
+}
+
+/* Scrollbar tuning for light theme */
+.dashboard-light-theme .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--app-accent, #6366f1) 30%, transparent) !important;
+}
+.dashboard-light-theme .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--app-accent, #6366f1) 50%, transparent) !important;
 }
 
 
