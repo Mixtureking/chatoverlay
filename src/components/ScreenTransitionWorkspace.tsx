@@ -68,26 +68,11 @@ export default function ScreenTransitionWorkspace({
   const [newPresetDuration, setNewPresetDuration] = useState(5);
   const [newPresetSustain, setNewPresetSustain] = useState<"auto" | "manual">("auto");
 
-  // Run a quick cleanup on mount if transition was stuck Active
-  useEffect(() => {
-    if (settings.transitionActive) {
-      updateSettings({ transitionActive: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     return () => {
       if (localSimTimeout) clearTimeout(localSimTimeout);
     };
   }, [localSimTimeout]);
-
-  // Turn off Option focus when the transition is no longer active (finished/closed)
-  useEffect(() => {
-    if (!settings.transitionActive) {
-      setSelectedOptionId(null);
-    }
-  }, [settings.transitionActive]);
 
   // Unified function to handle property updates for transition and synchronize them to preset overrides
   const handleUpdateTransitionField = (fieldsToUpdate: Partial<OverlaySettings>) => {
@@ -148,6 +133,11 @@ export default function ScreenTransitionWorkspace({
       ...fieldsToUpdate,
       ...(selectedOptionId && hasPresetField ? { transitionCustomPresets: nextCustomList } : {})
     };
+    
+    if (mergedUpdate.transitionSustainType === "manual" && localSimTimeout) {
+      clearTimeout(localSimTimeout);
+      setLocalSimTimeout(null);
+    }
     
     updateSettings(mergedUpdate);
     

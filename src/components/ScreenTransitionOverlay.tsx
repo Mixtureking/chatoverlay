@@ -109,9 +109,8 @@ export default function ScreenTransitionOverlay({
     const triggerCount = settings.transitionTriggerCount || 0;
 
     // Trigger or fresh-restart the transition if it's active AND:
-    // - Not currently active in local state, OR
     // - The user switched transition presets (meaning trigger count changed)
-    const deservesActivation = isTransitionActive && (!isActiveRef.current || triggerCount !== lastTriggerCountRef.current);
+    const deservesActivation = isTransitionActive && (triggerCount !== lastTriggerCountRef.current);
 
     if (deservesActivation) {
       if (manualTurnOffTimerRef.current) {
@@ -138,6 +137,14 @@ export default function ScreenTransitionOverlay({
         autoCloseTimerRef.current = setTimeout(() => {
           setIsActive(false);
           autoCloseTimerRef.current = null;
+          
+          // Auto sync the OFF state to the server to prevent getting stuck if dashboard is closed
+          fetch("/api/youtube/settings-sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings: { ...settings, transitionActive: false } })
+          }).catch(() => {});
+
         }, duration + 500); // Pad +500ms to allow server state to comfortably reflect off via transitionWorkspace timeout
       }
     } else if (!isTransitionActive && isActiveRef.current) {
@@ -157,6 +164,10 @@ export default function ScreenTransitionOverlay({
       } else {
         setIsActive(false);
       }
+    } else if (isTransitionActive && settings.transitionSustainType === "manual" && autoCloseTimerRef.current) {
+      // If changed to manual mode while auto-close timer is running, clear it!
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
     } else if (isTransitionActive && manualTurnOffTimerRef.current) {
       // Cancel manual turn off if server turns active again during 800ms
       clearTimeout(manualTurnOffTimerRef.current);

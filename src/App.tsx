@@ -730,7 +730,10 @@ export default function App() {
   const [settings, setSettings] = useState<OverlaySettings>(() => {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
-      try { return JSON.parse(saved); } catch { return DEFAULT_SETTINGS; }
+      try { 
+        const parsed = JSON.parse(saved); 
+        return { ...parsed, transitionActive: false }; 
+      } catch { return DEFAULT_SETTINGS; }
     }
     return DEFAULT_SETTINGS;
   });
@@ -738,7 +741,10 @@ export default function App() {
   const [savedSettingsBenchmark, setSavedSettingsBenchmark] = useState<OverlaySettings>(() => {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
-      try { return JSON.parse(saved); } catch { return DEFAULT_SETTINGS; }
+      try { 
+        const parsed = JSON.parse(saved); 
+        return { ...parsed, transitionActive: false }; 
+      } catch { return DEFAULT_SETTINGS; }
     }
     return DEFAULT_SETTINGS;
   });
