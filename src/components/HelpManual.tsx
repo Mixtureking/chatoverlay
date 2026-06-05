@@ -1,7 +1,7 @@
-import React from "react";
+import React, { memo } from "react";
 import { Key, Video, Tv, Keyboard, Smartphone, Code, Heart } from "lucide-react";
 
-export default function HelpManual() {
+export default memo(function HelpManual() {
   return (
     <div className="space-y-6 text-slate-300 pr-1 select-text">
       {/* Introduction Banner */}
@@ -91,4 +91,4 @@ export default function HelpManual() {
       </div>
     </div>
   );
-}
+});

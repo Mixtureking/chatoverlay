@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import { 
   motion 
 } from "motion/react";
@@ -27,7 +27,7 @@ interface SettingsWorkspaceProps {
   accentColor: string;
 }
 
-export default function SettingsWorkspace({
+const SettingsWorkspace = memo(function SettingsWorkspace({
   settings,
   updateSettings,
   language = "vi",
@@ -344,4 +344,6 @@ export default function SettingsWorkspace({
       </div>
     </div>
   );
-}
+});
+
+export default SettingsWorkspace;

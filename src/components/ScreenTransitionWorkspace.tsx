@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import { 
   motion, 
   AnimatePresence 
@@ -45,7 +45,7 @@ const defaultPresets = [
   { id: "preset_waiting", name: "Be Right Back ☕", title: "BE RIGHT BACK", subtitle: "Streamer đang bận một chút, sẽ quay lại ngay!", duration: 5, sustainType: "auto" as const },
 ];
 
-export default function ScreenTransitionWorkspace({
+const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
   settings,
   updateSettings,
   language = "vi",
@@ -1094,4 +1094,6 @@ export default function ScreenTransitionWorkspace({
       </div>
     </div>
   );
-}
+});
+
+export default ScreenTransitionWorkspace;

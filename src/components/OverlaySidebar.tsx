@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, memo } from "react";
 import { 
   motion, 
   AnimatePresence 
@@ -27,7 +27,7 @@ interface OverlaySidebarProps {
   language?: "vi" | "en";
 }
 
-export default function OverlaySidebar({
+const OverlaySidebar = memo(function OverlaySidebar({
   isOpen,
   onClose,
   messages,
@@ -138,4 +138,6 @@ export default function OverlaySidebar({
       )}
     </AnimatePresence>
   );
-}
+});
+
+export default OverlaySidebar;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { 
   motion, 
   AnimatePresence 
@@ -24,7 +24,7 @@ interface SidebarNavigatorProps {
   accentColor: string;
 }
 
-export default function SidebarNavigator({
+const SidebarNavigator = memo(function SidebarNavigator({
   activeRoute,
   setActiveRoute,
   isOpen,
@@ -186,4 +186,6 @@ export default function SidebarNavigator({
       )}
     </AnimatePresence>
   );
-}
+});
+
+export default SidebarNavigator;

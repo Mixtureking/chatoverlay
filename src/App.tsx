@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
-import HelpManual from "./components/HelpManual";
-import SidebarNavigator from "./components/SidebarNavigator";
-import ScreenTransition from "./components/ScreenTransition";
-import ScreenTransitionWorkspace from "./components/ScreenTransitionWorkspace";
-import ScreenTransitionOverlay from "./components/ScreenTransitionOverlay";
-import SettingsWorkspace from "./components/SettingsWorkspace";
 import { TRANSLATIONS } from "./translations";
+
+const HelpManual = lazy(() => import("./components/HelpManual"));
+const SidebarNavigator = lazy(() => import("./components/SidebarNavigator"));
+const ScreenTransition = lazy(() => import("./components/ScreenTransition"));
+const ScreenTransitionWorkspace = lazy(() => import("./components/ScreenTransitionWorkspace"));
+const ScreenTransitionOverlay = lazy(() => import("./components/ScreenTransitionOverlay"));
+const SettingsWorkspace = lazy(() => import("./components/SettingsWorkspace"));
 import {
   Tv,
   Key,
@@ -2525,7 +2526,9 @@ export default function App() {
     if (isTransitionOverlay) {
       return (
         <div className="w-full h-screen bg-transparent overflow-hidden">
-          <ScreenTransitionOverlay settings={obsSettings} />
+          <Suspense fallback={null}>
+            <ScreenTransitionOverlay settings={obsSettings} />
+          </Suspense>
         </div>
       );
     }
@@ -2671,19 +2674,22 @@ export default function App() {
         )}
         {/* PERSISTENT SIDEBAR NAVIGATION PANELS */}
         <div className="absolute top-0 bottom-0 left-0 z-50 lg:relative lg:z-auto pointer-events-none h-full flex flex-col">
-          <SidebarNavigator
-            activeRoute={activeMainRoute}
-            setActiveRoute={setActiveMainRoute}
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            language={activeLanguage}
-            accentColor={currentAccent}
-          />
+          <Suspense fallback={<div className="w-[300px] h-full bg-slate-950 border-r border-slate-800/80 animate-pulse"></div>}>
+            <SidebarNavigator
+              activeRoute={activeMainRoute}
+              setActiveRoute={setActiveMainRoute}
+              isOpen={sidebarOpen}
+              onClose={() => setSidebarOpen(false)}
+              language={activeLanguage}
+              accentColor={currentAccent}
+            />
+          </Suspense>
         </div>
 
         {/* Main Routed Dashboard Area */}
         <div className="flex-1 overflow-hidden relative flex flex-col min-w-0" id="main-routed-dashboard-area">
-          <ScreenTransition transitionKey={activeMainRoute} type={settings.transitionType || "shutter"}>
+          <Suspense fallback={<div className="flex-1 overflow-hidden flex items-center justify-center"><Sparkles className="w-8 h-8 text-indigo-400 animate-spin" /></div>}>
+            <ScreenTransition transitionKey={activeMainRoute} type={settings.transitionType || "shutter"}>
             {activeMainRoute === "chat_overlay" && (
               <div className="w-full h-full overflow-y-auto lg:overflow-hidden flex flex-col lg:grid lg:grid-cols-5" id="chat-overlay-deck-grid">
           {/* LEFT COLUMN: CONTROL SU BOARD */}
@@ -4157,6 +4163,7 @@ export default function App() {
         />
       )}
     </ScreenTransition>
+          </Suspense>
   </div>
 </div>
       {pipContainer && createPortal(

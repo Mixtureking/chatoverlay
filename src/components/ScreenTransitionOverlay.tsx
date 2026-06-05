@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, memo } from "react";
 import { motion, AnimatePresence, useAnimationControls } from "motion/react";
 import { Sparkles, Tv } from "lucide-react";
 import { OverlaySettings } from "../types";
@@ -88,7 +88,7 @@ interface ScreenTransitionOverlayProps {
   settings: OverlaySettings;
 }
 
-export default function ScreenTransitionOverlay({
+const ScreenTransitionOverlay = memo(function ScreenTransitionOverlay({
   settings,
 }: ScreenTransitionOverlayProps) {
   const [isActive, setIsActive] = useState(false);
@@ -369,4 +369,6 @@ export default function ScreenTransitionOverlay({
       </AnimatePresence>
     </div>
   );
-}
+});
+
+export default ScreenTransitionOverlay;

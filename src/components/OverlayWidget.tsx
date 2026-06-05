@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import { ChatMessage, OverlaySettings } from "../types";
 import { Shield, Sparkles, Star, Award, Heart, Flame, Crown, Gamepad2, Bolt, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -55,7 +55,7 @@ interface OverlayWidgetProps {
   previewMode?: boolean; // If true, rendering in the dashboard simulator frame
 }
 
-export default function OverlayWidget({
+const OverlayWidget = memo(function OverlayWidget({
   messages,
   settings,
   previewMode = false,
@@ -641,4 +641,6 @@ export default function OverlayWidget({
       </div>
     </div>
   );
-}
+});
+
+export default OverlayWidget;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ScreenTransitionProps {
@@ -7,7 +7,7 @@ interface ScreenTransitionProps {
   type?: "fade" | "slide" | "zoom" | "rotate" | "shutter" | "curtain" | "glitch" | "morph";
 }
 
-export default function ScreenTransition({
+const ScreenTransition = memo(function ScreenTransition({
   children,
   transitionKey,
   type = "fade",
@@ -111,4 +111,6 @@ export default function ScreenTransition({
       )}
     </div>
   );
-}
+});
+
+export default ScreenTransition;
