@@ -59,7 +59,6 @@ export interface OverlaySettings {
 
   // Application Language & Styling Accents Configuration (New)
   language?: "vi" | "en";
-  dashboardTheme?: "dark" | "light";
   accentColor?: string; // hex like #6366f1, #10b981 etc.
   transitionType?: "fade" | "slide" | "zoom" | "rotate" | "shutter" | "curtain" | "glitch" | "morph";
 

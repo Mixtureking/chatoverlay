@@ -84,28 +84,6 @@ export const playTransitionSound = (soundType: "none" | "bell" | "pop" | "synth"
   }
 };
 
-// Custom Glitch component logic encapsulation
-const GlitchSubContainer = ({ children, type }: { children: React.ReactNode, type: string }) => {
-  const controls = useAnimationControls();
-  useEffect(() => {
-    if (type !== "glitch") return;
-    const timer = setInterval(() => {
-      controls.start({
-        x: [0, -3, 3, -1, 0],
-        transition: { duration: 0.15 }
-      });
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [controls, type]);
-  
-  if (type !== "glitch") return <>{children}</>;
-  return (
-    <motion.div animate={controls} className="w-full h-full relative z-10 flex flex-col items-center justify-center">
-      {children}
-    </motion.div>
-  );
-};
-
 interface ScreenTransitionOverlayProps {
   settings: OverlaySettings;
 }
@@ -117,29 +95,66 @@ const ScreenTransitionOverlay = memo(function ScreenTransitionOverlay({
   
   // Track trigger increments strictly to prevent re-renders breaking things
   const lastTriggerCountRef = useRef<number>(settings.transitionTriggerCount || 0);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor count increments and strictly reflect server active state
+  // Monitor count increments
   useEffect(() => {
     const isTransitionActive = !!settings.transitionActive;
+    const currentTriggerCount = settings.transitionTriggerCount || 0;
 
-    if (isTransitionActive && !isActive) {
+    if (currentTriggerCount > lastTriggerCountRef.current) {
+      // It's a new trigger call! Turn on.
+      lastTriggerCountRef.current = currentTriggerCount;
       setIsActive(true);
       
-      // If trigger count increased, play sound (meaning it's a new trigger, not just a reload)
-      if ((settings.transitionTriggerCount || 0) > lastTriggerCountRef.current) {
-        lastTriggerCountRef.current = settings.transitionTriggerCount || 0;
-        const soundType = settings.transitionSoundType || "bell";
-        playTransitionSound(soundType);
+      // Stop old timers
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+      
+      // Play sound
+      const soundType = settings.transitionSoundType || "bell";
+      playTransitionSound(soundType);
+      
+      // Set new auto-close
+      const sustainType = settings.transitionSustainType || "auto";
+      if (sustainType === "auto") {
+        const duration = (settings.transitionDuration || 3) * 1000;
+        autoCloseTimerRef.current = setTimeout(() => {
+          setIsActive(false);
+          autoCloseTimerRef.current = null;
+          
+          // Fire-and-forget sync to off, using PATCH so we don't clobber layout settings
+          fetch("/api/youtube/settings-sync", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings: { transitionActive: false } })
+          }).catch(() => {});
+        }, duration);
       }
     } else if (!isTransitionActive && isActive) {
+      // Transition was turned off externally (e.g. from Dashboard manually clicking off)
       setIsActive(false);
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
     }
   }, [
-    settings.transitionActive,
-    settings.transitionTriggerCount,
-    settings.transitionSoundType,
+    settings.transitionActive, 
+    settings.transitionTriggerCount, 
+    settings.transitionSustainType, 
+    settings.transitionDuration, 
+    settings.transitionSoundType, 
     isActive
   ]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+    };
+  }, []);
 
   // Determine Background stylings
   const getBackgroundStyle = () => {
@@ -225,6 +240,28 @@ const ScreenTransitionOverlay = memo(function ScreenTransitionOverlay({
   const transitionImg = settings.transitionImageBase64 || settings.transitionImageUrl;
   const type = settings.transitionType || "shutter";
   const contentDelayOffset = type === "morph" ? 0.3 : 0;
+  
+  // Custom Glitch component logic encapsulation
+  const GlitchSubContainer = ({ children }: { children: React.ReactNode }) => {
+    const controls = useAnimationControls();
+    useEffect(() => {
+      if (type !== "glitch") return;
+      const timer = setInterval(() => {
+        controls.start({
+          x: [0, -3, 3, -1, 0],
+          transition: { duration: 0.15 }
+        });
+      }, 2500);
+      return () => clearInterval(timer);
+    }, [controls]);
+    
+    if (type !== "glitch") return <>{children}</>;
+    return (
+      <motion.div animate={controls} className="w-full h-full relative z-10 flex flex-col items-center justify-center">
+        {children}
+      </motion.div>
+    );
+  };
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative" id="obs-transition-layer-root">
@@ -267,7 +304,7 @@ const ScreenTransitionOverlay = memo(function ScreenTransitionOverlay({
               <div className="absolute inset-0 z-0 bg-[repeating-linear-gradient(transparent,transparent_2px,rgba(0,0,0,0.1)_3px,rgba(0,0,0,0.1)_4px)] pointer-events-none" />
             )}
 
-            <GlitchSubContainer type={type}>
+            <GlitchSubContainer>
               {/* Ambient Animated Grid backing */}
               <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 

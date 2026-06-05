@@ -73,10 +73,6 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
     slide: language === "vi" ? "➡️ Trượt ngang mượt mà (Spring Slide)" : "➡️ Smooth Spring Horizon Slide",
     zoom: language === "vi" ? "🔍 Thu phòng êm ái (Zooming Out)" : "🔍 Ambient Depth Zoom Out",
     rotate: language === "vi" ? "🔄 Xoay góc 3D (3D Spiral Card)" : "🔄 Elegant 3D Spiral Rotation",
-    themeHeader: language === "vi" ? "Giao diện màn hình điều khiển (Dashboard)" : "Dashboard Interface Theme",
-    themeDesc: language === "vi" ? "Chuyển đổi giao diện Sáng/Tối cho bảng điều khiển Web của bạn" : "Quickly switch your Web Dashboard between Light and Dark mode",
-    themeDark: language === "vi" ? "🌙 Giao diện Tối" : "🌙 Dark Dashboard",
-    themeLight: language === "vi" ? "☀️ Giao diện Sáng" : "☀️ Light Dashboard",
   };
 
   return (
@@ -134,51 +130,6 @@ const SettingsWorkspace = memo(function SettingsWorkspace({
             >
               <span className="text-sm">🇺🇸</span>
               <span>English</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Global Theme select */}
-        <div className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-xl space-y-3.5">
-          <div className="space-y-0.5">
-            <h4 className="text-xs font-bold text-slate-205 uppercase tracking-wide flex items-center gap-1.5">
-              <span>{text.themeHeader}</span>
-            </h4>
-            <p className="text-[10px] text-slate-500">{text.themeDesc}</p>
-          </div>
-
-          <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                updateSettings({
-                  dashboardTheme: "dark"
-                });
-                showToast(language === "vi" ? "🌙 Đã áp dụng giao diện Web Tối" : "🌙 Applied Dark Dashboard Theme");
-              }}
-              className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                settings.dashboardTheme !== "light"
-                  ? "bg-slate-950 border-teal-500/40 text-teal-400 shadow-md"
-                  : "bg-transparent border-transparent hover:bg-slate-900/40 text-slate-450"
-              }`}
-            >
-              <span>{text.themeDark}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                updateSettings({
-                  dashboardTheme: "light"
-                });
-                showToast(language === "vi" ? "☀️ Đã áp dụng giao diện Web Sáng" : "☀️ Applied Light Dashboard Theme");
-              }}
-              className={`flex-1 p-3 rounded-lg border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                settings.dashboardTheme === "light"
-                  ? "bg-slate-100 border-teal-500/40 text-teal-600 shadow-md"
-                  : "bg-slate-100/10 border-transparent hover:bg-white/20 text-slate-300"
-              }`}
-            >
-              <span>{text.themeLight}</span>
             </button>
           </div>
         </div>

@@ -149,31 +149,31 @@ const OverlayWidget = memo(function OverlayWidget({
   // Target ID mapping based on context
   const containerId = previewMode ? "youtube-chat-overlay-preview" : "youtube-chat-overlay";
 
-  // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage
+  // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage (e.g. body { overflow: hidden; })
+  // from hijacking the scrollbars/layout of the main website dashboard.
   const getCleanedCss = () => {
     if (!settings.customCss) return "";
     if (!previewMode) return settings.customCss;
 
     let css = settings.customCss;
-    const imports: string[] = [];
+    const prefix = "#youtube-chat-overlay-preview";
     
-    // Extract @import rules to keep them at the top level
-    css = css.replace(/@import\s+[^;]+;/g, (match) => {
-      imports.push(match);
-      return "";
-    });
+    // Replace top-level selectors to target the scoped preview element
+    css = css.replace(/\bbody\b/g, prefix);
+    css = css.replace(/\bhtml\b/g, prefix);
+    css = css.replace(/\b:root\b/g, prefix);
+    
+    // Replace standalone asterisks that could leak
+    css = css.replace(/(^\s*|\s*,\s*)\*(?=\s*\{|\s*\,|\s+)/g, `$1${prefix} *`);
 
-    // Provide base wrapper styles without native CSS nesting,
-    // relying on the user's specific IDs/classes for their own sandboxing.
-    return `
-      ${imports.join("\n")}
-      #youtube-chat-overlay-preview {
+    // Force preview container boundary & scrolling safety
+    css += `
+      ${prefix} {
         max-height: 100% !important;
         overflow: hidden !important;
       }
-      /* User Custom CSS */
-      ${css}
     `;
+    return css;
   };
 
   // Helper to get font weights and colors
@@ -279,11 +279,6 @@ const OverlayWidget = memo(function OverlayWidget({
         sandboxSetInterval,
         sandboxSetTimeout
       );
-
-      // Trigger immediate re-render of existing messages so the newly compiled script isn't blank
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("onChatUpdate", { detail: visibleMessages }));
-      }, 50);
     } catch (err) {
       console.error("Custom JS execution error inside Sandbox:", err);
     }

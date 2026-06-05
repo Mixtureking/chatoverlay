@@ -433,37 +433,21 @@ window.addEventListener('onChatUpdate', (e) => {
   const container = document.getElementById('custom-chat-box');
   if (!container) return;
   
-  // Lấy danh sách ID hiện tại
-  const currentIds = messages.map(m => 'msg-' + m.id);
-  
-  // Xóa các tin nhắn cũ đã hết hạn (chống giật/refresh liên tục)
-  Array.from(container.children).forEach(child => {
-    if (!currentIds.includes(child.id)) {
-      child.remove();
-    }
-  });
-
-  // Render danh sách tin nhắn của bạn bằng cách chỉ thêm tin nhắn MỚI
-  messages.forEach(msg => {
-    if (!document.getElementById('msg-' + msg.id)) {
-      let nameColor = "#3ea6ff"; // Người xem thông thường
-      if (msg.isOwner) nameColor = "#ff3e3e"; // Streamer Chủ Kênh
-      else if (msg.isModerator) nameColor = "#1ae0a0"; // Quản trị viên
-      else if (msg.isSponsor) nameColor = "#ffd700"; // Nhà tài trợ hội viên
-      
-      const div = document.createElement('div');
-      div.id = 'msg-' + msg.id;
-      div.className = 'custom-msg';
-      div.style.borderLeftColor = nameColor;
-      
-      div.innerHTML = \`
+  // Render danh sách tin nhắn của bạn
+  container.innerHTML = messages.map(msg => {
+    // Xác định màu sắc người gửi cực kỳ trực quan
+    let nameColor = "#3ea6ff"; // Người xem thông thường
+    if (msg.isOwner) nameColor = "#ff3e3e"; // Streamer Chủ Kênh
+    else if (msg.isModerator) nameColor = "#1ae0a0"; // Quản trị viên
+    else if (msg.isSponsor) nameColor = "#ffd700"; // Nhà tài trợ hội viên
+    
+    return \`
+      <div class="custom-msg" style="border-left-color: \${nameColor}">
         <span class="custom-author" style="color: \${nameColor}">\${msg.authorName || 'Anonymous'}:</span>
         <span class="custom-text">\${msg.messageText || ''}</span>
-      \`;
-      
-      container.appendChild(div);
-    }
-  });
+      </div>
+    \`;
+  }).join('');
   
   // Tự động cuộn mượt xuống phía dưới khi có tin nhắn mới xuôi dòng
   container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
@@ -501,9 +485,9 @@ const isSettingsEqual = (a: OverlaySettings, b: OverlaySettings, ignoreTransitio
 
 export default function App() {
   // 1. DYNAMIC ROUTING CHECK - OBS Browser Source Detection
-  const [isOverlayRoute, setIsOverlayRoute] = useState(false);
-  const [isDesktopOverlay, setIsDesktopOverlay] = useState(false);
-  const [isTransitionOverlay, setIsTransitionOverlay] = useState(false);
+  const [isOverlayRoute, setIsOverlayRoute] = useState(() => typeof window !== "undefined" && (window.location.search.includes("overlay=chat") || window.location.search.includes("ob=")));
+  const [isDesktopOverlay, setIsDesktopOverlay] = useState(() => typeof window !== "undefined" && window.location.search.includes("desktop=1"));
+  const [isTransitionOverlay, setIsTransitionOverlay] = useState(() => typeof window !== "undefined" && window.location.search.includes("overlay=transition"));
   const [isOverlayLocked, setIsOverlayLocked] = useState(false);
   const [isElectronEnv, setIsElectronEnv] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
@@ -703,7 +687,7 @@ export default function App() {
     if (!isOverlayRoute) {
       const checkStatus = async () => {
         try {
-          const res = await fetch(`/api/desktop-overlay/status?t=${Date.now()}`, { cache: 'no-store' });
+          const res = await fetch("/api/desktop-overlay/status");
           if (res.ok) {
             const data = await res.json();
             setIsElectronEnv(data.isElectron);
@@ -763,11 +747,7 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved);
-        // Migration: Fix innerHTML constant refresh bug in legacy custom JS
-        if (parsed.customJs && parsed.customJs.includes("container.innerHTML = messages.map(")) {
-          parsed.customJs = DEFAULT_SETTINGS.customJs;
-        }
+        const parsed = JSON.parse(saved); 
         return { ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
@@ -778,11 +758,7 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved);
-        // Migration: Fix innerHTML constant refresh bug in legacy custom JS
-        if (parsed.customJs && parsed.customJs.includes("container.innerHTML = messages.map(")) {
-          parsed.customJs = DEFAULT_SETTINGS.customJs;
-        }
+        const parsed = JSON.parse(saved); 
         return { ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
@@ -790,28 +766,7 @@ export default function App() {
   });
 
   const hasUnsavedChanges = useMemo(() => {
-    if (isOverlayRoute) return false;
-    
-    // Nút Lưu thay đổi chỉ ghi nhận các thay đổi ở giao diện App.tsx (Khung chat)
-    const watchedKeys: (keyof OverlaySettings)[] = [
-      "fontSize", "fontFamily", "textColor", "bgColor", "bgOpacity",
-      "authorColor", "moderatorColor", "sponsorColor", "superChatDuration",
-      "isTransparent", "scale", "chatDuration", "showAvatar", "showBadges", "animationType",
-      "useCustomCode", "customHtml", "customCss", "customJs",
-      "bgImageEnabled", "bgImageType", "bgImageUrl", "bgImageBase64",
-      "bgImageOpacity", "bgImageBlur", "bgImagePreset",
-      "decorativeIconEnabled", "decorativeIconType", "decorativeIconPosition"
-    ];
-    
-    // So sánh tất cả các trường cấu hình Khung Chat đang được theo dõi
-    for (const key of watchedKeys) {
-      const val1 = settings[key] ?? DEFAULT_SETTINGS[key];
-      const val2 = savedSettingsBenchmark[key] ?? DEFAULT_SETTINGS[key];
-      if (val1 !== val2) {
-        return true;
-      }
-    }
-    return false;
+    return !isOverlayRoute && !isSettingsEqual(settings, savedSettingsBenchmark, true);
   }, [settings, savedSettingsBenchmark, isOverlayRoute]);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
@@ -887,12 +842,11 @@ export default function App() {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       safeSaveSettingsToLocalStorage(updated);
+      if (saveBenchmark) {
+        setSavedSettingsBenchmark(updated);
+      }
       return updated;
     });
-    
-    if (saveBenchmark) {
-      setSavedSettingsBenchmark((prev) => ({ ...prev, ...newSettings }));
-    }
   };
 
   const lastMsgLengthRef = useRef<number>(messages.length);
@@ -1381,11 +1335,11 @@ export default function App() {
         }
 
         try {
-          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}&t=${Date.now()}`;
+          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}`;
           if (nextPageTokenRef.current) {
             u += `&pageToken=${nextPageTokenRef.current}`;
           }
-          const response = await fetch(u, { cache: 'no-store' });
+          const response = await fetch(u);
           if (response.ok) {
             const data = await response.json();
             const incomingArr = data.messages || [];
@@ -1419,7 +1373,7 @@ export default function App() {
     if (isOverlayRoute) {
       const fetchSettings = async () => {
         try {
-          const res = await fetch(`/api/youtube/settings-sync?t=${Date.now()}`, { cache: 'no-store' });
+          const res = await fetch("/api/youtube/settings-sync");
           if (res.ok) {
             const data = await res.json();
             if (data && data.settings) {
@@ -2623,10 +2577,7 @@ export default function App() {
   };
 
   return (
-    <div 
-      className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.dashboardTheme === 'light' ? 'dashboard-light-theme' : ''}`}
-      style={{ '--app-accent': currentAccent } as React.CSSProperties}
-    >
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* 🔴 Active Flash Indicator Toast */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-indigo-600/95 text-white text-xs py-2 px-4 rounded-xl shadow-lg border border-indigo-400 font-bold backdrop-blur flex items-center gap-2">

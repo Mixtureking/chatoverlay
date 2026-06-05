@@ -4,17 +4,6 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
-## [1.0.4] - 2026-06-05
-
-### 🚀 Nâng cấp Giao diện (UI/UX Improvements)
-- **Tân trang Giao diện Sáng (Premium Light Theme)**: Thiết kế lại toàn bộ Giao diện Sáng (Light Theme) theo phong cách Glassmorphism hiện đại. Kết hợp tinh tế các mảng màu nền trong suốt cùng màu Accent (điểm nhấn) của bảng điều khiển để tạo ra một không gian làm việc cao cấp, lung linh và chuyên nghiệp hơn. Khắc phục triệt để các lỗi hiển thị màu sắc trên nền sáng, đặc biệt là lỗi màu ở nút đóng Sidebar Navigator.
-- **Chỉnh sửa Ngôn ngữ (Localization)**: Cập nhật tiêu đề mục "Cứu hộ kết nối" thành "URL Livestream" để thân thiện và sát với ngữ cảnh sử dụng thực tế của người dùng.
-
-### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
-- **Tách biệt Logic Lưu cấu hình (Smart Save System)**: Tối ưu lại cơ chế nhận diện thay đổi (`hasUnsavedChanges`) trên Dashboard. Nút "Lưu thay đổi" giờ đây chỉ ghi nhận và xuất hiện khi bạn chỉnh sửa các thông số giao diện của Khung Chat Overlay (màu sắc, kích thước, hiệu ứng,...). Các chỉnh sửa tại tab Cài đặt chung hay Studio Chuyển Cảnh sẽ không còn kích hoạt bảng cảnh báo chưa lưu, giúp tránh gây khó chịu cho người dùng.
-- **Sửa triệt để lỗi Timer Chuyển Cảnh OBS (Single-Thread Transition Fix)**: Giải quyết dứt điểm hiện tượng chuyển cảnh "bị kẹt", "giật giật", hoặc tự động khởi động lại trên màn hình OBS. Áp dụng cơ chế **xử lý đơn luồng** (Single-Thread Processing): Gỡ bỏ các bộ đếm giờ (Timer) nội bộ độc lập trên mã nguồn phía OBS, biến Bảng điều khiển (Dashboard) thành "Nguồn chân lý" duy nhất (Single Source of Truth) điều khiển Timer. Xóa bỏ hoàn toàn xung đột trạng thái (Race Condition).
-
-
 ## [1.0.3] - 2026-06-05
 
 ### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
