@@ -81,138 +81,96 @@ export default function ScreenTransitionWorkspace({
     }
   }, [settings.transitionActive]);
 
-  // Ref for tracking the last selectedOptionId to avoid race conditions on preset switch
-  const prevSelectedOptionIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    prevSelectedOptionIdRef.current = selectedOptionId;
-  }, [selectedOptionId]);
-
-  const prevSelectedOptionId = prevSelectedOptionIdRef.current;
-
-  // Synchronize transition configuration when Option preset options are changed
-  useEffect(() => {
-    if (!selectedOptionId) return;
+  // Unified function to handle property updates for transition and synchronize them to preset overrides
+  const handleUpdateTransitionField = (fieldsToUpdate: Partial<OverlaySettings>) => {
+    let nextCustomList = [...(settings.transitionCustomPresets || [])];
     
-    // Only synchronize once selectedOptionId has stabilized (prev and current match)
-    // to avoid overwriting a newly selected preset's values with the prior preset's values
-    if (prevSelectedOptionId !== selectedOptionId) return;
+    // Check if any of the fields being updated belong to the preset option
+    const presetFields = ["transitionTitle", "transitionSubtitle", "transitionDuration", "transitionSustainType"];
+    const hasPresetField = Object.keys(fieldsToUpdate).some(k => presetFields.includes(k));
 
-    const customList = settings.transitionCustomPresets || [];
-    const existing = customList.find(p => p.id === selectedOptionId);
-    const defaultPreset = defaultPresets.find(p => p.id === selectedOptionId);
-
-    const currentTitle = settings.transitionTitle || "";
-    const currentSubtitle = settings.transitionSubtitle || "";
-    const currentDuration = settings.transitionDuration || 3;
-    const currentSustainType = settings.transitionSustainType || "auto";
-
-    let shouldUpdatePrs = false;
-    let nextCustomList = [...customList];
-
-    if (existing) {
-      if (
-        existing.title !== currentTitle ||
-        existing.subtitle !== currentSubtitle ||
-        existing.duration !== currentDuration ||
-        existing.sustainType !== currentSustainType
-      ) {
-        shouldUpdatePrs = true;
-        nextCustomList = customList.map(p => {
-          if (p.id === selectedOptionId) {
-            return {
-              ...p,
-              title: currentTitle,
-              subtitle: currentSubtitle,
-              duration: currentDuration,
-              sustainType: currentSustainType as "auto" | "manual"
-            };
-          }
-          return p;
-        });
-      }
-    } else if (defaultPreset) {
-      // It's a default preset, we can create an override in customList with its same ID
-      const titleDiverged = currentTitle !== defaultPreset.title;
-      const subtitleDiverged = currentSubtitle !== defaultPreset.subtitle;
-      const durationDiverged = currentDuration !== defaultPreset.duration;
-      const sustainTypeDiverged = currentSustainType !== defaultPreset.sustainType;
-
-      if (titleDiverged || subtitleDiverged || durationDiverged || sustainTypeDiverged) {
-        shouldUpdatePrs = true;
+    if (selectedOptionId && hasPresetField) {
+      const isDefault = defaultPresets.some(dp => dp.id === selectedOptionId);
+      
+      if (isDefault) {
+        const dp = defaultPresets.find(p => p.id === selectedOptionId)!;
+        const existingIdx = nextCustomList.findIndex(p => p.id === selectedOptionId);
         
-        // Check if there is an override already in custom list to update
-        const alreadyHasOverride = customList.some(p => p.id === selectedOptionId);
-        if (alreadyHasOverride) {
-          nextCustomList = customList.map(p => {
-            if (p.id === selectedOptionId) {
-              return {
-                ...p,
-                title: currentTitle,
-                subtitle: currentSubtitle,
-                duration: currentDuration,
-                sustainType: currentSustainType as "auto" | "manual"
-              };
-            }
-            return p;
-          });
+        const title = "transitionTitle" in fieldsToUpdate ? fieldsToUpdate.transitionTitle : (settings.transitionTitle ?? dp.title);
+        const subtitle = "transitionSubtitle" in fieldsToUpdate ? fieldsToUpdate.transitionSubtitle : (settings.transitionSubtitle ?? dp.subtitle);
+        const duration = "transitionDuration" in fieldsToUpdate ? fieldsToUpdate.transitionDuration : (settings.transitionDuration ?? dp.duration);
+        const sustainType = "transitionSustainType" in fieldsToUpdate ? fieldsToUpdate.transitionSustainType : (settings.transitionSustainType ?? dp.sustainType);
+        
+        const updatedOverride = {
+          id: dp.id,
+          name: dp.name,
+          title: title || dp.name,
+          subtitle: subtitle || "Vui lòng chờ giây lát...",
+          duration: duration || 3,
+          sustainType: (sustainType || "auto") as "auto" | "manual"
+        };
+        
+        if (existingIdx > -1) {
+          nextCustomList[existingIdx] = updatedOverride;
         } else {
-          nextCustomList = [
-            ...customList,
-            {
-              id: defaultPreset.id,
-              name: defaultPreset.name,
-              title: currentTitle,
-              subtitle: currentSubtitle,
-              duration: currentDuration,
-              sustainType: currentSustainType as "auto" | "manual"
-            }
-          ];
+          nextCustomList.push(updatedOverride);
+        }
+      } else {
+        const existingIdx = nextCustomList.findIndex(p => p.id === selectedOptionId);
+        if (existingIdx > -1) {
+          const original = nextCustomList[existingIdx];
+          
+          const title = "transitionTitle" in fieldsToUpdate ? fieldsToUpdate.transitionTitle : (settings.transitionTitle ?? original.title);
+          const subtitle = "transitionSubtitle" in fieldsToUpdate ? fieldsToUpdate.transitionSubtitle : (settings.transitionSubtitle ?? original.subtitle);
+          const duration = "transitionDuration" in fieldsToUpdate ? fieldsToUpdate.transitionDuration : (settings.transitionDuration ?? original.duration);
+          const sustainType = "transitionSustainType" in fieldsToUpdate ? fieldsToUpdate.transitionSustainType : (settings.transitionSustainType ?? original.sustainType);
+          
+          nextCustomList[existingIdx] = {
+            ...original,
+            title: title || original.name,
+            subtitle: subtitle || "Vui lòng chờ giây lát...",
+            duration: duration || 3,
+            sustainType: (sustainType || "auto") as "auto" | "manual"
+          };
         }
       }
     }
+    
+    const mergedUpdate = {
+      ...fieldsToUpdate,
+      ...(selectedOptionId && hasPresetField ? { transitionCustomPresets: nextCustomList } : {})
+    };
+    
+    updateSettings(mergedUpdate);
+    
+    fetch("/api/youtube/settings-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: {
+          ...settings,
+          ...mergedUpdate
+        }
+      })
+    }).catch(err => console.warn("Failed syncing preset properties on change:", err));
+  };
 
-    if (shouldUpdatePrs) {
-      updateSettings({
-        transitionCustomPresets: nextCustomList
-      });
-
-      // Also persist to server database instantly
-      fetch("/api/youtube/settings-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          settings: {
-            ...settings,
-            transitionCustomPresets: nextCustomList
-          }
-        })
-      }).catch(err => console.warn("Failed to sync updated presets on edit:", err));
+  const overriddenDefaults = defaultPresets.map(dp => {
+    const override = (settings.transitionCustomPresets || []).find(p => p.id === dp.id);
+    if (override) {
+      return {
+        ...dp,
+        title: override.title,
+        subtitle: override.subtitle,
+        duration: override.duration,
+        sustainType: override.sustainType
+      };
     }
-  }, [
-    selectedOptionId,
-    prevSelectedOptionId,
-    settings.transitionTitle,
-    settings.transitionSubtitle,
-    settings.transitionDuration,
-    settings.transitionSustainType,
-    settings.transitionCustomPresets,
-  ]);
+    return dp;
+  });
 
   const allPresets = [
-    ...defaultPresets.map(dp => {
-      const override = (settings.transitionCustomPresets || []).find(p => p.id === dp.id);
-      if (override) {
-        return {
-          ...dp,
-          title: override.title,
-          subtitle: override.subtitle,
-          duration: override.duration,
-          sustainType: override.sustainType
-        };
-      }
-      return dp;
-    }),
+    ...overriddenDefaults,
     ...(settings.transitionCustomPresets || [])
       .filter(p => !p.id.startsWith("preset_"))
       .map(p => ({
@@ -386,8 +344,8 @@ export default function ScreenTransitionWorkspace({
 
     const nextActive = true; 
     const updatedCount = (settings.transitionTriggerCount || 0) + 1;
-    const durationVal = preset.duration || settings.transitionDuration || 3;
-    const sustainTypeVal = settings.transitionSustainType || "auto";
+    const durationVal = preset.duration || 3;
+    const sustainTypeVal = preset.sustainType || "auto";
 
     // Build the fully resolved settings block
     const updatedSettings = {
@@ -611,7 +569,7 @@ export default function ScreenTransitionWorkspace({
           {/* Preset Buttons Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" id="presets-buttons-grid">
             {/* Render defaults */}
-            {defaultPresets.map(preset => (
+            {overriddenDefaults.map(preset => (
               <button
                 key={preset.id}
                 type="button"
@@ -756,7 +714,7 @@ export default function ScreenTransitionWorkspace({
                   <input
                     type="text"
                     value={settings.transitionTitle || ""}
-                    onChange={(e) => updateSettings({ transitionTitle: e.target.value })}
+                    onChange={(e) => handleUpdateTransitionField({ transitionTitle: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
                     placeholder="e.g. LIVE STARTING SOON"
                   />
@@ -766,7 +724,7 @@ export default function ScreenTransitionWorkspace({
                   <span className="text-[10px] text-slate-450 block font-semibold">Dòng chữ phụ (Mô tả rèm)</span>
                   <textarea
                     value={settings.transitionSubtitle || ""}
-                    onChange={(e) => updateSettings({ transitionSubtitle: e.target.value })}
+                    onChange={(e) => handleUpdateTransitionField({ transitionSubtitle: e.target.value })}
                     rows={2}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium custom-scrollbar"
                     placeholder="e.g. Vui lòng đợi trong giây lát..."
@@ -788,7 +746,7 @@ export default function ScreenTransitionWorkspace({
                   <span className="text-[10px] text-slate-450 block font-semibold">Kiểu nền giao diện</span>
                   <select
                     value={settings.transitionBgType || "gradient"}
-                    onChange={(e) => updateSettings({ transitionBgType: e.target.value as any })}
+                    onChange={(e) => handleUpdateTransitionField({ transitionBgType: e.target.value as any })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
                   >
                     <option value="gradient">🎨 Nền dải màu (Linear Gradient Presets)</option>
@@ -805,14 +763,14 @@ export default function ScreenTransitionWorkspace({
                       <input
                         type="color"
                         value={settings.transitionBgColor || "#0f172a"}
-                        onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                        onChange={(e) => handleUpdateTransitionField({ transitionBgColor: e.target.value })}
                         className="w-7 h-7 border-0 bg-transparent cursor-pointer shrink-0"
                       />
                       <input
                         type="text"
                         maxLength={7}
                         value={settings.transitionBgColor || "#0f172a"}
-                        onChange={(e) => updateSettings({ transitionBgColor: e.target.value })}
+                        onChange={(e) => handleUpdateTransitionField({ transitionBgColor: e.target.value })}
                         className="w-full bg-transparent border-0 text-xs font-mono font-bold text-slate-300 uppercase tracking-widest pl-1"
                       />
                     </div>
@@ -824,7 +782,7 @@ export default function ScreenTransitionWorkspace({
                     <span className="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider pl-0.5">Preset Gradient phối sọc</span>
                     <select
                       value={settings.transitionBgGradient || "linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #030712 100%)"}
-                      onChange={(e) => updateSettings({ transitionBgGradient: e.target.value })}
+                      onChange={(e) => handleUpdateTransitionField({ transitionBgGradient: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-805 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none cursor-pointer"
                     >
                       {presetsGradients.map((g) => (
@@ -840,7 +798,7 @@ export default function ScreenTransitionWorkspace({
                     <input
                       type="text"
                       value={settings.transitionImageUrl || ""}
-                      onChange={(e) => updateSettings({ transitionImageUrl: e.target.value })}
+                      onChange={(e) => handleUpdateTransitionField({ transitionImageUrl: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-805 rounded-md px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500"
                       placeholder="Paste direct .png/.jpg link"
                     />
@@ -869,7 +827,7 @@ export default function ScreenTransitionWorkspace({
                       </div>
                       <button
                         type="button"
-                        onClick={() => updateSettings({ transitionImageBase64: "", transitionImageUrl: "" })}
+                        onClick={() => handleUpdateTransitionField({ transitionImageBase64: "", transitionImageUrl: "" })}
                         className="p-1 px-1.5 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/20 text-rose-400 rounded transition-all cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -907,7 +865,7 @@ export default function ScreenTransitionWorkspace({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => updateSettings({ transitionSustainType: "auto" })}
+                      onClick={() => handleUpdateTransitionField({ transitionSustainType: "auto" })}
                       className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         (settings.transitionSustainType || "auto") === "auto"
                           ? "bg-pink-600/20 border-pink-500 text-pink-400"
@@ -919,7 +877,7 @@ export default function ScreenTransitionWorkspace({
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateSettings({ transitionSustainType: "manual" })}
+                      onClick={() => handleUpdateTransitionField({ transitionSustainType: "manual" })}
                       className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         settings.transitionSustainType === "manual"
                           ? "bg-pink-600/20 border-pink-500 text-pink-400"
@@ -945,7 +903,7 @@ export default function ScreenTransitionWorkspace({
                       max="10"
                       step="1"
                       value={settings.transitionDuration || 3}
-                      onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
+                      onChange={(e) => handleUpdateTransitionField({ transitionDuration: parseInt(e.target.value, 10) })}
                       className="w-full accent-pink-500 cursor-pointer"
                     />
                   </div>
@@ -959,7 +917,7 @@ export default function ScreenTransitionWorkspace({
                   </span>
                   <select
                     value={settings.transitionSoundType || "bell"}
-                    onChange={(e) => updateSettings({ transitionSoundType: e.target.value as any })}
+                    onChange={(e) => handleUpdateTransitionField({ transitionSoundType: e.target.value as any })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
                   >
                     <option value="none">🔇 Không phát âm thanh (Silent)</option>
