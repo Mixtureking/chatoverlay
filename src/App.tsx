@@ -766,7 +766,25 @@ export default function App() {
   });
 
   const hasUnsavedChanges = useMemo(() => {
-    return !isOverlayRoute && !isSettingsEqual(settings, savedSettingsBenchmark, true);
+    if (isOverlayRoute) return false;
+    
+    // Nút Lưu thay đổi chỉ ghi nhận các thay đổi ở giao diện App.tsx, không ảnh hưởng tới Settings hay Transition
+    const ignoredKeys = [
+      "language", "dashboardTheme", "dashboardAccentColor",
+      "soundEnabled", "soundType", "soundVolume", "soundUrl", "soundFileBase64", "soundFileName",
+      "transitionActive", "transitionTriggerCount", "transitionType", "transitionDuration",
+      "transitionText", "transitionTitle", "transitionIcon", "transitionImageUrl", "transitionAudioUrl",
+      "transitionBgColor", "transitionSoundType", "transitionSustainType", "transitionSubtitle", "transitionCustomPresets"
+    ];
+    
+    const a = { ...settings };
+    const b = { ...savedSettingsBenchmark };
+    for (const key of ignoredKeys) {
+      delete a[key as keyof typeof a];
+      delete b[key as keyof typeof b];
+    }
+    
+    return JSON.stringify(a) !== JSON.stringify(b);
   }, [settings, savedSettingsBenchmark, isOverlayRoute]);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
