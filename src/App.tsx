@@ -687,7 +687,7 @@ export default function App() {
     if (!isOverlayRoute) {
       const checkStatus = async () => {
         try {
-          const res = await fetch("/api/desktop-overlay/status");
+          const res = await fetch(`/api/desktop-overlay/status?t=${Date.now()}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
             setIsElectronEnv(data.isElectron);
@@ -1335,11 +1335,11 @@ export default function App() {
         }
 
         try {
-          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}`;
+          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}&t=${Date.now()}`;
           if (nextPageTokenRef.current) {
             u += `&pageToken=${nextPageTokenRef.current}`;
           }
-          const response = await fetch(u);
+          const response = await fetch(u, { cache: 'no-store' });
           if (response.ok) {
             const data = await response.json();
             const incomingArr = data.messages || [];
@@ -1373,7 +1373,7 @@ export default function App() {
     if (isOverlayRoute) {
       const fetchSettings = async () => {
         try {
-          const res = await fetch("/api/youtube/settings-sync");
+          const res = await fetch(`/api/youtube/settings-sync?t=${Date.now()}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
             if (data && data.settings) {
