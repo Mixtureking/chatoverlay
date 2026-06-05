@@ -467,6 +467,19 @@ const SAMPLE_MESSAGES_TEMPLATES = [
   { name: "Chủ Kênh Vip", text: "Đã donate 200 đô ủng hộ streamer leo top tối nay! Cháy lên nào!!!! 🔥🔥", role: "superchat", amount: "200.00$", tier: 6, color: "#e91e63" },
 ];
 
+const isSettingsEqual = (a: OverlaySettings, b: OverlaySettings, ignoreTransitionToggle = false) => {
+  if (!a || !b) return a === b;
+  if (!ignoreTransitionToggle) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  // Clone to avoid mutation and remove unstable keys like 'transitionActive'
+  const cloneA = { ...a };
+  const cloneB = { ...b };
+  delete cloneA.transitionActive;
+  delete cloneB.transitionActive;
+  return JSON.stringify(cloneA) === JSON.stringify(cloneB);
+};
+
 export default function App() {
   // 1. DYNAMIC ROUTING CHECK - OBS Browser Source Detection
   const [isOverlayRoute, setIsOverlayRoute] = useState(false);
@@ -1354,13 +1367,22 @@ export default function App() {
           if (res.ok) {
             const data = await res.json();
             if (data && data.settings) {
-              setObsSettings(data.settings);
-              setSettings(data.settings);
-              setSavedSettingsBenchmark(data.settings);
+              // Only update state if something actually changed to prevent constant re-renders
+              setObsSettings((prev) => isSettingsEqual(prev, data.settings) ? prev : data.settings);
+              setSettings((prev) => isSettingsEqual(prev, data.settings) ? prev : data.settings);
+              setSavedSettingsBenchmark((prev) => isSettingsEqual(prev, data.settings) ? prev : data.settings);
+              
+              const effectiveChatIdLocal = obsChatId || data.settings.activeLiveChatId;
+              const effectiveApiKeyLocal = obsApiKey || data.settings.apiKey;
+              const isSimulated = effectiveChatIdLocal === "SIMULATED" || effectiveApiKeyLocal === "SANDBOX_MOCK_DRIVEN";
+
               // Auto delete previous message contents if they went offline
-              if (data.settings.isOffline) {
-                setMessages([]);
-                messagesSetRef.current.clear();
+              if (data.settings.isOffline && !isSimulated) {
+                setMessages((prev) => {
+                  if (prev.length === 0) return prev;
+                  messagesSetRef.current.clear();
+                  return [];
+                });
               }
             }
           }
@@ -2553,7 +2575,7 @@ export default function App() {
       )}
 
       {/* 💾 Globally Floating Unsaved Changes Card (Gần góc dưới bên phải màn hình, chạy theo thanh cuộn) */}
-      {!isOverlayRoute && JSON.stringify(settings) !== JSON.stringify(savedSettingsBenchmark) && (
+      {!isOverlayRoute && !isSettingsEqual(settings, savedSettingsBenchmark, true) && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 p-4 rounded-xl flex flex-col sm:flex-row items-center gap-4.5 shadow-2xl shadow-indigo-500/20 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-xs sm:max-w-md pointer-events-auto">
           <div className="text-left flex-1 select-none">
             <div className="text-xs font-bold text-indigo-400 flex items-center gap-1.5 leading-none">

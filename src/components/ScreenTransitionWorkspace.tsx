@@ -308,7 +308,6 @@ export default function ScreenTransitionWorkspace({
   const handlePresetClick = async (preset: { id: string; name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
     // If clicking the currently active option, deactivate it immediately
     if (selectedOptionId === preset.id && settings.transitionActive) {
-      setSelectedOptionId(null);
       setIsLocalSimulating(false);
       if (localSimTimeout) clearTimeout(localSimTimeout);
 
