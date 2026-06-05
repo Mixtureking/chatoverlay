@@ -109,9 +109,8 @@ export default function ScreenTransitionOverlay({
     const triggerCount = settings.transitionTriggerCount || 0;
 
     // Trigger or fresh-restart the transition if it's active AND:
-    // - Not currently active in local state, OR
     // - The user switched transition presets (meaning trigger count changed)
-    const deservesActivation = isTransitionActive && (!isActiveRef.current || triggerCount !== lastTriggerCountRef.current);
+    const deservesActivation = isTransitionActive && (triggerCount !== lastTriggerCountRef.current);
 
     if (deservesActivation) {
       if (manualTurnOffTimerRef.current) {
