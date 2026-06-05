@@ -164,6 +164,20 @@
   border-color: #db2777 !important;
 }
 
+/* Unsaved Changes Banner Light Mode Adaptations */
+.dashboard-light-theme .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 20%, transparent) !important;
+  box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--app-accent, #6366f1) 15%, transparent) !important;
+}
+.dashboard-light-theme .bg-slate-900\/95 .text-slate-300 {
+  color: #475569 !important; /* slate-600 */
+}
+.dashboard-light-theme .bg-slate-900\/95 .text-indigo-400 {
+  color: var(--app-accent, #6366f1) !important;
+}
+
+
 .dashboard-light-theme .text-amber-300,
 .dashboard-light-theme .text-amber-350,
 .dashboard-light-theme .text-amber-400 {

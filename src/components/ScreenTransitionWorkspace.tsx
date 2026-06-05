@@ -681,7 +681,7 @@ const ScreenTransitionWorkspace = memo(function ScreenTransitionWorkspace({
 
             {/* Explicit Activation Button right inside the options form */}
             <button
-              onClick={triggerGlobalTransition}
+              onClick={triggerObsTransitionGlobal}
               disabled={settings.transitionActive}
               className={`w-full py-3 rounded-xl font-black text-[13px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 shadow-lg ${
                 settings.transitionActive 
