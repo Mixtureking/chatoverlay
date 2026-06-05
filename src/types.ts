@@ -31,6 +31,7 @@ export interface OverlaySettings {
   showAvatar: boolean;    // toggle avatars
   showBadges: boolean;    // moderator/sponsor badge icons
   animationType: "fade" | "slide" | "bounce"; // animations
+  messageLayout?: "block" | "inline"; // place message text side by side or below name
   useCustomCode?: boolean; // custom widget renderer flag
   customHtml?: string;     // user custom html
   customCss?: string;      // user custom css

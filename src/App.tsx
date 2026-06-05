@@ -343,6 +343,7 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   showAvatar: true,
   showBadges: true,
   animationType: "fade",
+  messageLayout: "block",
   useCustomCode: false,
   soundEnabled: false,
   soundType: "default",
@@ -473,17 +474,22 @@ const SAMPLE_MESSAGES_TEMPLATES = [
 
 const isSettingsEqual = (a: OverlaySettings, b: OverlaySettings, ignoreTransitionToggle = false) => {
   if (!a || !b) return a === b;
-  if (!ignoreTransitionToggle) {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  // Clone to avoid mutation and remove unstable keys like 'transitionActive'
   const cloneA = { ...a };
   const cloneB = { ...b };
-  delete cloneA.transitionActive;
-  delete cloneB.transitionActive;
+  if (ignoreTransitionToggle) {
+    delete cloneA.transitionActive;
+    delete cloneB.transitionActive;
+  }
   delete cloneA.transitionTriggerCount;
   delete cloneB.transitionTriggerCount;
-  return JSON.stringify(cloneA) === JSON.stringify(cloneB);
+  delete (cloneA as any).bgImageBase64;
+  delete (cloneB as any).bgImageBase64;
+  delete (cloneA as any).soundFileBase64;
+  delete (cloneB as any).soundFileBase64;
+  
+  const stableA = Object.keys(cloneA).sort().reduce((obj: any, key) => { obj[key] = (cloneA as any)[key]; return obj; }, {});
+  const stableB = Object.keys(cloneB).sort().reduce((obj: any, key) => { obj[key] = (cloneB as any)[key]; return obj; }, {});
+  return JSON.stringify(stableA) === JSON.stringify(stableB);
 };
 
 export default function App() {
@@ -616,6 +622,7 @@ export default function App() {
       const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
       const pShowBadges = decodedParams.showBadges !== undefined ? decodedParams.showBadges : (searchParams.get("showBadges") !== "false");
       const pAnimType = (decodedParams.animationType || searchParams.get("animationType") || "fade") as "fade" | "slide" | "bounce";
+      const pMessageLayout = (decodedParams.messageLayout || searchParams.get("messageLayout") || "block") as "block" | "inline";
       const pThemeMode = (decodedParams.themeMode || searchParams.get("themeMode") || "dark") as "dark" | "light";
 
       setObsSettings({
@@ -635,6 +642,7 @@ export default function App() {
         showAvatar: pShowAvatar,
         showBadges: pShowBadges,
         animationType: pAnimType,
+        messageLayout: pMessageLayout,
       });
 
       setObsChatId(decodedParams.liveChatId || searchParams.get("liveChatId") || "");
@@ -1142,6 +1150,8 @@ export default function App() {
         activeLiveChatId: data.activeLiveChatId, 
         apiKey: apiKey 
       };
+      setSettings(updatedSettings);
+      setSavedSettingsBenchmark(updatedSettings);
       fetch("/api/youtube/settings-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1181,6 +1191,8 @@ export default function App() {
 
     // Đồng bộ trạng thái ngắt kết nối tới các OBS overlay để xoá tin nhắn ngay lập tức
     const updatedSettings = { ...settings, isOffline: true, activeLiveChatId: "", apiKey: "" };
+    setSettings(updatedSettings);
+    setSavedSettingsBenchmark(updatedSettings);
     fetch("/api/youtube/settings-sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1539,6 +1551,7 @@ export default function App() {
       showAvatar: settings.showAvatar,
       showBadges: settings.showBadges,
       animationType: settings.animationType,
+      messageLayout: settings.messageLayout || "block",
       themeMode: settings.themeMode,
     };
 
@@ -1575,6 +1588,7 @@ export default function App() {
       query.set("showAvatar", config.showAvatar ? "true" : "false");
       query.set("showBadges", config.showBadges ? "true" : "false");
       query.set("animationType", config.animationType);
+      query.set("messageLayout", config.messageLayout || "block");
       query.set("themeMode", config.themeMode || "dark");
       return `${rootUrl}/?${query.toString()}`;
     }
@@ -3425,6 +3439,18 @@ export default function App() {
                       <option value="fade">Mờ dần khi vào (Fade In)</option>
                       <option value="slide">Bay vào từ bên trái (Slide Left)</option>
                       <option value="bounce">Đàn hồi tự nhiên (Bounce In)</option>
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1 pt-1.5">
+                    <label className="text-[11px] text-slate-400 block">Bố cục tin nhắn (Message Layout)</label>
+                    <select
+                      value={settings.messageLayout || "block"}
+                      onChange={(e) => updateSettings({ messageLayout: e.target.value as any })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="block">Nằm ở dưới tên (Dạng Khối)</option>
+                      <option value="inline">Bên tay phải của tên (Cùng 1 dòng)</option>
                     </select>
                   </div>
                 </div>

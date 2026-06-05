@@ -561,77 +561,128 @@ const OverlayWidget = memo(function OverlayWidget({
                     />
                   )}
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                      {/* Decorative companion tiny icon (position: before_name) */}
-                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
-                        renderDecorativeIcon(settings.decorativeIconType)
-                      )}
-
-                      {/* Name with specific styling */}
-                      <span
-                        className="font-bold tracking-tight text-ellipsis overflow-hidden whitespace-nowrap"
-                        style={{ color: uColor }}
-                      >
-                        {msg.authorName}
-                      </span>
-
-                      {/* Decorative companion tiny icon (position: after_name) */}
-                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
-                        renderDecorativeIcon(settings.decorativeIconType)
-                      )}
-
-                      {/* Display Creator/Mod Badges if enabled */}
-                      {settings.showBadges && (
-                        <div className="inline-flex items-center gap-0.5">
-                          {msg.isOwner && (
-                            <span
-                              title="Tác chủ Stream"
-                              className="bg-red-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
-                            >
-                              <Award className="w-2.5 h-2.5" />
-                            </span>
+                  <div className="flex-1 min-w-0 leading-tight">
+                    {/* Choose between block (name on top, message on bottom) and inline (name and message adjacent) layouts */}
+                    {settings.messageLayout === "inline" ? (
+                      <div className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight">
+                        <span className="inline-flex items-center flex-wrap gap-1 align-baseline mr-1.5 relative top-0.5">
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
+                            renderDecorativeIcon(settings.decorativeIconType)
                           )}
-                          {msg.isModerator && (
-                            <span
-                              title="Kiểm duyệt viên"
-                              className="bg-emerald-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
-                            >
-                              <Shield className="w-2.5 h-2.5" />
-                            </span>
+                          <span
+                            className="font-bold tracking-tight inline-block"
+                            style={{ color: uColor }}
+                          >
+                            {msg.authorName}
+                          </span>
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
+                            renderDecorativeIcon(settings.decorativeIconType)
                           )}
-                          {msg.isSponsor && (
-                            <span
-                              title="Hội viên kênh"
-                              className="bg-amber-400 text-slate-900 rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
-                            >
-                              <Star className="w-2.5 h-2.5" fill="currentColor" />
-                            </span>
+                          {settings.showBadges && (
+                            <div className="inline-flex items-center gap-0.5 relative -top-[1px]">
+                              {msg.isOwner && (
+                                <span className="bg-red-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
+                                  <Award className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                              {msg.isModerator && (
+                                <span className="bg-emerald-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
+                                  <Shield className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                              {msg.isSponsor && (
+                                <span className="bg-amber-400 text-slate-900 rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
+                                  <Star className="w-2.5 h-2.5" fill="currentColor" />
+                                </span>
+                              )}
+                            </div>
                           )}
+                          <span className="text-[0.75em] text-gray-400 opacity-60 ml-0.5 font-mono">
+                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </span>
+                        
+                        <span style={{ color: settings.textColor }}>
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_msg" && settings.decorativeIconType && (
+                            <span className="inline-flex align-baseline mr-1 relative top-[1px]">{renderDecorativeIcon(settings.decorativeIconType)}</span>
+                          )}
+                          <span dangerouslySetInnerHTML={{ __html: msg.messageText + '&nbsp;' }} />
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-1 mb-0.5">
+                          {/* Decorative companion tiny icon (position: before_name) */}
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
+                            renderDecorativeIcon(settings.decorativeIconType)
+                          )}
+
+                          {/* Name with specific styling */}
+                          <span
+                            className="font-bold tracking-tight text-ellipsis overflow-hidden whitespace-nowrap"
+                            style={{ color: uColor }}
+                          >
+                            {msg.authorName}
+                          </span>
+
+                          {/* Decorative companion tiny icon (position: after_name) */}
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
+                            renderDecorativeIcon(settings.decorativeIconType)
+                          )}
+
+                          {/* Display Creator/Mod Badges if enabled */}
+                          {settings.showBadges && (
+                            <div className="inline-flex items-center gap-0.5">
+                              {msg.isOwner && (
+                                <span
+                                  title="Tác chủ Stream"
+                                  className="bg-red-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
+                                >
+                                  <Award className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                              {msg.isModerator && (
+                                <span
+                                  title="Kiểm duyệt viên"
+                                  className="bg-emerald-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
+                                >
+                                  <Shield className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                              {msg.isSponsor && (
+                                <span
+                                  title="Hội viên kênh"
+                                  className="bg-amber-400 text-slate-900 rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center"
+                                >
+                                  <Star className="w-2.5 h-2.5" fill="currentColor" />
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Timing label for preview context/desktop monitoring option */}
+                          <span className="text-[0.75em] text-gray-400 opacity-60 ml-1 font-mono">
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
                         </div>
-                      )}
 
-                      {/* Timing label for preview context/desktop monitoring option */}
-                      <span className="text-[0.75em] text-gray-400 opacity-60 ml-1 font-mono">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
-                      </span>
-                    </div>
-
-                    {/* Chat Bubble / Message body block */}
-                    <div
-                      className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight"
-                      style={{ color: settings.textColor }}
-                    >
-                      {/* Decorative companion tiny icon (position: before_msg) */}
-                      {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_msg" && settings.decorativeIconType && (
-                        renderDecorativeIcon(settings.decorativeIconType)
-                      )}
-                      <span>{msg.messageText}</span>
-                    </div>
+                        {/* Chat Bubble / Message body block */}
+                        <div
+                          className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight"
+                          style={{ color: settings.textColor }}
+                        >
+                          {/* Decorative companion tiny icon (position: before_msg) */}
+                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_msg" && settings.decorativeIconType && (
+                            renderDecorativeIcon(settings.decorativeIconType)
+                          )}
+                          <span>{msg.messageText}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               );
