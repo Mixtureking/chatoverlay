@@ -341,6 +341,7 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   scale: 1.0,
   chatDuration: 0, // 0 = permanent
   showAvatar: true,
+  showTimestamp: true,
   showBadges: true,
   animationType: "fade",
   messageLayout: "block",
@@ -620,6 +621,7 @@ export default function App() {
       const pIsTransparent = decodedParams.isTransparent !== undefined ? decodedParams.isTransparent : (searchParams.get("isTransparent") === "true");
       const pScale = parseFloat(decodedParams.scale?.toString() || searchParams.get("scale") || "1.0");
       const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
+      const pShowTimestamp = decodedParams.showTimestamp !== undefined ? decodedParams.showTimestamp : (searchParams.get("showTimestamp") !== "false");
       const pShowBadges = decodedParams.showBadges !== undefined ? decodedParams.showBadges : (searchParams.get("showBadges") !== "false");
       const pAnimType = (decodedParams.animationType || searchParams.get("animationType") || "fade") as "fade" | "slide" | "bounce";
       const pMessageLayout = (decodedParams.messageLayout || searchParams.get("messageLayout") || "block") as "block" | "inline";
@@ -640,6 +642,7 @@ export default function App() {
         scale: pScale,
         chatDuration: pChatDuration,
         showAvatar: pShowAvatar,
+        showTimestamp: pShowTimestamp,
         showBadges: pShowBadges,
         animationType: pAnimType,
         messageLayout: pMessageLayout,
@@ -1549,6 +1552,7 @@ export default function App() {
       isTransparent: settings.isTransparent,
       scale: settings.scale,
       showAvatar: settings.showAvatar,
+      showTimestamp: settings.showTimestamp ?? true,
       showBadges: settings.showBadges,
       animationType: settings.animationType,
       messageLayout: settings.messageLayout || "block",
@@ -1586,6 +1590,7 @@ export default function App() {
       query.set("isTransparent", config.isTransparent ? "true" : "false");
       query.set("scale", config.scale.toString());
       query.set("showAvatar", config.showAvatar ? "true" : "false");
+      query.set("showTimestamp", config.showTimestamp !== false ? "true" : "false");
       query.set("showBadges", config.showBadges ? "true" : "false");
       query.set("animationType", config.animationType);
       query.set("messageLayout", config.messageLayout || "block");
@@ -3415,6 +3420,15 @@ export default function App() {
                         type="checkbox"
                         checked={settings.showAvatar}
                         onChange={(e) => updateSettings({ showAvatar: e.target.checked })}
+                        className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Hiển thị thời gian (Ngày/giờ)</span>
+                      <input
+                        type="checkbox"
+                        checked={settings.showTimestamp ?? true}
+                        onChange={(e) => updateSettings({ showTimestamp: e.target.checked })}
                         className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
                       />
                     </div>

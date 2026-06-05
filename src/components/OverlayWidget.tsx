@@ -578,61 +578,67 @@ const OverlayWidget = memo(function OverlayWidget({
                   <div className="flex-1 min-w-0 leading-tight">
                     {/* Choose between block (name on top, message on bottom) and inline (name and message adjacent) layouts */}
                     {settings.messageLayout === "inline" ? (
-                      <div className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight">
-                        <span className="inline-flex items-center flex-wrap gap-1 align-baseline mr-1.5 relative top-0.5">
-                          {settings.showAvatar && (
-                            <img
-                              src={msg.authorPhotoUrl}
-                              alt={msg.authorName}
-                              className="w-5 h-5 rounded-full border border-white/10 shrink-0 object-cover inline-block align-middle mr-0.5"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80";
-                              }}
-                            />
-                          )}
-                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
-                            renderDecorativeIcon(settings.decorativeIconType)
-                          )}
-                          <span
-                            className="font-bold tracking-tight inline-block"
-                            style={{ color: uColor }}
-                          >
-                            {msg.authorName}
+                      <div className="text-[1em] font-normal break-words whitespace-pre-wrap leading-tight align-baseline">
+                        {settings.showAvatar && (
+                          <img
+                            src={msg.authorPhotoUrl}
+                            alt={msg.authorName}
+                            className="w-[1.2em] h-[1.2em] rounded-full border border-white/10 shrink-0 object-cover inline-block align-middle mr-1.5"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80";
+                            }}
+                          />
+                        )}
+                        {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_name" && settings.decorativeIconType && (
+                          <span className="inline-flex items-center align-middle mr-1 relative -top-[1px]">
+                            {renderDecorativeIcon(settings.decorativeIconType)}
                           </span>
-                          {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
-                            renderDecorativeIcon(settings.decorativeIconType)
-                          )}
-                          {settings.showBadges && (
-                            <div className="inline-flex items-center gap-0.5 relative -top-[1px]">
-                              {msg.isOwner && (
-                                <span className="bg-red-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
-                                  <Award className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                              {msg.isModerator && (
-                                <span className="bg-emerald-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
-                                  <Shield className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                              {msg.isSponsor && (
-                                <span className="bg-amber-400 text-slate-900 rounded p-0.5 text-[8px] font-bold tracking-wider uppercase inline-flex items-center">
-                                  <Star className="w-2.5 h-2.5" fill="currentColor" />
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          <span className="text-[0.75em] text-gray-400 opacity-60 ml-0.5 font-mono">
+                        )}
+                        <span
+                          className="font-bold tracking-tight inline-block align-middle mr-1.5"
+                          style={{ color: uColor }}
+                        >
+                          {msg.authorName}
+                        </span>
+                        {settings.decorativeIconEnabled && settings.decorativeIconPosition === "after_name" && settings.decorativeIconType && (
+                          <span className="inline-flex items-center align-middle mr-1 relative -top-[1px]">
+                            {renderDecorativeIcon(settings.decorativeIconType)}
+                          </span>
+                        )}
+                        {settings.showBadges && (
+                          <span className="inline-flex items-center gap-0.5 align-middle mr-1.5 relative -top-[1px]">
+                            {msg.isOwner && (
+                              <span className="bg-red-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase flex items-center">
+                                <Award className="w-2.5 h-2.5" />
+                              </span>
+                            )}
+                            {msg.isModerator && (
+                              <span className="bg-emerald-500 text-white rounded p-0.5 text-[8px] font-bold tracking-wider uppercase flex items-center">
+                                <Shield className="w-2.5 h-2.5" />
+                              </span>
+                            )}
+                            {msg.isSponsor && (
+                              <span className="bg-amber-400 text-slate-900 rounded p-0.5 text-[8px] font-bold tracking-wider uppercase flex items-center">
+                                <Star className="w-2.5 h-2.5" fill="currentColor" />
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {(settings.showTimestamp ?? true) && (
+                          <span className="text-[0.75em] text-gray-400 opacity-60 ml-0.5 mr-1.5 font-mono align-middle">
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                           </span>
-                        </span>
+                        )}
                         
-                        <span style={{ color: settings.textColor }}>
+                        <span style={{ color: settings.textColor }} className="align-middle inline">
                           {settings.decorativeIconEnabled && settings.decorativeIconPosition === "before_msg" && settings.decorativeIconType && (
-                            <span className="inline-flex align-baseline mr-1 relative top-[1px]">{renderDecorativeIcon(settings.decorativeIconType)}</span>
+                            <span className="inline-flex items-center align-middle mr-1 relative -top-[1px]">
+                              {renderDecorativeIcon(settings.decorativeIconType)}
+                            </span>
                           )}
-                          <span dangerouslySetInnerHTML={{ __html: msg.messageText + '&nbsp;' }} />
+                          <span dangerouslySetInnerHTML={{ __html: msg.messageText }} />
                         </span>
                       </div>
                     ) : (
@@ -687,13 +693,15 @@ const OverlayWidget = memo(function OverlayWidget({
                           )}
 
                           {/* Timing label for preview context/desktop monitoring option */}
-                          <span className="text-[0.75em] text-gray-400 opacity-60 ml-1 font-mono">
-                            {new Date(msg.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
+                          {(settings.showTimestamp ?? true) && (
+                            <span className="text-[0.75em] text-gray-400 opacity-60 ml-1 font-mono">
+                              {new Date(msg.timestamp).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })}
+                            </span>
+                          )}
                         </div>
 
                         {/* Chat Bubble / Message body block */}
