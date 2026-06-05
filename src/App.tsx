@@ -779,8 +779,11 @@ export default function App() {
       "decorativeIconEnabled", "decorativeIconType", "decorativeIconPosition"
     ];
     
+    // So sánh tất cả các trường cấu hình Khung Chat đang được theo dõi
     for (const key of watchedKeys) {
-      if (settings[key] !== savedSettingsBenchmark[key]) {
+      const val1 = settings[key] ?? DEFAULT_SETTINGS[key];
+      const val2 = savedSettingsBenchmark[key] ?? DEFAULT_SETTINGS[key];
+      if (val1 !== val2) {
         return true;
       }
     }
@@ -860,11 +863,12 @@ export default function App() {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       safeSaveSettingsToLocalStorage(updated);
-      if (saveBenchmark) {
-        setSavedSettingsBenchmark(updated);
-      }
       return updated;
     });
+    
+    if (saveBenchmark) {
+      setSavedSettingsBenchmark((prev) => ({ ...prev, ...newSettings }));
+    }
   };
 
   const lastMsgLengthRef = useRef<number>(messages.length);
