@@ -87,7 +87,7 @@ export default function SidebarNavigator({
           <div className="p-4 border-b border-slate-900/90 bg-slate-900/40 shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div 
-                className="w-2.5 h-2.5 rounded-full animate-pulse" 
+                className="w-2.5 h-2.5 rounded-full md:animate-pulse" 
                 style={{ backgroundColor: accentColor }} 
               />
               <div className="min-w-0">
@@ -175,7 +175,7 @@ export default function SidebarNavigator({
           {/* Footer Branding panel */}
           <div className="p-4 border-t border-slate-900/90 bg-slate-900/20 text-center shrink-0" id="sidebar-navigator-footer">
             <div className="flex items-center justify-center gap-1.5 text-[8px] font-bold text-slate-500 tracking-widest uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 md:animate-ping inline-block" />
               <span>{text.systemStatus}</span>
             </div>
             <div className="font-mono text-[9px] text-slate-600 mt-1 font-semibold">
