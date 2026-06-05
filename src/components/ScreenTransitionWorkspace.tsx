@@ -211,12 +211,44 @@ export default function ScreenTransitionWorkspace({
   };
 
   const handlePresetClick = async (preset: { id: string; name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
-    // Select this option
+    // If clicking the currently active option, deactivate it immediately
+    if (selectedOptionId === preset.id && settings.transitionActive) {
+      setSelectedOptionId(null);
+      setIsLocalSimulating(false);
+      if (localSimTimeout) clearTimeout(localSimTimeout);
+
+      const updatedSettings = {
+        ...settings,
+        transitionActive: false,
+      };
+
+      updateSettings(updatedSettings);
+
+      try {
+        const { soundFileBase64, ...settingsToSave } = updatedSettings;
+        await fetch("/api/youtube/settings-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings: settingsToSave }),
+        });
+        showToast(
+          language === "vi"
+            ? `🚪 Đã hủy chuyển cảnh: "${preset.name}"`
+            : `🚪 Cancelled transition: "${preset.name}"`
+        );
+      } catch (err) {
+        console.warn("Failed to cancel preset transition:", err);
+      }
+      return;
+    }
+
+    // Otherwise, select and trigger this option
     setSelectedOptionId(preset.id);
 
     const nextActive = true; 
     const updatedCount = (settings.transitionTriggerCount || 0) + 1;
     const durationVal = preset.duration || settings.transitionDuration || 3;
+    const sustainTypeVal = settings.transitionSustainType || "auto";
 
     // Build the fully resolved settings block
     const updatedSettings = {
@@ -224,7 +256,7 @@ export default function ScreenTransitionWorkspace({
       transitionTitle: preset.title || preset.name,
       transitionSubtitle: preset.subtitle || "Vui lòng chờ giây lát...",
       transitionDuration: durationVal,
-      transitionSustainType: "auto" as const, // Force auto-sustain closing
+      transitionSustainType: sustainTypeVal,
       transitionActive: nextActive,
       transitionTriggerCount: updatedCount
     };
@@ -240,10 +272,13 @@ export default function ScreenTransitionWorkspace({
     setIsLocalSimulating(true);
 
     if (localSimTimeout) clearTimeout(localSimTimeout);
-    const timeout = setTimeout(() => {
-      setIsLocalSimulating(false);
-    }, durationVal * 1050); 
-    setLocalSimTimeout(timeout);
+    
+    if (sustainTypeVal === "auto") {
+      const timeout = setTimeout(() => {
+        setIsLocalSimulating(false);
+      }, durationVal * 1050); 
+      setLocalSimTimeout(timeout);
+    }
 
     try {
       const { soundFileBase64, ...settingsToSave } = updatedSettings;
@@ -255,28 +290,30 @@ export default function ScreenTransitionWorkspace({
 
       showToast(
         language === "vi"
-          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.name}" (${durationVal} giây)`
+          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.name}" (${sustainTypeVal === "manual" ? "vô hạn" : `${durationVal} giây`})`
           : `🚀 Direct transition preset triggered: "${preset.name}"`
       );
 
-      // Auto clear timeout from server
-      setTimeout(async () => {
-        updateSettings({ transitionActive: false });
-        try {
-          await fetch("/api/youtube/settings-sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              settings: { 
-                ...updatedSettings, 
-                transitionActive: false 
-              } 
-            }),
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }, durationVal * 1000);
+      // Auto clear timeout from server if it is auto close
+      if (sustainTypeVal === "auto") {
+        setTimeout(async () => {
+          updateSettings({ transitionActive: false });
+          try {
+            await fetch("/api/youtube/settings-sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                settings: { 
+                  ...updatedSettings, 
+                  transitionActive: false 
+                } 
+              }),
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        }, durationVal * 1000);
+      }
     } catch (err) {
       console.warn("Failed to instantly sync preset trigger state:", err);
     }
@@ -722,23 +759,56 @@ export default function ScreenTransitionWorkspace({
                 <span>{language === "vi" ? "Thời gian & Âm thanh (FXs)" : "Timing & FXs"}</span>
               </label>
 
-              <div className="space-y-3">
-                {/* Speed duration */}
+              <div className="space-y-3.5">
+                {/* Duration Mode Selector */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Thời lượng hiệu ứng rèm</span>
-                    <span className="font-bold text-pink-500 font-mono">{settings.transitionDuration || 3} giây</span>
+                  <span className="text-[10px] text-slate-400 block font-semibold pl-0.5">Kiểu thời lượng rèm</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ transitionSustainType: "auto" })}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        (settings.transitionSustainType || "auto") === "auto"
+                          ? "bg-pink-600/20 border-pink-500 text-pink-400"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-350 hover:bg-slate-900"
+                      }`}
+                      id="duration-mode-auto-btn"
+                    >
+                      ⏱️ Ít giây (Tự tắt)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ transitionSustainType: "manual" })}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        settings.transitionSustainType === "manual"
+                          ? "bg-pink-600/20 border-pink-500 text-pink-400"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-350 hover:bg-slate-900"
+                      }`}
+                      id="duration-mode-infinite-btn"
+                    >
+                      ♾️ Vô hạn (Thủ công)
+                    </button>
                   </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={settings.transitionDuration || 3}
-                    onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
-                    className="w-full accent-pink-500 cursor-pointer"
-                  />
                 </div>
+
+                {/* Speed duration - Only render if auto close sustain type is active */}
+                {(settings.transitionSustainType || "auto") === "auto" && (
+                  <div className="space-y-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Thời gian tự tắt rèm</span>
+                      <span className="font-bold text-pink-500 font-mono">{settings.transitionDuration || 3} giây</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      step="1"
+                      value={settings.transitionDuration || 3}
+                      onChange={(e) => updateSettings({ transitionDuration: parseInt(e.target.value, 10) })}
+                      className="w-full accent-pink-500 cursor-pointer"
+                    />
+                  </div>
+                )}
 
                 {/* Sound Choice */}
                 <div className="space-y-1">
@@ -783,19 +853,6 @@ export default function ScreenTransitionWorkspace({
                 </div>
               </div>
             )}
-
-            {/* Sandbox Local Testing Controls */}
-            <div className="pt-1.5" id="options-details-sandbox-run">
-              <button
-                type="button"
-                onClick={handleTriggerTest}
-                className="w-full bg-slate-850 hover:bg-slate-800 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer shadow border border-slate-705 transition-all"
-                id="shutter-trigger-simulation-btn"
-              >
-                <Play className="w-3.5 h-3.5 text-pink-400 fill-current shrink-0" />
-                <span>{text.testBtn}</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
