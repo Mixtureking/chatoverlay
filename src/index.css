@@ -177,6 +177,17 @@
   color: var(--app-accent, #6366f1) !important;
 }
 
+/* Sidebar Collapse Button Light Mode */
+.dashboard-light-theme #sidebar-navigator-collapse-btn {
+  background-color: color-mix(in srgb, var(--app-accent, #6366f1) 10%, transparent) !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 25%, transparent) !important;
+  color: var(--app-accent, #6366f1) !important;
+}
+.dashboard-light-theme #sidebar-navigator-collapse-btn:hover {
+  background-color: color-mix(in srgb, var(--app-accent, #6366f1) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--app-accent, #6366f1) 40%, transparent) !important;
+}
+
 
 .dashboard-light-theme .text-amber-300,
 .dashboard-light-theme .text-amber-350,
