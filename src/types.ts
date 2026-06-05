@@ -73,6 +73,16 @@ export interface OverlaySettings {
   transitionBgGradient?: string;
   transitionSoundType?: "none" | "bell" | "pop" | "synth";
   transitionTriggerCount?: number;
+  transitionActive?: boolean;
+  transitionSustainType?: "auto" | "manual";
+  transitionCustomPresets?: Array<{
+    id: string;
+    name: string;
+    title: string;
+    subtitle: string;
+    duration: number;
+    sustainType: "auto" | "manual";
+  }>;
 }
 
 export interface FilterKeyword {

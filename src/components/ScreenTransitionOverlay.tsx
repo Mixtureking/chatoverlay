@@ -95,35 +95,33 @@ export default function ScreenTransitionOverlay({
   const [sessionCount, setSessionCount] = useState(0);
   const triggerRef = useRef<number | null>(null);
 
-  // Monitor the transitionTriggerCount
+  // Monitor the transitionActive and transitionTriggerCount
   useEffect(() => {
-    // Sync trigger tracking
-    const currentTrigger = settings.transitionTriggerCount || 0;
-    if (triggerRef.current === null) {
-      triggerRef.current = currentTrigger;
-      return;
-    }
+    const isTransitionCurrentlyActive = !!settings.transitionActive;
+    
+    if (isTransitionCurrentlyActive !== isActive) {
+      if (isTransitionCurrentlyActive) {
+        setIsActive(true);
+        setSessionCount(prev => prev + 1);
+        
+        // Play transition chime sound
+        const soundType = settings.transitionSoundType || "bell";
+        playTransitionSound(soundType);
 
-    if (currentTrigger !== triggerRef.current) {
-      triggerRef.current = currentTrigger;
-      
-      // Fire the transition!
-      setIsActive(true);
-      setSessionCount(prev => prev + 1);
-
-      // Play transition chime sound
-      const soundType = settings.transitionSoundType || "bell";
-      playTransitionSound(soundType);
-
-      // Reset transition state after configuration duration
-      const duration = (settings.transitionDuration || 3) * 1000;
-      const timeout = setTimeout(() => {
+        // Auto transition out timer if sustainType is "auto"
+        const sustainType = settings.transitionSustainType || "auto";
+        if (sustainType === "auto") {
+          const duration = (settings.transitionDuration || 3) * 1000;
+          const timeout = setTimeout(() => {
+            setIsActive(false);
+          }, duration);
+          return () => clearTimeout(timeout);
+        }
+      } else {
         setIsActive(false);
-      }, duration);
-
-      return () => clearTimeout(timeout);
+      }
     }
-  }, [settings.transitionTriggerCount, settings.transitionDuration, settings.transitionSoundType]);
+  }, [settings.transitionActive, settings.transitionSustainType, settings.transitionDuration, settings.transitionSoundType, isActive]);
 
   // Determine Background stylings
   const getBackgroundStyle = () => {

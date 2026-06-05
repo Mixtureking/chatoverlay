@@ -51,6 +51,21 @@ export default function ScreenTransitionWorkspace({
   const [previewTab, setPreviewTab] = useState<"screen_a" | "screen_b">("screen_a");
   const [triggerCount, setTriggerCount] = useState(0);
   const [isLocalSimulating, setIsLocalSimulating] = useState(false);
+  const [localSimTimeout, setLocalSimTimeout] = useState<any>(null);
+
+  // Custom Preset Option states
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [newPresetTitle, setNewPresetTitle] = useState("");
+  const [newPresetSubtitle, setNewPresetSubtitle] = useState("");
+  const [newPresetDuration, setNewPresetDuration] = useState(5);
+  const [newPresetSustain, setNewPresetSustain] = useState<"auto" | "manual">("auto");
+
+  useEffect(() => {
+    return () => {
+      if (localSimTimeout) clearTimeout(localSimTimeout);
+    };
+  }, [localSimTimeout]);
 
   const text = {
     title: language === "vi" ? "Studio Chuyển Cảnh OBS" : "OBS Transition Studio",
@@ -73,6 +88,13 @@ export default function ScreenTransitionWorkspace({
   };
 
   const handleTriggerTest = () => {
+    if (isLocalSimulating) {
+      if (localSimTimeout) clearTimeout(localSimTimeout);
+      setIsLocalSimulating(false);
+      showToast(language === "vi" ? "🚪 Đã dừng mô phỏng thử!" : "🚪 Simulation stopped!");
+      return;
+    }
+
     // Play local chimes
     const soundType = settings.transitionSoundType || "bell";
     playTransitionSound(soundType);
@@ -84,36 +106,67 @@ export default function ScreenTransitionWorkspace({
     // Trigger local screen cover
     setIsLocalSimulating(true);
 
-    const duration = (settings.transitionDuration || 3) * 1000;
-    const timeout = setTimeout(() => {
-      setIsLocalSimulating(false);
-    }, duration);
+    const sustainType = settings.transitionSustainType || "auto";
+    if (sustainType === "auto") {
+      const duration = (settings.transitionDuration || 3) * 1050;
+      const timeout = setTimeout(() => {
+        setIsLocalSimulating(false);
+      }, duration);
+      setLocalSimTimeout(timeout);
+    }
 
     showToast(
       language === "vi" 
-        ? `🎬 Đang chạy biểu diễn hiệu ứng: "${settings.transitionType || "shutter"}" (${settings.transitionDuration || 3} giây)` 
-        : `🎬 Interactive simulation activated: ${settings.transitionType || "shutter"} animation`
+        ? `🎬 Đang mô phỏng rèm: "${settings.transitionType || "shutter"}" (${sustainType === "auto" ? `${settings.transitionDuration || 3} giây` : "vô hạn, click lại để tắt"})` 
+        : `🎬 Sandbox active: ${settings.transitionType || "shutter"}`
     );
-
-    return () => clearTimeout(timeout);
   };
 
   const triggerObsTransitionGlobal = async () => {
-    const currentCount = settings.transitionTriggerCount || 0;
-    const updatedCount = currentCount + 1;
-    
+    const nextActive = !settings.transitionActive;
+    const updatedCount = (settings.transitionTriggerCount || 0) + 1;
+
     // Save locally
     updateSettings({
+      transitionActive: nextActive,
       transitionTriggerCount: updatedCount
     });
 
-    // Fire sound effect locally on Streamer controller panel
-    const soundType = settings.transitionSoundType || "bell";
-    playTransitionSound(soundType);
+    if (nextActive) {
+      // Fire sound effect locally on Streamer controller panel
+      const soundType = settings.transitionSoundType || "bell";
+      playTransitionSound(soundType);
+
+      // Handle controller auto shutoff in auto sustain type
+      const sustainType = settings.transitionSustainType || "auto";
+      if (sustainType === "auto") {
+        setTimeout(async () => {
+          updateSettings({ transitionActive: false });
+          try {
+            await fetch("/api/youtube/settings-sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                settings: { 
+                  ...settings, 
+                  transitionActive: false 
+                } 
+              }),
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        }, (settings.transitionDuration || 3) * 1000);
+      }
+    }
 
     // Persist settings directly onto synchronized server JSON instantly
     try {
-      const { soundFileBase64, ...settingsToSave } = { ...settings, transitionTriggerCount: updatedCount };
+      const { soundFileBase64, ...settingsToSave } = { 
+        ...settings, 
+        transitionActive: nextActive, 
+        transitionTriggerCount: updatedCount 
+      };
       await fetch("/api/youtube/settings-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,8 +174,10 @@ export default function ScreenTransitionWorkspace({
       });
       showToast(
         language === "vi"
-          ? "🚀 Đã kích hoạt chuyển cảnh sang OBS thành công!"
-          : "🚀 Command fired! All connected OBS Transition Overlays are executing!"
+          ? (nextActive 
+              ? `🚀 Đã kích hoạt sập rèm OBS (${settings.transitionSustainType === "manual" ? "thủ công, bấm lại để đóng" : `${settings.transitionDuration || 3} giây`})!` 
+              : "🚪 Đã mở rèm, kết thúc chuyển cảnh OBS!")
+          : (nextActive ? "🚀 OBS Transition overlay activated!" : "🚪 OBS Transition closed!")
       );
     } catch (err) {
       console.warn("Failed to instantly sync trigger global transition to server:", err);
@@ -132,6 +187,104 @@ export default function ScreenTransitionWorkspace({
           : "⚠️ Fired transition locally (server connection slow)"
       );
     }
+  };
+
+  const handlePresetClick = async (preset: { title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
+    const nextActive = true; 
+    const updatedCount = (settings.transitionTriggerCount || 0) + 1;
+
+    // Build the fully resolved settings block
+    const updatedSettings = {
+      ...settings,
+      transitionTitle: preset.title,
+      transitionSubtitle: preset.subtitle,
+      transitionDuration: preset.duration,
+      transitionSustainType: preset.sustainType,
+      transitionActive: nextActive,
+      transitionTriggerCount: updatedCount
+    };
+
+    updateSettings(updatedSettings);
+
+    // Play chime sound locally
+    const soundType = settings.transitionSoundType || "bell";
+    playTransitionSound(soundType);
+
+    // Toggle simulated previews
+    setTriggerCount(c => c + 1);
+    setIsLocalSimulating(true);
+
+    if (preset.sustainType === "auto") {
+      if (localSimTimeout) clearTimeout(localSimTimeout);
+      const timeout = setTimeout(() => {
+        setIsLocalSimulating(false);
+      }, preset.duration * 1050); 
+      setLocalSimTimeout(timeout);
+    }
+
+    try {
+      const { soundFileBase64, ...settingsToSave } = updatedSettings;
+      await fetch("/api/youtube/settings-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: settingsToSave }),
+      });
+
+      showToast(
+        language === "vi"
+          ? `🚀 Kích hoạt chuyển cảnh nhanh: "${preset.title}" (${preset.sustainType === "manual" ? "thủ công" : `${preset.duration} giây`})`
+          : `🚀 Direct transition preset triggered: "${preset.title}"`
+      );
+
+      // Auto clear timeout from server if it is auto
+      if (preset.sustainType === "auto") {
+        setTimeout(async () => {
+          updateSettings({ transitionActive: false });
+          try {
+            await fetch("/api/youtube/settings-sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                settings: { 
+                  ...updatedSettings, 
+                  transitionActive: false 
+                } 
+              }),
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        }, preset.duration * 1000);
+      }
+    } catch (err) {
+      console.warn("Failed to instantly sync preset trigger state:", err);
+    }
+  };
+
+  const handleAddNewPreset = (newPreset: { name: string; title: string; subtitle: string; duration: number; sustainType: "auto" | "manual" }) => {
+    const currentCustom = settings.transitionCustomPresets || [];
+    const created = {
+      id: "custom_" + Date.now(),
+      ...newPreset
+    };
+    const nextCustomList = [...currentCustom, created];
+    updateSettings({
+      transitionCustomPresets: nextCustomList
+    });
+    
+    // Save to server
+    fetch("/api/youtube/settings-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        settings: { 
+          ...settings, 
+          transitionCustomPresets: nextCustomList 
+        } 
+      }),
+    });
+
+    showToast(language === "vi" ? `✨ Đã lưu tùy chọn chuyển cảnh: ${newPreset.name}` : `✨ Transition preset saved: ${newPreset.name}`);
   };
 
   // Logo file upload handler converting to Base64 store
@@ -231,6 +384,196 @@ export default function ScreenTransitionWorkspace({
           <div className="text-[9px] text-slate-400 leading-normal bg-indigo-500/5 p-2 rounded border border-indigo-500/10">
             💡 <strong>OBS Setup:</strong> Rộng: <b>1920</b>, Cao: <b>1080</b> (hoặc độ phân giải stream của bạn). Đừng quên tích chọn <i>"Refresh browser when scene becomes active"</i> để tối ưu phục hồi rèm!
           </div>
+        </div>
+
+        {/* TRANSITION PRESETS DECK */}
+        <div className="bg-slate-900/50 border border-indigo-500/10 p-4 rounded-xl space-y-3" id="transition-quick-presets-deck-card">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-pink-400 uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+              <Layers className="w-3.5 h-3.5 text-pink-400" />
+              <span>Chuyển Cảnh Nhanh (Options)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/30 text-indigo-300 text-[9px] font-extrabold px-2 py-1 rounded cursor-pointer transition-all uppercase flex items-center gap-1 shrink-0"
+              id="toggle-add-preset-form-btn"
+            >
+              <Plus className="w-3 h-3 text-indigo-400" />
+              <span>{showAddForm ? "Đóng" : "Thêm Nút"}</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400 leading-normal">
+            Bấm nút dưới đây để thiết lập nhanh nội dung chữ, thời gian duy trì và sập rèm OBS tức thì.
+          </p>
+
+          {/* Preset Buttons Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" id="presets-buttons-grid">
+            {/* Render defaults */}
+            {[
+              { id: "preset_soon", name: "Streaming Soon ⏳", title: "STREAMING SOON", subtitle: "Chuẩn bị bắt đầu trong vài phút nữa...", duration: 5, sustainType: "manual" as const },
+              { id: "preset_changing", name: "Changing Screen 🔄", title: "CHANGING SCENE", subtitle: "Streamer đang chuyển cảnh, vui lòng chờ...", duration: 3, sustainType: "auto" as const },
+              { id: "preset_waiting", name: "Be Right Back ☕", title: "BE RIGHT BACK", subtitle: "Streamer đang bận một chút, sẽ quay lại ngay!", duration: 10, sustainType: "manual" as const },
+            ].map(preset => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handlePresetClick(preset)}
+                className="bg-slate-950/90 hover:bg-indigo-950/30 active:scale-95 text-slate-200 border border-slate-850 hover:border-indigo-500/35 p-2 rounded-lg text-[11px] font-medium leading-tight text-left flex flex-col justify-between cursor-pointer transition-all space-y-1 group"
+                id={`preset-btn-${preset.id}`}
+              >
+                <span className="font-bold text-slate-200 group-hover:text-indigo-300 transition-colors">{preset.name}</span>
+                <span className="text-[9px] text-slate-500 truncate font-mono block">
+                  {preset.sustainType === "manual" ? "Duy trì: Thủ công 🔗" : `Tự tắt: ${preset.duration}s ⏱️`}
+                </span>
+              </button>
+            ))}
+
+            {/* Render custom presets */}
+            {(settings.transitionCustomPresets || []).map(preset => (
+              <div 
+                key={preset.id}
+                className="bg-slate-950/90 border border-slate-850 hover:border-pink-500/30 p-2 rounded-lg flex items-center justify-between gap-1.5 transition-all text-left relative group/custom"
+                id={`custom-preset-container-${preset.id}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handlePresetClick({
+                    title: preset.title,
+                    subtitle: preset.subtitle,
+                    duration: preset.duration,
+                    sustainType: preset.sustainType
+                  })}
+                  className="flex-1 flex flex-col justify-between cursor-pointer space-y-1 min-w-0"
+                  id={`custom-preset-btn-${preset.id}`}
+                >
+                  <span className="font-bold text-slate-200 text-[11px] truncate block group-hover/custom:text-pink-400 transition-colors">{preset.name}</span>
+                  <span className="text-[9px] text-slate-500 font-mono block">
+                    {preset.sustainType === "manual" ? "Duy trì: Thủ công 🔗" : `Tự tắt: ${preset.duration}s ⏱️`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextList = (settings.transitionCustomPresets || []).filter(p => p.id !== preset.id);
+                    updateSettings({ transitionCustomPresets: nextList });
+                    fetch("/api/youtube/settings-sync", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ settings: { ...settings, transitionCustomPresets: nextList } }),
+                    });
+                    showToast(language === "vi" ? `🗑️ Đã xóa tùy chọn: ${preset.name}` : `🗑️ Deleted option: ${preset.name}`);
+                  }}
+                  className="hover:bg-rose-950/40 text-slate-500 hover:text-rose-450 p-1 rounded cursor-pointer transition-all shrink-0"
+                  title="Xóa tùy chọn này"
+                  id={`delete-custom-preset-btn-${preset.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* New Option creation inline form */}
+          {showAddForm && (
+            <div className="bg-slate-950 border border-slate-850 p-3 rounded-lg space-y-2.5 animate-in slide-in-from-top-2 duration-200" id="add-preset-inline-form">
+              <span className="text-[9.5px] font-bold text-indigo-400 uppercase tracking-widest pl-0.5 block">Cài đặt nút chuyển cảnh mới</span>
+              
+              <div className="space-y-1">
+                <span className="text-[9px] text-slate-500 block font-semibold">Tên Nút (Hiển thị)</span>
+                <input
+                  type="text"
+                  maxLength={20}
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  placeholder="e.g. Giải Lao 🍿"
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  id="new-preset-display-name-input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[9px] text-slate-500 block font-semibold">Dòng Tiêu Đề Rèm (Title)</span>
+                <input
+                  type="text"
+                  value={newPresetTitle}
+                  onChange={(e) => setNewPresetTitle(e.target.value)}
+                  placeholder="e.g. BE RIGHT BACK"
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-bold"
+                  id="new-preset-headline-input"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[9px] text-slate-500 block font-semibold">Mô Tả Phụ Nhỏ (Subtitle)</span>
+                <input
+                  type="text"
+                  value={newPresetSubtitle}
+                  onChange={(e) => setNewPresetSubtitle(e.target.value)}
+                  placeholder="e.g. Streamer có chút việc bận..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  id="new-preset-desc-input"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-500 block font-semibold">Kiểu Duy Trì</span>
+                  <select
+                    value={newPresetSustain}
+                    onChange={(e) => setNewPresetSustain(e.target.value as any)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none cursor-pointer"
+                    id="new-preset-sustain-select"
+                  >
+                    <option value="auto">⏱️ Tự tắt sau s</option>
+                    <option value="manual">🔗 Bấm thủ công</option>
+                  </select>
+                </div>
+
+                {newPresetSustain === "auto" && (
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-slate-500 block font-semibold">Thời Gian (giây)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={newPresetDuration}
+                      onChange={(e) => setNewPresetDuration(Math.max(1, parseInt(e.target.value) || 5))}
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none"
+                      id="new-preset-duration-input"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newPresetName.trim() || !newPresetTitle.trim()) {
+                    showToast(language === "vi" ? "⚠️ Hãy điền Tên Nút và Dòng Tiêu Đề Rèm!" : "⚠️ Fill name and title fields!");
+                    return;
+                  }
+                  handleAddNewPreset({
+                    name: newPresetName,
+                    title: newPresetTitle,
+                    subtitle: newPresetSubtitle || "Vui lòng chờ trong giây lát...",
+                    duration: newPresetDuration,
+                    sustainType: newPresetSustain
+                  });
+                  // Reset form
+                  setNewPresetName("");
+                  setNewPresetTitle("");
+                  setNewPresetSubtitle("");
+                  setShowAddForm(false);
+                }}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white py-2 px-2 rounded-lg text-[11px] font-bold uppercase transition-all shadow cursor-pointer"
+                id="save-new-preset-btn"
+              >
+                💾 Lưu Tùy Chọn Mới
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 2. Text Contents Card */}
@@ -408,6 +751,20 @@ export default function ScreenTransitionWorkspace({
               />
             </div>
 
+            {/* Sustain type */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 block font-semibold pl-0.5">Thời lượng duy trì sập rèm</span>
+              <select
+                value={settings.transitionSustainType || "auto"}
+                onChange={(e) => updateSettings({ transitionSustainType: e.target.value as any })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
+                id="transition-sustain-type-select"
+              >
+                <option value="auto">⏱️ Tự động biến mất sau {settings.transitionDuration || 3} giây</option>
+                <option value="manual">🔗 Thủ công (Bấm lại nút Kích hoạt để mở khoá sập rèm)</option>
+              </select>
+            </div>
+
             {/* Sound Choice */}
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 block font-semibold flex items-center gap-1 pl-0.5">
@@ -469,11 +826,24 @@ export default function ScreenTransitionWorkspace({
           <button
             type="button"
             onClick={triggerObsTransitionGlobal}
-            className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:brightness-110 active:scale-95 text-white font-black py-4 px-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-600/20 hover:shadow-pink-600/35 border border-pink-500/20 transition-all"
+            className={`w-full hover:brightness-110 active:scale-95 text-white font-black py-4 px-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer shadow-lg border transition-all ${
+              settings.transitionActive 
+                ? "bg-gradient-to-r from-red-650 to-rose-700 shadow-rose-600/35 border-rose-500/30 animate-pulse"
+                : "bg-gradient-to-r from-pink-600 to-pink-700 shadow-pink-600/20 hover:shadow-pink-600/35 border-pink-500/20"
+            }`}
             id="obs-global-trigger-hotkey-btn"
           >
-            <Sparkles className="w-4 h-4 fill-current shrink-0 animate-bounce" />
-            <span>{text.obsTriggerBtn}</span>
+            {settings.transitionActive ? (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
+                <span>⏹️ ĐÓNG CHUYỂN CẢNH OBS (ACTIVE)</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 fill-current shrink-0 animate-bounce" />
+                <span>{text.obsTriggerBtn}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
