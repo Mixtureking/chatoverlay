@@ -632,6 +632,7 @@ export default function App() {
       const pThemeMode = (decodedParams.themeMode || searchParams.get("themeMode") || "dark") as "dark" | "light";
 
       setObsSettings({
+        ...DEFAULT_SETTINGS,
         themeMode: pThemeMode,
         fontSize: pFontSize,
         fontFamily: pFontFamily,
@@ -769,8 +770,11 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved); 
-        return { ...parsed, transitionActive: false }; 
+        const parsed = JSON.parse(saved);
+        if (!parsed.customHtml) parsed.customHtml = DEFAULT_SETTINGS.customHtml;
+        if (!parsed.customCss) parsed.customCss = DEFAULT_SETTINGS.customCss;
+        if (!parsed.customJs) parsed.customJs = DEFAULT_SETTINGS.customJs;
+        return { ...DEFAULT_SETTINGS, ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
     return DEFAULT_SETTINGS;
@@ -780,8 +784,11 @@ export default function App() {
     const saved = localStorage.getItem("yt_overlay_settings");
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved); 
-        return { ...parsed, transitionActive: false }; 
+        const parsed = JSON.parse(saved);
+        if (!parsed.customHtml) parsed.customHtml = DEFAULT_SETTINGS.customHtml;
+        if (!parsed.customCss) parsed.customCss = DEFAULT_SETTINGS.customCss;
+        if (!parsed.customJs) parsed.customJs = DEFAULT_SETTINGS.customJs;
+        return { ...DEFAULT_SETTINGS, ...parsed, transitionActive: false }; 
       } catch { return DEFAULT_SETTINGS; }
     }
     return DEFAULT_SETTINGS;
@@ -1561,6 +1568,51 @@ export default function App() {
     };
     reader.readAsText(file);
     // Flush event
+    e.target.value = "";
+  };
+
+  const handleExportCustomCode = () => {
+    const backupObj = {
+      version: "1.0",
+      customCodeOnly: true,
+      customHtml: settings.customHtml || "",
+      customCss: settings.customCss || "",
+      customJs: settings.customJs || "",
+      useCustomCode: settings.useCustomCode
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `youtube-custom-layout.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("📤 Đã tải tệp Custom Layout (JSON)!");
+  };
+
+  const handleImportCustomCode = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (!data.customCodeOnly) throw new Error("Chỉ hỗ trợ tệp Custom Layout JSON.");
+        
+        updateSettings({
+          useCustomCode: true,
+          customHtml: data.customHtml || "",
+          customCss: data.customCss || "",
+          customJs: data.customJs || "",
+        });
+
+        showToast("📥 Đã nạp Custom Layout thành công!");
+      } catch (err: any) {
+        showToast("❌ Lỗi tệp tin Custom Layout không hợp lệ!");
+      }
+    };
+    reader.readAsText(file);
     e.target.value = "";
   };
 
@@ -4216,6 +4268,25 @@ export default function App() {
                         className="w-full bg-slate-950 border border-slate-805 rounded-lg p-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 custom-scrollbar resize-y max-h-[180px] overflow-y-auto block"
                         placeholder="Mã kịch bản JavaScript đồng bộ..."
                       />
+                    </div>
+
+                    <div className="flex gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleExportCustomCode}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded-lg text-xs transition-colors shadow-none"
+                      >
+                        📥 XUẤT THÀNH JSON
+                      </button>
+                      <label className="flex-1 bg-indigo-650 hover:bg-indigo-600 text-slate-100 font-bold py-2 rounded-lg text-xs transition-colors text-center cursor-pointer shadow-none">
+                        TẢI LÊN JSON
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleImportCustomCode}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
 
                     <div className="p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-xl text-[11px] text-indigo-300 space-y-1.5 leading-relaxed">

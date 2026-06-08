@@ -200,13 +200,17 @@ const OverlayWidget = memo(function OverlayWidget({
 
   // Debounce state to avoid running customJs compiles on every single keystroke (avoid browser freezes/crashes when typing)
   const [debouncedCustomJs, setDebouncedCustomJs] = useState(settings.customJs || "");
+  const [debouncedCustomHtml, setDebouncedCustomHtml] = useState(settings.customHtml || "");
+  const [debouncedCustomCss, setDebouncedCustomCss] = useState(settings.customCss || "");
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedCustomJs(settings.customJs || "");
+      setDebouncedCustomHtml(settings.customHtml || "");
+      setDebouncedCustomCss(settings.customCss || "");
     }, 800);
     return () => clearTimeout(timer);
-  }, [settings.customJs]);
+  }, [settings.customJs, settings.customHtml, settings.customCss]);
 
   // Target ID mapping based on context
   const containerId = previewMode ? "youtube-chat-overlay-preview" : "youtube-chat-overlay";
@@ -214,10 +218,10 @@ const OverlayWidget = memo(function OverlayWidget({
   // Sanitize and prefix custom CSS in preview mode to prevent global stylesheet leakage (e.g. body { overflow: hidden; })
   // from hijacking the scrollbars/layout of the main website dashboard.
   const getCleanedCss = () => {
-    if (!settings.customCss) return "";
-    if (!previewMode) return settings.customCss;
+    if (!debouncedCustomCss) return "";
+    if (!previewMode) return debouncedCustomCss;
 
-    let css = settings.customCss;
+    let css = debouncedCustomCss;
     const prefix = "#youtube-chat-overlay-preview";
     
     // Replace top-level selectors to target the scoped preview element
@@ -373,12 +377,12 @@ const OverlayWidget = memo(function OverlayWidget({
         className="w-full h-full relative overflow-hidden select-text"
         style={overlayScaleStyle}
       >
-        {settings.customCss && (
+        {debouncedCustomCss && (
           <style dangerouslySetInnerHTML={{ __html: getCleanedCss() }} />
         )}
         <div
           className="w-full h-full"
-          dangerouslySetInnerHTML={{ __html: settings.customHtml || "" }}
+          dangerouslySetInnerHTML={{ __html: debouncedCustomHtml || "" }}
         />
       </div>
     );
