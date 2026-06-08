@@ -341,6 +341,7 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   scale: 1.0,
   chatDuration: 0, // 0 = permanent
   maxMessages: 5, // 0 = no limit
+  apiPollingInterval: 5000, 
   showAvatar: true,
   showTimestamp: true,
   showBadges: true,
@@ -620,6 +621,7 @@ export default function App() {
       const pScDuration = parseInt(decodedParams.superChatDuration?.toString() || searchParams.get("superChatDuration") || "45", 10);
       const pChatDuration = parseInt(decodedParams.chatDuration?.toString() || searchParams.get("chatDuration") || "0", 10);
       const pMaxMessages = parseInt(decodedParams.maxMessages?.toString() || searchParams.get("maxMessages") || "0", 10);
+      const pApiPollingInterval = parseInt(decodedParams.apiPollingInterval?.toString() || searchParams.get("apiPollingInterval") || "5000", 10);
       const pIsTransparent = decodedParams.isTransparent !== undefined ? decodedParams.isTransparent : (searchParams.get("isTransparent") === "true");
       const pScale = parseFloat(decodedParams.scale?.toString() || searchParams.get("scale") || "1.0");
       const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
@@ -644,6 +646,7 @@ export default function App() {
         scale: pScale,
         chatDuration: pChatDuration,
         maxMessages: pMaxMessages,
+        apiPollingInterval: pApiPollingInterval,
         showAvatar: pShowAvatar,
         showTimestamp: pShowTimestamp,
         showBadges: pShowBadges,
@@ -1212,6 +1215,8 @@ export default function App() {
   const startPollingMessages = (chatId: string, devKey: string) => {
     if (pollingTimer.current) clearInterval(pollingTimer.current);
 
+    let lastViewerCountSync = 0;
+
     const pull = async () => {
       try {
         let uri = `/api/youtube/messages?liveChatId=${chatId}&apiKey=${devKey}`;
@@ -1250,18 +1255,33 @@ export default function App() {
           });
         }
 
-        // Sync viewer counts in parallel
-        triggerViewerCountSync(chatId, devKey);
+        // Sync viewer counts in parallel, heavily throttled to save API quota (every 30 seconds)
+        const now = Date.now();
+        if (now - lastViewerCountSync > 30000) {
+          lastViewerCountSync = now;
+          triggerViewerCountSync(chatId, devKey);
+        }
 
+        let pollDelay = 5000;
+        try {
+          const stored = JSON.parse(localStorage.getItem("yt_overlay_settings") || "{}");
+          pollDelay = stored.apiPollingInterval || 5000;
+        } catch { /* ignore */ }
+        
+        if (data.pollingIntervalMillis && data.pollingIntervalMillis > pollDelay) {
+          pollDelay = data.pollingIntervalMillis;
+        }
+        if (pollDelay < 2000) pollDelay = 2000;
+
+        pollingTimer.current = window.setTimeout(pull, pollDelay);
       } catch (err) {
         console.warn("Polling error details:", err);
+        pollingTimer.current = window.setTimeout(pull, 5000);
       }
     };
 
     // run initial fetch immediately
     pull();
-    // continue on interval timers
-    pollingTimer.current = setInterval(pull, 5000);
   };
 
   const triggerViewerCountSync = async (chatId: string, devKey: string) => {
@@ -1347,6 +1367,7 @@ export default function App() {
         return () => clearInterval(interval);
       }
 
+      let timeoutId: number;
       const fetchLoop = async () => {
         // If the stream is offline, clear messages and do not fetch
         // Exception: If the user passed direct explicit parameters via URL (obsChatId), bypass global offline checks
@@ -1357,17 +1378,26 @@ export default function App() {
           return;
         }
 
+        let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}`;
+        if (nextPageTokenRef.current) {
+          u += `&pageToken=${nextPageTokenRef.current}`;
+        }
+        
+        let pollDelay = (obsSettings as any).apiPollingInterval || 5000;
+        if (pollDelay < 2000) pollDelay = 2000; // minimum safety boundary
+        
         try {
-          let u = `/api/youtube/messages?liveChatId=${effectiveChatId}&apiKey=${effectiveApiKey}`;
-          if (nextPageTokenRef.current) {
-            u += `&pageToken=${nextPageTokenRef.current}`;
-          }
           const response = await fetch(u);
           if (response.ok) {
             const data = await response.json();
             const incomingArr = data.messages || [];
             nextPageTokenRef.current = data.nextPageToken;
             
+            // Allow dynamic server-requested polling interval override if presented
+            if (data.pollingIntervalMillis && data.pollingIntervalMillis > pollDelay) {
+              pollDelay = data.pollingIntervalMillis;
+            }
+
             if (incomingArr.length > 0) {
               setMessages((prev) => {
                 const combined = [...prev];
@@ -1382,14 +1412,14 @@ export default function App() {
             }
           }
         } catch { /* suppress */ }
+        
+        timeoutId = window.setTimeout(fetchLoop, pollDelay);
       };
 
       fetchLoop();
-      // Fast polling interval for OBS widgets (4 seconds matches YouTube stream pacing)
-      const interval = setInterval(fetchLoop, 4000);
-      return () => clearInterval(interval);
+      return () => clearTimeout(timeoutId);
     }
-  }, [isOverlayRoute, obsChatId, obsApiKey, (obsSettings as any).activeLiveChatId, (obsSettings as any).apiKey, (obsSettings as any).isOffline]);
+  }, [isOverlayRoute, obsChatId, obsApiKey, (obsSettings as any).activeLiveChatId, (obsSettings as any).apiKey, (obsSettings as any).isOffline, (obsSettings as any).apiPollingInterval]);
 
   // OBS SUITE SETTINGS SYNC POLLER (Enables immediate UI hot-reloads without link updates)
   useEffect(() => {
@@ -1553,6 +1583,7 @@ export default function App() {
       superChatDuration: settings.superChatDuration,
       chatDuration: settings.chatDuration,
       maxMessages: settings.maxMessages ?? 0,
+      apiPollingInterval: settings.apiPollingInterval ?? 5000,
       isTransparent: settings.isTransparent,
       scale: settings.scale,
       showAvatar: settings.showAvatar,
@@ -1592,6 +1623,7 @@ export default function App() {
       query.set("superChatDuration", config.superChatDuration.toString());
       query.set("chatDuration", config.chatDuration.toString());
       query.set("maxMessages", (config.maxMessages ?? 0).toString());
+      query.set("apiPollingInterval", (config.apiPollingInterval ?? 5000).toString());
       query.set("isTransparent", config.isTransparent ? "true" : "false");
       query.set("scale", config.scale.toString());
       query.set("showAvatar", config.showAvatar ? "true" : "false");
@@ -3433,6 +3465,25 @@ export default function App() {
                       className="w-full accent-indigo-500 cursor-pointer"
                     />
                     <span className="text-[9px] text-slate-500 italic block">Đặt về 0 để không giới hạn. Khi vượt quá, tin nhắn cũ nhất sẽ bị xóa.</span>
+                  </div>
+
+                  <div className="space-y-1 mt-3">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Thời gian quét tin nhắn mới (Tối ưu Quota)</span>
+                      <span className="font-bold text-emerald-400">
+                        {(settings.apiPollingInterval ?? 5000) / 1000} giây / lần
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2000"
+                      max="30000"
+                      step="1000"
+                      value={settings.apiPollingInterval ?? 5000}
+                      onChange={(e) => updateSettings({ apiPollingInterval: parseInt(e.target.value, 10) })}
+                      className="w-full accent-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-[9px] text-slate-500 italic block">Kéo dài thời gian quét (Ví dụ: 10 giây) để NHÂN ĐÔI thời gian hiển thị chat theo ngày của API Key!</span>
                   </div>
 
                   <hr className="border-slate-800/50" />
