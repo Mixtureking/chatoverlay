@@ -348,6 +348,88 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   animationType: "fade",
   messageLayout: "block",
   useCustomCode: false,
+  customHtml: `<div id="custom-chat-box" class="custom-scroll">
+  <!-- Tin nhắn mới sẽ được biểu diễn tự động tại đây -->
+</div>`,
+  customCss: `#custom-chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  overflow-y: auto;
+}
+
+.custom-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border-left: 4px solid #6366f1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+.custom-author {
+  font-weight: 700;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.custom-text {
+  font-size: 13px;
+  color: #e2e8f0;
+  font-family: inherit;
+  word-break: break-word;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom scrollbar matching premium streamer layouts */
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 10px;
+}`,
+  customJs: `// Lắng nghe sự kiện "onChatUpdate" được phát đi từ hệ thống
+// e.detail chứa danh sách toàn bộ tin nhắn mới của bạn!
+window.addEventListener('onChatUpdate', (e) => {
+  const messages = e.detail;
+  const container = document.getElementById('custom-chat-box');
+  if (!container) return;
+  
+  // Render danh sách tin nhắn của bạn
+  container.innerHTML = messages.map(msg => {
+    // Xác định màu sắc người gửi cực kỳ trực quan
+    let nameColor = "#3ea6ff"; // Người xem thông thường
+    if (msg.isOwner) nameColor = "#ff3e3e"; // Streamer Chủ Kênh
+    else if (msg.isModerator) nameColor = "#1ae0a0"; // Quản trị viên
+    else if (msg.isSponsor) nameColor = "#ffd700"; // Nhà tài trợ hội viên
+    
+    return \`
+      <div class="custom-msg" style="border-left-color: \${nameColor}">
+        <span class="custom-author" style="color: \${nameColor}">\${msg.authorName || 'Anonymous'}:</span>
+        <span class="custom-text">\${msg.messageText || ''}</span>
+      </div>
+    \`;
+  }).join('');
+  
+  // Tự động cuộn mượt xuống phía dưới khi có tin nhắn mới xuôi dòng
+  container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+});`,
   soundEnabled: false,
   soundType: "default",
   soundVolume: 0.5,
