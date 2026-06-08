@@ -340,6 +340,7 @@ const DEFAULT_SETTINGS: OverlaySettings = {
   isTransparent: false,
   scale: 1.0,
   chatDuration: 0, // 0 = permanent
+  maxMessages: 5, // 0 = no limit
   showAvatar: true,
   showTimestamp: true,
   showBadges: true,
@@ -618,6 +619,7 @@ export default function App() {
       const pSponsorColor = decodedParams.sponsorColor || searchParams.get("sponsorColor") || "#fbbf24";
       const pScDuration = parseInt(decodedParams.superChatDuration?.toString() || searchParams.get("superChatDuration") || "45", 10);
       const pChatDuration = parseInt(decodedParams.chatDuration?.toString() || searchParams.get("chatDuration") || "0", 10);
+      const pMaxMessages = parseInt(decodedParams.maxMessages?.toString() || searchParams.get("maxMessages") || "0", 10);
       const pIsTransparent = decodedParams.isTransparent !== undefined ? decodedParams.isTransparent : (searchParams.get("isTransparent") === "true");
       const pScale = parseFloat(decodedParams.scale?.toString() || searchParams.get("scale") || "1.0");
       const pShowAvatar = decodedParams.showAvatar !== undefined ? decodedParams.showAvatar : (searchParams.get("showAvatar") !== "false");
@@ -641,6 +643,7 @@ export default function App() {
         isTransparent: pIsTransparent,
         scale: pScale,
         chatDuration: pChatDuration,
+        maxMessages: pMaxMessages,
         showAvatar: pShowAvatar,
         showTimestamp: pShowTimestamp,
         showBadges: pShowBadges,
@@ -1549,6 +1552,7 @@ export default function App() {
       sponsorColor: settings.sponsorColor,
       superChatDuration: settings.superChatDuration,
       chatDuration: settings.chatDuration,
+      maxMessages: settings.maxMessages ?? 0,
       isTransparent: settings.isTransparent,
       scale: settings.scale,
       showAvatar: settings.showAvatar,
@@ -1587,6 +1591,7 @@ export default function App() {
       query.set("sponsorColor", config.sponsorColor);
       query.set("superChatDuration", config.superChatDuration.toString());
       query.set("chatDuration", config.chatDuration.toString());
+      query.set("maxMessages", (config.maxMessages ?? 0).toString());
       query.set("isTransparent", config.isTransparent ? "true" : "false");
       query.set("scale", config.scale.toString());
       query.set("showAvatar", config.showAvatar ? "true" : "false");
@@ -3409,6 +3414,25 @@ export default function App() {
                       className="w-full accent-indigo-500 cursor-pointer"
                     />
                     <span className="text-[9px] text-slate-500 italic block">Đặt về 0 để tin nhắn luôn hiển thị vĩnh viễn trên màn hình.</span>
+                  </div>
+
+                  <div className="space-y-1 mt-3">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Số lượng tin nhắn tối đa</span>
+                      <span className="font-bold text-indigo-400">
+                        {settings.maxMessages === 0 || settings.maxMessages === undefined ? "Không giới hạn" : `${settings.maxMessages} tin`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={settings.maxMessages ?? 0}
+                      onChange={(e) => updateSettings({ maxMessages: parseInt(e.target.value, 10) })}
+                      className="w-full accent-indigo-500 cursor-pointer"
+                    />
+                    <span className="text-[9px] text-slate-500 italic block">Đặt về 0 để không giới hạn. Khi vượt quá, tin nhắn cũ nhất sẽ bị xóa.</span>
                   </div>
 
                   <hr className="border-slate-800/50" />

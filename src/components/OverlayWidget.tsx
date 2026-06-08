@@ -154,12 +154,17 @@ const OverlayWidget = memo(function OverlayWidget({
       : "font-sans";
 
   // Filter out expired normal messages (excluding Super Chats from quick expiration if streamer wants)
-  const visibleMessages = messages.filter((msg) => {
+  let visibleMessages = messages.filter((msg) => {
     if (settings.chatDuration <= 0) return true;
     if (msg.isSuperChat) return true; // keep Super Chats based on superChatDuration, not normal duration
     const ageInSeconds = (currentTimestamp - msg.timestamp) / 1000;
     return ageInSeconds < settings.chatDuration;
   });
+
+  // Limit to maxMessages if configured
+  if (settings.maxMessages !== undefined && settings.maxMessages > 0) {
+    visibleMessages = visibleMessages.slice(-settings.maxMessages);
+  }
 
   // Get active SuperChats that are still within their pinned age limit
   const activeSuperChats = messages.filter((msg) => {

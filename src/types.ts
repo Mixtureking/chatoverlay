@@ -28,6 +28,7 @@ export interface OverlaySettings {
   isTransparent: boolean;  // toggle background completely
   scale: number;          // 0.5 to 2.0 (overall window multiplier)
   chatDuration: number;   // fade out messages after X seconds (0 for infinite)
+  maxMessages?: number;   // maximum concurrent messages (0 for infinite)
   showAvatar: boolean;    // toggle avatars
   showTimestamp?: boolean; // toggle timestamp
   showBadges: boolean;    // moderator/sponsor badge icons
