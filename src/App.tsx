@@ -1350,7 +1350,7 @@ export default function App() {
       const fetchLoop = async () => {
         // If the stream is offline, clear messages and do not fetch
         // Exception: If the user passed direct explicit parameters via URL (obsChatId), bypass global offline checks
-        const reallyOffline = !obsChatId && (obsSettings as any).isOffline;
+        const reallyOffline = (obsSettings as any).isOffline;
         if (reallyOffline) {
           setMessages([]);
           messagesSetRef.current.clear();

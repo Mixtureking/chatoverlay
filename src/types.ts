@@ -87,6 +87,11 @@ export interface OverlaySettings {
     duration: number;
     sustainType: "auto" | "manual";
   }>;
+
+  // Connection states
+  activeLiveChatId?: string;
+  apiKey?: string;
+  isOffline?: boolean;
 }
 
 export interface FilterKeyword {
