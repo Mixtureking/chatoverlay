@@ -553,6 +553,7 @@ function WheelWidget() {
   const [isReloading, setIsReloading] = useState(false);
   const usersRef = useRef(users);
   const mountedRef = useRef(true);
+  const lastSpinTriggerRef = useRef<number>(0);
 
   useEffect(() => {
     usersRef.current = users;
@@ -629,6 +630,16 @@ function WheelWidget() {
         if (persisted?.wheelUsers?.length) {
           setUsers(persisted.wheelUsers);
         }
+        if (persisted?.spinTrigger) {
+          if (lastSpinTriggerRef.current === 0) {
+            lastSpinTriggerRef.current = persisted.spinTrigger;
+          } else if (persisted.spinTrigger > lastSpinTriggerRef.current) {
+            lastSpinTriggerRef.current = persisted.spinTrigger;
+            const localChannel = new BroadcastChannel("sprint7_wheel_channel");
+            localChannel.postMessage({ type: "SPIN" });
+            localChannel.close();
+          }
+        }
       }
     };
     window.addEventListener("storage", onStorage);
@@ -638,13 +649,25 @@ function WheelWidget() {
       try {
         const res = await fetch("/api/sprint7/state-sync");
         const data = await res.json();
-        if (data?.state?.wheelUsers?.length) {
-          setUsers(data.state.wheelUsers);
+        if (data?.state) {
+          if (data.state.wheelUsers && JSON.stringify(data.state.wheelUsers) !== JSON.stringify(usersRef.current)) {
+            setUsers(data.state.wheelUsers);
+          }
+          if (data.state.spinTrigger) {
+            if (lastSpinTriggerRef.current === 0) {
+              lastSpinTriggerRef.current = data.state.spinTrigger;
+            } else if (data.state.spinTrigger > lastSpinTriggerRef.current) {
+              lastSpinTriggerRef.current = data.state.spinTrigger;
+              const localChannel = new BroadcastChannel("sprint7_wheel_channel");
+              localChannel.postMessage({ type: "SPIN" });
+              localChannel.close();
+            }
+          }
         }
       } catch {}
     };
     pollWheelState();
-    const pollInterval = setInterval(pollWheelState, 2000);
+    const pollInterval = setInterval(pollWheelState, 750);
 
     return () => {
       wheelChannel.close();

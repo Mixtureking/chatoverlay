@@ -113,6 +113,10 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     const channel = new BroadcastChannel("sprint7_wheel_channel");
     channel.postMessage({ type: "SPIN" });
     channel.close();
+    syncState({
+      ...state,
+      spinTrigger: Date.now(),
+    });
     flash("🎡 Đã gửi lệnh quay!");
   };
 
