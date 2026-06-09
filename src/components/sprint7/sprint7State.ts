@@ -36,7 +36,7 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
         }))
       : [],
     customCSS: typeof input?.customCSS === "string" ? input.customCSS : "",
-    socialLinks: input?.socialLinks && typeof input.socialLinks === "object" && Object.keys(input.socialLinks).length > 0 ? input.socialLinks : { youtube: "https://youtube.com/@YourChannel", discord: "https://discord.gg/example" },
+    socialLinks: input?.socialLinks && typeof input.socialLinks === "object" ? input.socialLinks : { youtube: "https://youtube.com/@YourChannel", discord: "https://discord.gg/example" },
     timerSeconds: typeof input?.timerSeconds === "number" && input.timerSeconds >= 0 ? input.timerSeconds : 5 * 60,
     timerDoneText: typeof input?.timerDoneText === "string" && input.timerDoneText.trim() ? input.timerDoneText : "Thời gian đã kết thúc",
     timerTrigger: typeof input?.timerTrigger === "number" ? input.timerTrigger : 0,

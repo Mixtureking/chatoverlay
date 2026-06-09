@@ -9,7 +9,7 @@ interface Sprint7DashboardProps {
 
 /* ─────────── Shared style tokens ─────────── */
 const glassCard = "relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 backdrop-blur-sm shadow-xl";
-const inputCls = "w-full bg-slate-950/70 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-[13px] text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50 transition-all duration-200";
+const inputCls = "bg-slate-950/70 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-[13px] text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50 transition-all duration-200";
 const sectionTitle = "text-[11px] font-semibold uppercase tracking-[0.15em] flex items-center gap-2";
 
 export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
@@ -186,7 +186,8 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
   // ---- Social link helpers ----
   const addLink = () => {
-    const key = newLinkKey.trim() || `link${Object.keys(state.socialLinks).length + 1}`;
+    const safeLinks = state.socialLinks || {};
+    const key = newLinkKey.trim() || `link${Object.keys(safeLinks).length + 1}`;
     const url = newLinkUrl.trim() || "https://example.com";
     
     // Clear any existing draft for this key to prevent old values showing up
@@ -198,13 +199,14 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
     syncState({
       ...state,
-      socialLinks: { ...state.socialLinks, [key]: url },
+      socialLinks: { ...safeLinks, [key]: url },
     });
     setNewLinkKey("");
     setNewLinkUrl("");
   };
   const deleteLink = (key: string) => {
-    const { [key]: _, ...rest } = state.socialLinks;
+    const safeLinks = state.socialLinks || {};
+    const { [key]: _, ...rest } = safeLinks;
     setLinkDrafts(prev => {
       const next = { ...prev };
       delete next[key];
@@ -213,11 +215,12 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     syncState({ ...state, socialLinks: rest });
   };
   const saveLinkText = (key: string) => {
+    const safeLinks = state.socialLinks || {};
     const val = linkDrafts[key];
     if (val === undefined) return;
     syncState({
       ...state,
-      socialLinks: { ...state.socialLinks, [key]: val },
+      socialLinks: { ...safeLinks, [key]: val },
     });
   };
 
@@ -367,7 +370,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                     <label className="text-[11px] text-slate-400 font-medium">Thời gian (giây)</label>
                     <input
                       type="number"
-                      className={inputCls}
+                      className={`${inputCls} w-full`}
                       value={timerSec}
                       onChange={(e) => setTimerSec(e.target.value)}
                       onBlur={() => saveField("timer", timerSec, timerDoneText)}
@@ -380,7 +383,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                     <label className="text-[11px] text-slate-400 font-medium">Thông báo khi hết giờ</label>
                     <input
                       type="text"
-                      className={inputCls}
+                      className={`${inputCls} w-full`}
                       value={timerDoneText}
                       onChange={(e) => setTimerDoneText(e.target.value)}
                       onBlur={() => saveField("timer", timerSec, timerDoneText)}
@@ -398,7 +401,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">Tên người chơi, cách nhau bởi dấu phẩy</label>
                     <textarea
-                      className={`${inputCls} resize-y min-h-[68px]`}
+                      className={`${inputCls} w-full resize-y min-h-[68px]`}
                       value={wheelUsersInput}
                       onChange={(e) => setWheelUsersInput(e.target.value)}
                       onBlur={() => saveField("wheel", wheelUsersInput)}
@@ -512,7 +515,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   <Palette className="w-3.5 h-3.5" /> CSS tùy chỉnh
                 </h4>
                 <textarea
-                  className={`${inputCls} font-mono text-[12px] resize-y leading-relaxed`}
+                  className={`${inputCls} w-full font-mono text-[12px] resize-y leading-relaxed`}
                   rows={5}
                   value={cssDraft}
                   onChange={(e) => setCssDraft(e.target.value)}

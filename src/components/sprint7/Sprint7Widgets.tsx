@@ -176,6 +176,8 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
   const [roulette, setRoulette] = useState<string[]>(sampleComments);
   const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
+  const [newLinkKey, setNewLinkKey] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [cssDraft, setCssDraft] = useState("");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState("300");
   const [timerDraftDoneText, setTimerDraftDoneText] = useState("Time is up");
@@ -223,21 +225,35 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
 
   const updateLinkText = (key: string, value: string) => setLinkDrafts((prev) => ({ ...prev, [key]: value }));
   const saveLinkText = (key: string) => {
-    const next = { ...widgetState };
-    next.socialLinks = { ...next.socialLinks, [key]: linkDrafts[key] ?? next.socialLinks[key] };
-    syncState(next);
+    const safeLinks = widgetState.socialLinks || {};
+    const val = linkDrafts[key];
+    if (val === undefined) return;
+    syncState({
+      ...widgetState,
+      socialLinks: { ...safeLinks, [key]: val },
+    });
   };
   const deleteLink = (key: string) => {
-    const next = { ...widgetState };
-    const { [key]: _removed, ...rest } = next.socialLinks;
-    next.socialLinks = rest;
-    syncState(next);
+    const safeLinks = widgetState.socialLinks || {};
+    const { [key]: _removed, ...rest } = safeLinks;
+    setLinkDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    syncState({ ...widgetState, socialLinks: rest });
   };
   const addSocialLink = () => {
-    const next = { ...widgetState };
-    const count = Object.keys(next.socialLinks).length + 1;
-    next.socialLinks = { ...next.socialLinks, [`link${count}`]: `https://example.com/${count}` };
-    syncState(next);
+    const safeLinks = widgetState.socialLinks || {};
+    const key = newLinkKey.trim() || `link${Object.keys(safeLinks).length + 1}`;
+    const url = newLinkUrl.trim() || "https://example.com";
+    
+    syncState({
+      ...widgetState,
+      socialLinks: { ...safeLinks, [key]: url },
+    });
+    setNewLinkKey("");
+    setNewLinkUrl("");
   };
   const resetSocialLinks = () => syncState({ ...widgetState, ...getFallbackState() });
   const saveCssDraft = () => {
@@ -358,6 +374,20 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
               Social Links
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
+              <input 
+                type="text" 
+                placeholder="Tên" 
+                value={newLinkKey} 
+                onChange={(e) => setNewLinkKey(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs outline-none text-slate-100 w-24"
+              />
+              <input 
+                type="text" 
+                placeholder="URL" 
+                value={newLinkUrl} 
+                onChange={(e) => setNewLinkUrl(e.target.value)}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs outline-none text-slate-100 flex-1"
+              />
               <button onClick={addSocialLink} className={getBtnClass("yellow", isLight)}>Add link</button>
               <button onClick={resetSocialLinks} className={getBtnClass("slate", isLight)}>Reset</button>
             </div>
@@ -1044,6 +1074,30 @@ export default function Sprint7Widgets() {
       }).catch(() => {});
     }
   };
+
+  useEffect(() => {
+    // Poll server state for dashboard to stay in sync with remote changes
+    const pollAllState = async () => {
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state) {
+          // Deep compare simple JSON to avoid unnecessary re-renders
+          const currentStr = JSON.stringify(state);
+          const nextStr = JSON.stringify(data.state);
+          if (currentStr !== nextStr) {
+            setState(data.state);
+            (window as any).__SPRINT7_STATE__ = data.state;
+          }
+        }
+      } catch {}
+    };
+
+    if (route === "dashboard") {
+      const interval = setInterval(pollAllState, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [route, state]);
 
   const isLight = themeMode === "light";
 
