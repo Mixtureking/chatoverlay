@@ -5,12 +5,12 @@ type VoteState = { A: number; B: number; total: number };
 type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel";
 
 const sampleComments = [
-  "Clip nay dinh qua!",
-  "Ban dep that",
-  "Roll di anh oi",
-  "Vote A nao",
-  "Cyberpunk vibe cuc manh",
-  "Chat dang nong len roi",
+  "Clip này đỉnh quá!",
+  "Bạn đẹp thật",
+  "Roll đi anh ơi",
+  "Vote A nào",
+  "Cyberpunk vibe cực mạnh",
+  "Chat đang nóng lên rồi",
 ];
 
 const getRoute = (): WidgetRoute => {
@@ -23,7 +23,6 @@ const getRoute = (): WidgetRoute => {
 
 function useVoteState() {
   const [state, setState] = useState<VoteState>({ A: 0, B: 0, total: 0 });
-
   useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -49,8 +48,8 @@ function useVoteState() {
   return { ...state, aPct, bPct };
 }
 
-function getSprint7State(): Sprint7WidgetState {
-  const fallback: Sprint7WidgetState = {
+function getFallbackState(): Sprint7WidgetState {
+  return {
     todoList: [
       { id: "todo-1", text: "Set scene", completed: false },
       { id: "todo-2", text: "Check mic", completed: true },
@@ -63,10 +62,13 @@ function getSprint7State(): Sprint7WidgetState {
       discord: "https://discord.com",
     },
     timerSeconds: 5 * 60,
-    timerDoneText: "Thoi gian da ket thuc",
-    wheelUsers: ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
+    timerDoneText: "Thời gian đã kết thúc",
+    wheelUsers: ["Doro", "An", "Bình", "Chi", "Dung", "Em"],
   };
+}
 
+function getSprint7State(): Sprint7WidgetState {
+  const fallback = getFallbackState();
   const raw = (window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined;
   if (!raw || typeof raw !== "object") return fallback;
   return {
@@ -77,25 +79,6 @@ function getSprint7State(): Sprint7WidgetState {
     timerSeconds: typeof raw.timerSeconds === "number" ? raw.timerSeconds : fallback.timerSeconds,
     timerDoneText: typeof raw.timerDoneText === "string" && raw.timerDoneText.trim() ? raw.timerDoneText : fallback.timerDoneText,
     wheelUsers: Array.isArray(raw.wheelUsers) && raw.wheelUsers.length > 0 ? raw.wheelUsers : fallback.wheelUsers,
-  };
-}
-
-function getDefaultSprint7State(): Sprint7WidgetState {
-  return {
-    todoList: [
-      { id: "todo-1", text: "Set scene", completed: false },
-      { id: "todo-2", text: "Check mic", completed: true },
-      { id: "todo-3", text: "Start stream", completed: false },
-    ],
-    customCSS: "",
-    socialLinks: {
-      youtube: "https://youtube.com",
-      tiktok: "https://tiktok.com",
-      discord: "https://discord.com",
-    },
-    timerSeconds: 5 * 60,
-    timerDoneText: "Thoi gian da ket thuc",
-    wheelUsers: ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
   };
 }
 
@@ -120,11 +103,7 @@ function LiveCssInjector() {
         styleTag.textContent = "";
         return;
       }
-      if (isLikelySafeCss(css)) {
-        styleTag.textContent = css;
-      } else {
-        styleTag.textContent = "";
-      }
+      styleTag.textContent = isLikelySafeCss(css) ? css : "";
     } catch {
       if (styleTag) styleTag.textContent = "";
     }
@@ -142,7 +121,7 @@ function VoteWidget() {
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [cssDraft, setCssDraft] = useState("");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState("300");
-  const [timerDraftDoneText, setTimerDraftDoneText] = useState("Thoi gian da ket thuc");
+  const [timerDraftDoneText, setTimerDraftDoneText] = useState("Thời gian đã kết thúc");
   const [wheelDrafts, setWheelDrafts] = useState<Record<number, string>>({});
 
   const syncState = (next: Sprint7WidgetState) => {
@@ -153,7 +132,7 @@ function VoteWidget() {
   useEffect(() => {
     setCssDraft(widgetState.customCSS || "");
     setTimerDraftSeconds(String(widgetState.timerSeconds ?? 300));
-    setTimerDraftDoneText(widgetState.timerDoneText || "Thoi gian da ket thuc");
+    setTimerDraftDoneText(widgetState.timerDoneText || "Thời gian đã kết thúc");
     setWheelDrafts(
       (widgetState.wheelUsers || []).reduce<Record<number, string>>((acc, value, index) => {
         acc[index] = value;
@@ -164,124 +143,74 @@ function VoteWidget() {
 
   const addTodo = () => {
     const next = getSprint7State();
-    next.todoList = next.todoList.concat({
-      id: `todo-${Date.now()}`,
-      text: `New task ${next.todoList.length + 1}`,
-      completed: false,
-    });
+    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiệm vụ ${next.todoList.length + 1}`, completed: false });
     syncState(next);
   };
-
   const toggleFirstTodo = () => {
     const next = getSprint7State();
     if (next.todoList.length === 0) return;
-    next.todoList = next.todoList.map((item, index) => index === 0 ? { ...item, completed: !item.completed } : item);
+    next.todoList = next.todoList.map((item, index) => (index === 0 ? { ...item, completed: !item.completed } : item));
     syncState(next);
   };
-
   const clearTodos = () => {
     const next = getSprint7State();
     next.todoList = [];
     syncState(next);
   };
-
-  const updateTodoText = (id: string, text: string) => {
-    setTodoDrafts((prev) => ({ ...prev, [id]: text }));
-  };
-
+  const updateTodoText = (id: string, text: string) => setTodoDrafts((prev) => ({ ...prev, [id]: text }));
   const saveTodoText = (id: string) => {
     const next = getSprint7State();
-    next.todoList = next.todoList.map((item) =>
-      item.id === id ? { ...item, text: todoDrafts[id] ?? item.text } : item,
-    );
+    next.todoList = next.todoList.map((item) => (item.id === id ? { ...item, text: todoDrafts[id] ?? item.text } : item));
     syncState(next);
   };
-
   const deleteTodo = (id: string) => {
     const next = getSprint7State();
     next.todoList = next.todoList.filter((item) => item.id !== id);
     syncState(next);
   };
 
-  const updateLinkText = (key: string, value: string) => {
-    setLinkDrafts((prev) => ({ ...prev, [key]: value }));
-  };
-
+  const updateLinkText = (key: string, value: string) => setLinkDrafts((prev) => ({ ...prev, [key]: value }));
   const saveLinkText = (key: string) => {
     const next = getSprint7State();
-    next.socialLinks = {
-      ...next.socialLinks,
-      [key]: linkDrafts[key] ?? next.socialLinks[key],
-    };
+    next.socialLinks = { ...next.socialLinks, [key]: linkDrafts[key] ?? next.socialLinks[key] };
     syncState(next);
   };
-
   const deleteLink = (key: string) => {
     const next = getSprint7State();
     const { [key]: _removed, ...rest } = next.socialLinks;
     next.socialLinks = rest;
     syncState(next);
   };
-
+  const addSocialLink = () => {
+    const next = getSprint7State();
+    const count = Object.keys(next.socialLinks).length + 1;
+    next.socialLinks = { ...next.socialLinks, [`link${count}`]: `https://example.com/${count}` };
+    syncState(next);
+  };
+  const resetSocialLinks = () => syncState({ ...getFallbackState() });
   const saveCssDraft = () => {
     const next = getSprint7State();
     next.customCSS = cssDraft;
     syncState(next);
   };
-
   const saveTimerDraft = () => {
     const next = getSprint7State();
     const parsedSeconds = Number.parseInt(timerDraftSeconds, 10);
     next.timerSeconds = Number.isFinite(parsedSeconds) && parsedSeconds >= 0 ? parsedSeconds : 300;
-    next.timerDoneText = timerDraftDoneText || "Thoi gian da ket thuc";
+    next.timerDoneText = timerDraftDoneText || "Thời gian đã kết thúc";
     syncState(next);
   };
-
-  const updateWheelDraft = (index: number, value: string) => {
-    setWheelDrafts((prev) => ({ ...prev, [index]: value }));
-  };
-
+  const updateWheelDraft = (index: number, value: string) => setWheelDrafts((prev) => ({ ...prev, [index]: value }));
   const saveWheelDrafts = () => {
     const next = getSprint7State();
-    const items = Object.entries(wheelDrafts)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([, value]) => value.trim())
-      .filter(Boolean);
-    next.wheelUsers = items.length > 0 ? items : ["Doro", "An", "Binh", "Chi", "Dung", "Em"];
+    const items = Object.entries(wheelDrafts).sort(([a], [b]) => Number(a) - Number(b)).map(([, value]) => value.trim()).filter(Boolean);
+    next.wheelUsers = items.length > 0 ? items : getFallbackState().wheelUsers;
     syncState(next);
   };
-
-  const addSocialLink = () => {
-    const next = getSprint7State();
-    const count = Object.keys(next.socialLinks).length + 1;
-    next.socialLinks = {
-      ...next.socialLinks,
-      [`link${count}`]: `https://example.com/${count}`,
-    };
-    syncState(next);
-  };
-
-  const resetSocialLinks = () => {
-    const next = getSprint7State();
-    next.socialLinks = {
-      youtube: "https://youtube.com",
-      tiktok: "https://tiktok.com",
-      discord: "https://discord.com",
-    };
-    syncState(next);
-  };
-
-  const resetAllState = () => {
-    syncState(getDefaultSprint7State());
-  };
-
+  const resetAllState = () => syncState(getFallbackState());
   const exportState = () => {
     const current = getSprint7State();
-    const payload = serializeSprint7FullState({
-      todoList: current.todoList,
-      customCSS: current.customCSS,
-      socialLinks: current.socialLinks,
-    });
+    const payload = serializeSprint7FullState({ todoList: current.todoList, customCSS: current.customCSS, socialLinks: current.socialLinks });
     const blob = new Blob([payload], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -292,213 +221,122 @@ function VoteWidget() {
     a.remove();
     URL.revokeObjectURL(url);
   };
-
   const copyState = async () => {
     try {
       const current = getSprint7State();
-      const payload = serializeSprint7FullState({
-        todoList: current.todoList,
-        customCSS: current.customCSS,
-        socialLinks: current.socialLinks,
-      });
-      await navigator.clipboard.writeText(payload);
-    } catch {
-      // Ignore clipboard failures in OBS/browser sandbox.
-    }
+      await navigator.clipboard.writeText(serializeSprint7FullState({ todoList: current.todoList, customCSS: current.customCSS, socialLinks: current.socialLinks }));
+    } catch {}
   };
-
   const importState = async (file: File | null) => {
     if (!file) return;
     try {
       const raw = await file.text();
       const parsed = parseSprint7FullState(raw);
-      syncState(
-        createSprint7WidgetState({
-          ...getSprint7State(),
-          todoList: parsed.todoList,
-          customCSS: parsed.customCSS,
-          socialLinks: parsed.socialLinks,
-        }),
-      );
-    } catch {
-      // Ignore malformed JSON to avoid breaking the overlay.
-    }
+      syncState(createSprint7WidgetState({ ...getSprint7State(), todoList: parsed.todoList, customCSS: parsed.customCSS, socialLinks: parsed.socialLinks }));
+    } catch {}
   };
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setRoulette((prev) => prev.slice(1).concat(prev[0]));
-    }, 2500);
+    const timer = window.setInterval(() => setRoulette((prev) => prev.slice(1).concat(prev[0])), 2500);
     return () => window.clearInterval(timer);
   }, []);
 
   return (
-    <div className="w-screen h-screen bg-[#050816] text-white p-6 overflow-hidden">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="rounded-3xl border border-cyan-400/30 bg-white/5 p-6 shadow-[0_0_40px_rgba(34,211,238,0.12)]">
-          <div className="text-xs uppercase tracking-[0.35em] text-cyan-300 mb-3">Live Vote</div>
-          <div className="grid grid-cols-2 gap-3 text-sm font-semibold">
-            <div>A: {vote.A}</div>
-            <div>B: {vote.B}</div>
+    <div className="w-full h-full overflow-hidden bg-[#050816] text-white">
+      <div className="h-full overflow-y-auto custom-scrollbar px-4 sm:px-6 py-6">
+        <div className="max-w-5xl mx-auto space-y-6 pb-10">
+          <div className="rounded-3xl border border-cyan-400/30 bg-white/5 p-6 shadow-[0_0_40px_rgba(34,211,238,0.12)]">
+            <div className="text-xs uppercase tracking-[0.35em] text-cyan-300 mb-3">Bỏ phiếu trực tiếp</div>
+            <div className="grid grid-cols-2 gap-3 text-sm font-semibold"><div>A: {vote.A}</div><div>B: {vote.B}</div></div>
+            <div className="mt-4 h-4 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${vote.aPct}%` }} /></div>
+            <div className="mt-2 text-xs text-cyan-200">{vote.aPct}% / {vote.bPct}%</div>
           </div>
-          <div className="mt-4 h-4 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${vote.aPct}%` }} />
-          </div>
-          <div className="mt-2 text-xs text-cyan-200">
-            {vote.aPct}% / {vote.bPct}%
-          </div>
-        </div>
 
-        <div className="rounded-3xl border border-fuchsia-400/30 bg-black/30 p-6">
-          <div className="cyberpunk-glitch rounded-2xl border border-fuchsia-400/80 p-4 text-xl font-bold text-fuchsia-200">
-            {roulette[0]}
+          <div className="rounded-3xl border border-fuchsia-400/30 bg-black/30 p-6">
+            <div className="cyberpunk-glitch rounded-2xl border border-fuchsia-400/80 p-4 text-xl font-bold text-fuchsia-200">{roulette[0]}</div>
+            <div className="mt-4 space-y-2 text-sm text-white/70">{roulette.slice(1, 4).map((item) => <div key={item}>{item}</div>)}</div>
           </div>
-          <div className="mt-4 space-y-2 text-sm text-white/70">
-            {roulette.slice(1, 4).map((item) => (
-              <div key={item}>{item}</div>
-            ))}
-          </div>
-        </div>
 
-        <div className="rounded-3xl border border-emerald-400/30 bg-white/5 p-5">
-          <div className="text-xs uppercase tracking-[0.35em] text-emerald-300 mb-3">Todo</div>
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button onClick={addTodo} className="text-[11px] px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30">Add</button>
-            <button onClick={toggleFirstTodo} className="text-[11px] px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30">Toggle 1st</button>
-            <button onClick={clearTodos} className="text-[11px] px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">Clear</button>
-          </div>
-          <div className="space-y-2">
-            {widgetState.todoList.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-xl px-3 py-2 bg-black/20 border border-white/10 space-y-2 ${
-                  item.completed ? "line-through opacity-60" : ""
-                }`}
-              >
-                <input
-                  value={todoDrafts[item.id] ?? item.text}
-                  onChange={(e) => updateTodoText(item.id, e.target.value)}
-                  onBlur={() => saveTodoText(item.id)}
-                  className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-sm outline-none"
-                />
-                <button
-                  onClick={() => deleteTodo(item.id)}
-                  className="text-[10px] px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/30"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-yellow-400/30 bg-black/30 p-4 overflow-hidden">
-          <div className="text-xs uppercase tracking-[0.35em] text-yellow-300 mb-3">Social Links</div>
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button onClick={addSocialLink} className="text-[11px] px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-400/30">
-              Add link
-            </button>
-            <button onClick={resetSocialLinks} className="text-[11px] px-3 py-1 rounded-full bg-slate-500/20 border border-slate-400/30">
-              Reset
-            </button>
-          </div>
-          <div className="overflow-hidden whitespace-nowrap">
-            <div className="marquee-track items-center">
-              {Object.entries(widgetState.socialLinks).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10">
-                  <input
-                    value={linkDrafts[key] ?? value}
-                    onChange={(e) => updateLinkText(key, e.target.value)}
-                    onBlur={() => saveLinkText(key)}
-                    className="bg-transparent outline-none text-sm min-w-[180px]"
-                  />
-                  <button
-                    onClick={() => deleteLink(key)}
-                    className="text-[10px] px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/30"
-                  >
-                    Delete
-                  </button>
+          <div className="rounded-3xl border border-emerald-400/30 bg-white/5 p-5">
+            <div className="text-xs uppercase tracking-[0.35em] text-emerald-300 mb-3">Danh sách việc cần làm</div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button onClick={addTodo} className="text-[11px] px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30">Thêm</button>
+              <button onClick={toggleFirstTodo} className="text-[11px] px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30">Đổi trạng thái đầu</button>
+              <button onClick={clearTodos} className="text-[11px] px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">Xóa hết</button>
+            </div>
+            <div className="space-y-2">
+              {widgetState.todoList.map((item) => (
+                <div key={item.id} className={`rounded-xl px-3 py-2 bg-black/20 border border-white/10 space-y-2 ${item.completed ? "line-through opacity-60" : ""}`}>
+                  <input value={todoDrafts[item.id] ?? item.text} onChange={(e) => updateTodoText(item.id, e.target.value)} onBlur={() => saveTodoText(item.id)} className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-sm outline-none" />
+                  <button onClick={() => deleteTodo(item.id)} className="text-[10px] px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">Xóa</button>
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        <div className="rounded-3xl border border-sky-400/30 bg-white/5 p-5">
-          <div className="text-xs uppercase tracking-[0.35em] text-sky-300 mb-3">State JSON</div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={exportState} className="text-[11px] px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30">
-              Export
-            </button>
-            <button onClick={copyState} className="text-[11px] px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30">
-              Copy
-            </button>
-            <label className="text-[11px] px-3 py-1 rounded-full bg-slate-500/20 border border-slate-400/30 cursor-pointer">
-              Import
-              <input
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={(e) => {
-                  void importState(e.target.files?.[0] || null);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
-            <button onClick={resetAllState} className="text-[11px] px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">
-              Reset all
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-indigo-400/30 bg-black/30 p-5">
-          <div className="text-xs uppercase tracking-[0.35em] text-indigo-300 mb-3">Custom CSS</div>
-          <textarea
-            value={cssDraft}
-            onChange={(e) => setCssDraft(e.target.value)}
-            onBlur={saveCssDraft}
-            rows={6}
-            className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono outline-none resize-y"
-            placeholder="Nhập CSS ở đây..."
-          />
-          <div className="mt-2 text-[11px] text-slate-400">
-            CSS sẽ được inject nếu số dấu ngoặc nhọn cân bằng. Sai cú pháp sẽ bị bỏ qua.
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-amber-400/30 bg-black/30 p-5">
-          <div className="text-xs uppercase tracking-[0.35em] text-amber-300 mb-3">Timer / Wheel</div>
-          <div className="grid gap-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input
-                value={timerDraftSeconds}
-                onChange={(e) => setTimerDraftSeconds(e.target.value)}
-                onBlur={saveTimerDraft}
-                className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
-                placeholder="Timer seconds"
-              />
-              <input
-                value={timerDraftDoneText}
-                onChange={(e) => setTimerDraftDoneText(e.target.value)}
-                onBlur={saveTimerDraft}
-                className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
-                placeholder="Done text"
-              />
+          <div className="rounded-3xl border border-yellow-400/30 bg-black/30 p-4 overflow-hidden">
+            <div className="text-xs uppercase tracking-[0.35em] text-yellow-300 mb-3">Thanh liên kết mạng xã hội</div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button onClick={addSocialLink} className="text-[11px] px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-400/30">Thêm liên kết</button>
+              <button onClick={resetSocialLinks} className="text-[11px] px-3 py-1 rounded-full bg-slate-500/20 border border-slate-400/30">Khôi phục</button>
             </div>
-            <div className="text-[11px] text-slate-400">
-              Sửa nhanh timer count và text kết thúc, lưu khi blur.
+            <div className="overflow-hidden whitespace-nowrap">
+              <div className="marquee-track items-center">
+                {Object.entries(widgetState.socialLinks).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10">
+                    <input value={linkDrafts[key] ?? value} onChange={(e) => updateLinkText(key, e.target.value)} onBlur={() => saveLinkText(key)} className="bg-transparent outline-none text-sm min-w-[180px]" />
+                    <button onClick={() => deleteLink(key)} className="text-[10px] px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">Xóa</button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {(widgetState.wheelUsers || []).map((user, index) => (
-                <input
-                  key={`${index}-${user}`}
-                  value={wheelDrafts[index] ?? user}
-                  onChange={(e) => updateWheelDraft(index, e.target.value)}
-                  onBlur={saveWheelDrafts}
-                  className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
-                  placeholder={`Wheel user ${index + 1}`}
-                />
-              ))}
+          </div>
+
+          <div className="rounded-3xl border border-sky-400/30 bg-white/5 p-5">
+            <div className="text-xs uppercase tracking-[0.35em] text-sky-300 mb-3">Tệp trạng thái JSON</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportState} className="text-[11px] px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30">Xuất</button>
+              <button onClick={copyState} className="text-[11px] px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30">Sao chép</button>
+              <label className="text-[11px] px-3 py-1 rounded-full bg-slate-500/20 border border-slate-400/30 cursor-pointer">Nhập
+                <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
+              </label>
+              <button onClick={resetAllState} className="text-[11px] px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/30">Đặt lại toàn bộ</button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-indigo-400/30 bg-black/30 p-5">
+            <div className="text-xs uppercase tracking-[0.35em] text-indigo-300 mb-3">CSS tùy chỉnh</div>
+            <textarea
+              value={cssDraft}
+              onChange={(e) => setCssDraft(e.target.value)}
+              onBlur={saveCssDraft}
+              rows={6}
+              className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono outline-none resize-y"
+              placeholder="Nhập CSS ở đây..."
+            />
+            <div className="mt-2 text-[11px] text-slate-400">CSS sẽ được inject nếu dấu ngoặc cân bằng. Sai cú pháp sẽ bị bỏ qua.</div>
+          </div>
+
+          <div className="rounded-3xl border border-amber-400/30 bg-black/30 p-5">
+            <div className="text-xs uppercase tracking-[0.35em] text-amber-300 mb-3">Bộ đếm / Vòng quay</div>
+            <div className="grid gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input value={timerDraftSeconds} onChange={(e) => setTimerDraftSeconds(e.target.value)} onBlur={saveTimerDraft} className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" placeholder="Số giây đếm ngược" />
+                <input value={timerDraftDoneText} onChange={(e) => setTimerDraftDoneText(e.target.value)} onBlur={saveTimerDraft} className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" placeholder="Thông báo khi kết thúc" />
+              </div>
+              <div className="text-[11px] text-slate-400">Sửa nhanh thời gian đếm và nội dung kết thúc, sẽ lưu khi rời ô nhập.</div>
+              <div className="space-y-2">
+                {(widgetState.wheelUsers || []).map((user, index) => (
+                  <input
+                    key={`${index}-${user}`}
+                    value={wheelDrafts[index] ?? user}
+                    onChange={(e) => updateWheelDraft(index, e.target.value)}
+                    onBlur={saveWheelDrafts}
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none"
+                    placeholder={`Người dùng vòng quay ${index + 1}`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -512,9 +350,7 @@ function TimerWidget() {
   const [seconds, setSeconds] = useState(widgetState.timerSeconds || 5 * 60);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setSeconds((prev) => Math.max(0, prev - 1));
-    }, 1000);
+    const timer = window.setInterval(() => setSeconds((prev) => Math.max(0, prev - 1)), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -523,12 +359,10 @@ function TimerWidget() {
   const secs = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="w-screen h-screen grid place-items-center bg-[#050816] text-white">
+    <div className="w-screen h-screen grid place-items-center bg-[#050816] text-white overflow-hidden">
       <div className="text-center">
-        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? "DONE" : `${mins}:${secs}`}</div>
-        <div className="text-cyan-300 uppercase tracking-[0.5em] mt-4">
-          {done ? widgetState.timerDoneText : "Countdown Timer"}
-        </div>
+        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? widgetState.timerDoneText : `${mins}:${secs}`}</div>
+        <div className="text-cyan-300 uppercase tracking-[0.5em] mt-4">{done ? widgetState.timerDoneText : "Bộ đếm thời gian"}</div>
       </div>
     </div>
   );
@@ -536,11 +370,7 @@ function TimerWidget() {
 
 function WheelWidget() {
   const widgetState = useMemo(() => getSprint7State(), []);
-  const [users, setUsers] = useState<string[]>(
-    widgetState.wheelUsers && widgetState.wheelUsers.length > 0
-      ? widgetState.wheelUsers
-      : ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
-  );
+  const [users, setUsers] = useState<string[]>(widgetState.wheelUsers && widgetState.wheelUsers.length > 0 ? widgetState.wheelUsers : getFallbackState().wheelUsers);
   const [angle, setAngle] = useState(0);
 
   useEffect(() => {
@@ -552,26 +382,17 @@ function WheelWidget() {
         const settings = syncData?.settings;
         const liveChatId = settings?.activeLiveChatId;
         const apiKey = settings?.apiKey;
-
         if (!liveChatId || !apiKey) return;
-
         const msgRes = await fetch(`/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`);
         const msgData = await msgRes.json().catch(() => ({}));
         const names = Array.isArray(msgData?.messages)
           ? Array.from(new Set(msgData.messages.map((m: any) => String(m?.authorName || "").trim()).filter(Boolean))).slice(0, 24)
           : [];
-
-        if (alive && names.length > 0) {
-          setUsers(names);
-        }
-      } catch {
-        // Keep fallback names if live chat lookup fails.
-      }
+        if (alive && names.length > 0) setUsers(names);
+      } catch {}
     };
-
     loadChatUsers();
     const refresh = window.setInterval(loadChatUsers, 10000);
-
     let raf = 0;
     const loop = () => {
       setAngle((prev) => (prev + 1.5) % 360);
@@ -586,15 +407,13 @@ function WheelWidget() {
   }, []);
 
   return (
-    <div className="w-screen h-screen grid place-items-center bg-[#050816]">
+    <div className="w-screen h-screen grid place-items-center bg-[#050816] overflow-hidden">
       <svg width="520" height="520" viewBox="0 0 520 520" style={{ transform: `rotate(${angle}deg)` }}>
         <g>
           {users.map((name, idx) => (
             <g key={name} transform={`rotate(${idx * (360 / users.length)} 260 260)`}>
               <path d="M260 260 L260 40 A220 220 0 0 1 440 140 Z" fill={idx % 2 ? "#1d4ed8" : "#0f766e"} opacity="0.85" />
-              <text x="260" y="110" fill="white" fontSize="20" textAnchor="middle">
-                {name}
-              </text>
+              <text x="260" y="110" fill="white" fontSize="20" textAnchor="middle">{name}</text>
             </g>
           ))}
         </g>

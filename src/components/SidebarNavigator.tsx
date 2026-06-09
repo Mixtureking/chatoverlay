@@ -1,12 +1,6 @@
 import React, { memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  MessageSquare,
-  Settings,
-  Sparkles,
-  ChevronLeft,
-  Sliders,
-} from "lucide-react";
+import { MessageSquare, Settings, Sparkles, ChevronLeft, Sliders } from "lucide-react";
 
 interface SidebarNavigatorProps {
   activeRoute: "chat_overlay" | "screen_transition" | "settings" | "sprint7";
@@ -26,50 +20,26 @@ const SidebarNavigator = memo(function SidebarNavigator({
   accentColor,
 }: SidebarNavigatorProps) {
   const text = {
-    title: language === "vi" ? "DIEU HUONG CHINH" : "MAIN NAVIGATION",
-    subTitle: language === "vi" ? "Trung tam dieu khien" : "Dashboard controls",
+    title: language === "vi" ? "ĐIỀU HƯỚNG CHÍNH" : "MAIN NAVIGATION",
+    subTitle: language === "vi" ? "Trung tâm điều khiển" : "Dashboard controls",
     chatOverlay: language === "vi" ? "Khung Chat Overlay" : "Chat Overlay Setup",
-    chatOverlayDesc: language === "vi" ? "Ket noi & tuy bien phong chu, mau sac" : "Connection & typography styling",
-    screenTransition: language === "vi" ? "Hieu ung chuyen trang" : "Screen Transition",
-    screenTransitionDesc: language === "vi" ? "Tuy bien hieu ung doi tab & chuyen doi" : "Tab switching shutter/fade choices",
-    settings: language === "vi" ? "Cau hinh chung" : "General Settings",
-    settingsDesc: language === "vi" ? "Ngon ngu, mau sac, am luong chuong" : "Language, dashboard colors & volume",
-    sprint7: "Sprint 7 Test",
-    sprint7Desc: language === "vi" ? "Test vote, wheel, timer, todo, social" : "Quick test for vote, wheel, timer, todo, social",
-    activeLabel: language === "vi" ? "Dang chon" : "Active",
-    collapse: language === "vi" ? "Thu gon menu" : "Collapse menu",
-    systemStatus: language === "vi" ? "HE THONG TRUC TUYEN" : "SYSTEM ONLINE",
+    chatOverlayDesc: language === "vi" ? "Kết nối & tùy biến phông chữ, màu sắc" : "Connection & typography styling",
+    screenTransition: language === "vi" ? "Hiệu ứng chuyển trang" : "Screen Transition",
+    screenTransitionDesc: language === "vi" ? "Tùy biến hiệu ứng đổi tab & chuyển đổi" : "Tab switching shutter/fade choices",
+    settings: language === "vi" ? "Cấu hình chung" : "General Settings",
+    settingsDesc: language === "vi" ? "Ngôn ngữ, màu sắc, âm lượng chuông" : "Language, dashboard colors & volume",
+    sprint7: language === "vi" ? "Khu thử Sprint 7" : "Sprint 7 Lab",
+    sprint7Desc: language === "vi" ? "Thử nhanh vote, wheel, timer, todo, social" : "Quick test for vote, wheel, timer, todo, social",
+    activeLabel: language === "vi" ? "Đang chọn" : "Active",
+    collapse: language === "vi" ? "Thu gọn menu" : "Collapse menu",
+    systemStatus: language === "vi" ? "HỆ THỐNG TRỰC TUYẾN" : "SYSTEM ONLINE",
   };
 
   const navItems = [
-    {
-      id: "chat_overlay" as const,
-      title: text.chatOverlay,
-      desc: text.chatOverlayDesc,
-      icon: MessageSquare,
-      color: accentColor,
-    },
-    {
-      id: "screen_transition" as const,
-      title: text.screenTransition,
-      desc: text.screenTransitionDesc,
-      icon: Sparkles,
-      color: "#ec4899",
-    },
-    {
-      id: "settings" as const,
-      title: text.settings,
-      desc: text.settingsDesc,
-      icon: Settings,
-      color: "#14b8a6",
-    },
-    {
-      id: "sprint7" as const,
-      title: text.sprint7,
-      desc: text.sprint7Desc,
-      icon: Sliders,
-      color: "#f59e0b",
-    },
+    { id: "chat_overlay" as const, title: text.chatOverlay, desc: text.chatOverlayDesc, icon: MessageSquare, color: accentColor },
+    { id: "screen_transition" as const, title: text.screenTransition, desc: text.screenTransitionDesc, icon: Sparkles, color: "#ec4899" },
+    { id: "settings" as const, title: text.settings, desc: text.settingsDesc, icon: Settings, color: "#14b8a6" },
+    { id: "sprint7" as const, title: text.sprint7, desc: text.sprint7Desc, icon: Sliders, color: "#f59e0b" },
   ];
 
   return (
@@ -87,15 +57,10 @@ const SidebarNavigator = memo(function SidebarNavigator({
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full md:animate-pulse" style={{ backgroundColor: accentColor }} />
               <div className="min-w-0">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-                  {text.title}
-                </h3>
-                <p className="text-[9px] text-slate-500 font-bold mt-1 leading-none">
-                  {text.subTitle}
-                </p>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{text.title}</h3>
+                <p className="text-[9px] text-slate-500 font-bold mt-1 leading-none">{text.subTitle}</p>
               </div>
             </div>
-
             <button
               type="button"
               onClick={onClose}
@@ -118,33 +83,21 @@ const SidebarNavigator = memo(function SidebarNavigator({
                   type="button"
                   onClick={() => setActiveRoute(item.id)}
                   className={`w-full text-left p-3.5 rounded-xl transition-all cursor-pointer duration-200 border flex items-start gap-3 relative overflow-hidden group ${
-                    isActive
-                      ? "bg-slate-900 border-slate-800/80 shadow-md"
-                      : "bg-transparent border-transparent hover:bg-slate-900/30 hover:border-slate-900 text-slate-400 hover:text-slate-200"
+                    isActive ? "bg-slate-900 border-slate-800/80 shadow-md" : "bg-transparent border-transparent hover:bg-slate-900/30 hover:border-slate-900 text-slate-400 hover:text-slate-200"
                   }`}
                   id={`nav-item-btn-${item.id}`}
                 >
-                  {isActive && (
-                    <motion.div
-                      layoutId="sidebarActiveBgBar"
-                      className="absolute left-0 top-0 bottom-0 w-1"
-                      style={{ backgroundColor: item.color }}
-                    />
-                  )}
-
+                  {isActive && <motion.div layoutId="sidebarActiveBgBar" className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: item.color }} />}
                   <div
                     className={`p-2.5 rounded-lg transition-all ${
-                      isActive
-                        ? "text-white"
-                        : "bg-slate-900/50 text-slate-500 group-hover:text-slate-350"
+                      isActive ? "text-white" : "bg-slate-900/50 text-slate-500 group-hover:text-slate-350"
                     }`}
                     style={isActive ? { backgroundColor: item.color } : {}}
                   >
                     <IconComponent className="w-4 h-4 shrink-0" />
                   </div>
-
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className={`text-xs font-black tracking-wide uppercase transition-colors ${isActive ? "text-slate-100" : "text-slate-300"}`}>
                         {item.title}
                       </span>
