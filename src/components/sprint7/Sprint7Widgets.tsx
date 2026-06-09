@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number };
@@ -74,6 +74,27 @@ function getFallbackState(): Sprint7WidgetState {
 
 function getSprint7State(): Sprint7WidgetState {
   const fallback = getFallbackState();
+
+  // Try parsing from URL parameter 'ob' first
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const ob = params.get("ob");
+    if (ob) {
+      const decoded = parseSprint7StateFromBase64(ob);
+      if (decoded) {
+        return {
+          ...fallback,
+          ...decoded,
+          todoList: Array.isArray(decoded.todoList) ? decoded.todoList : fallback.todoList,
+          socialLinks: decoded.socialLinks && typeof decoded.socialLinks === "object" ? decoded.socialLinks : fallback.socialLinks,
+          timerSeconds: typeof decoded.timerSeconds === "number" ? decoded.timerSeconds : fallback.timerSeconds,
+          timerDoneText: typeof decoded.timerDoneText === "string" && decoded.timerDoneText.trim() ? decoded.timerDoneText : fallback.timerDoneText,
+          wheelUsers: Array.isArray(decoded.wheelUsers) && decoded.wheelUsers.length > 0 ? decoded.wheelUsers : fallback.wheelUsers,
+        };
+      }
+    }
+  }
+
   const persisted = loadPersistedSprint7WidgetState();
   const raw = persisted || ((window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined);
   if (!raw || typeof raw !== "object") return fallback;

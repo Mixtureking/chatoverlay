@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
 import Sprint7Widgets from "./components/sprint7/Sprint7Widgets";
-import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./components/sprint7/sprint7State";
+import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, serializeSprint7StateToBase64, type Sprint7WidgetState } from "./components/sprint7/sprint7State";
 import { TRANSLATIONS } from "./translations";
 
 const HelpManual = lazy(() => import("./components/HelpManual"));
@@ -1676,10 +1676,7 @@ export default function App() {
   // OBS URL BUILDER COMPILER (Fulfills OBS Browser Source Dynamic Customization)
   const compileObsLink = (): string => {
     // Relying on root pathname '/' avoids path resolution errors and 404s on providers like Vercel
-    const origin = window.location.origin;
-    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
-      ? origin.replace("127.0.0.1", "localhost")
-      : "http://localhost:3000";
+    const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
     
     const config = {
       liveChatId: streamStatus.activeLiveChatId || localStorage.getItem("yt_last_connected_chat_id") || "SIMULATED",
@@ -1749,10 +1746,7 @@ export default function App() {
   };
 
   const compileObsTransitionLink = (): string => {
-    const origin = window.location.origin;
-    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
-      ? origin.replace("127.0.0.1", "localhost")
-      : "http://localhost:3000";
+    const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
     const config = {
       mode: "transition",
       apiKey: apiKey || "SANDBOX_MOCK_DRIVEN",
@@ -1779,10 +1773,12 @@ export default function App() {
   };
 
   const compileObsSprint7Link = (route: string) => {
-    const origin = window.location.origin;
-    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
-      ? origin.replace("127.0.0.1", "localhost")
-      : "http://localhost:3000";
+    const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
+    const localState = loadPersistedSprint7WidgetState();
+    if (localState) {
+      const b64 = serializeSprint7StateToBase64(localState);
+      return `${rootUrl}/${route}?ob=${b64}`;
+    }
     return `${rootUrl}/${route}`;
   };
 

@@ -101,3 +101,31 @@ export function parseSprint7FullState(raw: string): Sprint7FullState {
   }
   return createSprint7FullState(parsed);
 }
+
+export function serializeSprint7StateToBase64(state: Sprint7WidgetState): string {
+  try {
+    const jsonStr = JSON.stringify(state);
+    const utf8String = encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+      return String.fromCharCode(parseInt(p1, 16));
+    });
+    return btoa(utf8String).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+export function parseSprint7StateFromBase64(base64: string): Sprint7WidgetState | null {
+  try {
+    let normalized = base64.replace(/-/g, "+").replace(/_/g, "/");
+    while (normalized.length % 4) normalized += "=";
+    const binary = atob(normalized);
+    const utf8String = decodeURIComponent(
+      Array.prototype.map.call(binary, (c: string) => {
+        return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join("")
+    );
+    return JSON.parse(utf8String);
+  } catch {
+    return null;
+  }
+}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Download, Upload, Timer, CircleDot, MessageSquare, Link2, ListTodo, Palette, CheckCircle2, Clock, Users, ExternalLink, Sparkles } from "lucide-react";
-import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, serializeSprint7StateToBase64, type Sprint7WidgetState } from "./sprint7State";
 
 interface Sprint7DashboardProps {
   state: Sprint7WidgetState;
@@ -13,9 +13,7 @@ const inputCls = "w-full bg-slate-950/70 border border-white/[0.08] rounded-xl p
 const sectionTitle = "text-[11px] font-semibold uppercase tracking-[0.15em] flex items-center gap-2";
 
 export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
-  const rootUrl = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-    ? window.location.origin.replace("127.0.0.1", "localhost")
-    : "http://localhost:3000";
+  const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
 
   // ---- Local draft states ----
   const [wheelUsersInput, setWheelUsersInput] = useState((state.wheelUsers || []).join(", "));
@@ -91,7 +89,22 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
   // ---- Copy OBS link ----
   const handleCopy = (route: string, label: string) => {
-    navigator.clipboard.writeText(`${rootUrl}/${route}`);
+    const parsedSec = Number.parseInt(timerSec, 10);
+    const finalSec = Number.isFinite(parsedSec) && parsedSec >= 0 ? parsedSec : 300;
+    const finalDoneText = timerDoneText || "Time is up";
+    const finalWheelUsers = wheelUsersInput.split(",").map(s => s.trim()).filter(Boolean);
+
+    const config = {
+      todoList: state.todoList,
+      customCSS: cssDraft,
+      socialLinks: state.socialLinks,
+      timerSeconds: finalSec,
+      timerDoneText: finalDoneText,
+      wheelUsers: finalWheelUsers,
+    };
+
+    const b64 = serializeSprint7StateToBase64(config);
+    navigator.clipboard.writeText(`${rootUrl}/${route}?ob=${b64}`);
     flash(`✅ Đã sao chép link ${label}!`);
   };
 
