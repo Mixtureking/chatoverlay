@@ -4,6 +4,13 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.6] - 2026-06-09
+
+### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
+- **Sửa triệt để lỗi sập Serverless Function trên Vercel (FUNCTION_INVOCATION_FAILED)**: Giải quyết dứt điểm lỗi nạp module `.ts` bằng kỹ thuật **Pre-Bundling**. Đã di chuyển mã nguồn TypeScript của API về `src/server/api.ts` và tự động biên dịch bằng `esbuild` thành một file JavaScript thuần tự chứa `api/index.js` (dạng ESM, inlined đầy đủ logic của `createApiApp` và `chatInteractivity`) mỗi khi chạy build. Việc đẩy trực tiếp file `api/index.js` đã đóng gói lên Git giúp Vercel thực thi tức thì dưới dạng JS thuần mà không gặp bất kỳ lỗi biên dịch hay định dạng TypeScript nào ở môi trường đám mây.
+
+---
+
 ## [1.0.5] - 2026-06-09
 
 ### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
