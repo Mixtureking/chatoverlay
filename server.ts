@@ -294,11 +294,21 @@ app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"
         };
       }
 
+      const cleanMessageText = sanitizeHtml(snippet.textMessageDetails?.messageText || snippet.displayMessage || "");
+      const channelId = author.channelId || author.displayName || "anonymous";
+
+      if (cleanMessageText.trim().startsWith("!")) {
+        const cmd = parseChatCommand(cleanMessageText);
+        if (cmd && cmd.type === "vote") {
+          castVote(channelId, cmd.option);
+        }
+      }
+
       return {
         id: item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         authorName: sanitizeHtml(author.displayName || "Viewer"),
         authorPhotoUrl: author.profileImageUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80",
-        messageText: sanitizeHtml(snippet.textMessageDetails?.messageText || snippet.displayMessage || ""),
+        messageText: cleanMessageText,
         isModerator: !!author.isChatModerator,
         isOwner: !!author.isChatOwner,
         isSponsor: !!author.isChatSponsor,
