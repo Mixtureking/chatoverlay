@@ -1,23 +1,16 @@
 import React, { memo } from "react";
-import { 
-  motion, 
-  AnimatePresence 
-} from "motion/react";
-import { 
-  MessageSquare, 
-  Settings, 
-  Sparkles, 
+import { motion, AnimatePresence } from "motion/react";
+import {
+  MessageSquare,
+  Settings,
+  Sparkles,
   ChevronLeft,
-  ChevronRight,
-  Monitor,
-  Video,
-  Languages,
-  Sliders
+  Sliders,
 } from "lucide-react";
 
 interface SidebarNavigatorProps {
-  activeRoute: "chat_overlay" | "screen_transition" | "settings";
-  setActiveRoute: (route: "chat_overlay" | "screen_transition" | "settings") => void;
+  activeRoute: "chat_overlay" | "screen_transition" | "settings" | "sprint7";
+  setActiveRoute: (route: "chat_overlay" | "screen_transition" | "settings" | "sprint7") => void;
   isOpen: boolean;
   onClose: () => void;
   language: "vi" | "en";
@@ -32,20 +25,20 @@ const SidebarNavigator = memo(function SidebarNavigator({
   language = "vi",
   accentColor,
 }: SidebarNavigatorProps) {
-
-  // Translate static navigation labels
   const text = {
-    title: language === "vi" ? "ĐIỀU HƯỚNG CHÍNH" : "MAIN NAVIGATION",
-    subTitle: language === "vi" ? "Trung tâm điều khiển" : "Dashboard controls",
+    title: language === "vi" ? "DIEU HUONG CHINH" : "MAIN NAVIGATION",
+    subTitle: language === "vi" ? "Trung tam dieu khien" : "Dashboard controls",
     chatOverlay: language === "vi" ? "Khung Chat Overlay" : "Chat Overlay Setup",
-    chatOverlayDesc: language === "vi" ? "Kết nối & Tùy biến phông chữ, màu sắc" : "Connection & typography styling",
-    screenTransition: language === "vi" ? "Hiệu ứng chuyển trang" : "Screen Transition",
-    screenTransitionDesc: language === "vi" ? "Tùy biến hiệu ứng đổi tab & chuyển đổi" : "Tab switching shutter/fade choices",
-    settings: language === "vi" ? "Cấu hình chung" : "General Settings",
-    settingsDesc: language === "vi" ? "Ngôn ngữ, màu sắc, âm lượng chuông" : "Language, dashboard colors & volume",
-    activeLabel: language === "vi" ? "Đang chọn" : "Active",
-    collapse: language === "vi" ? "Thu gọn menu" : "Collapse menu",
-    systemStatus: language === "vi" ? "HỆ THỐNG TRỰC TUYẾN" : "SYSTEM ONLINE",
+    chatOverlayDesc: language === "vi" ? "Ket noi & tuy bien phong chu, mau sac" : "Connection & typography styling",
+    screenTransition: language === "vi" ? "Hieu ung chuyen trang" : "Screen Transition",
+    screenTransitionDesc: language === "vi" ? "Tuy bien hieu ung doi tab & chuyen doi" : "Tab switching shutter/fade choices",
+    settings: language === "vi" ? "Cau hinh chung" : "General Settings",
+    settingsDesc: language === "vi" ? "Ngon ngu, mau sac, am luong chuong" : "Language, dashboard colors & volume",
+    sprint7: "Sprint 7 Test",
+    sprint7Desc: language === "vi" ? "Test vote, wheel, timer, todo, social" : "Quick test for vote, wheel, timer, todo, social",
+    activeLabel: language === "vi" ? "Dang chon" : "Active",
+    collapse: language === "vi" ? "Thu gon menu" : "Collapse menu",
+    systemStatus: language === "vi" ? "HE THONG TRUC TUYEN" : "SYSTEM ONLINE",
   };
 
   const navItems = [
@@ -61,14 +54,21 @@ const SidebarNavigator = memo(function SidebarNavigator({
       title: text.screenTransition,
       desc: text.screenTransitionDesc,
       icon: Sparkles,
-      color: "#ec4899", // magenta accent
+      color: "#ec4899",
     },
     {
       id: "settings" as const,
       title: text.settings,
       desc: text.settingsDesc,
       icon: Settings,
-      color: "#14b8a6", // teal accent
+      color: "#14b8a6",
+    },
+    {
+      id: "sprint7" as const,
+      title: text.sprint7,
+      desc: text.sprint7Desc,
+      icon: Sliders,
+      color: "#f59e0b",
     },
   ];
 
@@ -83,13 +83,9 @@ const SidebarNavigator = memo(function SidebarNavigator({
           className="w-[280px] sm:w-[300px] h-full bg-slate-950 border-r border-slate-800/80 flex flex-col z-30 relative shadow-2xl shrink-0 pointer-events-auto"
           id="main-sidebar-navigation-bar"
         >
-          {/* Header Panel */}
           <div className="p-4 border-b border-slate-900/90 bg-slate-900/40 shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div 
-                className="w-2.5 h-2.5 rounded-full md:animate-pulse" 
-                style={{ backgroundColor: accentColor }} 
-              />
+              <div className="w-2.5 h-2.5 rounded-full md:animate-pulse" style={{ backgroundColor: accentColor }} />
               <div className="min-w-0">
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
                   {text.title}
@@ -100,7 +96,6 @@ const SidebarNavigator = memo(function SidebarNavigator({
               </div>
             </div>
 
-            {/* Collapse switch button */}
             <button
               type="button"
               onClick={onClose}
@@ -112,7 +107,6 @@ const SidebarNavigator = memo(function SidebarNavigator({
             </button>
           </div>
 
-          {/* Navigation Items List */}
           <div className="flex-1 p-3 space-y-2 overflow-y-auto custom-scrollbar" id="sidebar-navigator-links-container">
             {navItems.map((item) => {
               const isActive = activeRoute === item.id;
@@ -124,13 +118,12 @@ const SidebarNavigator = memo(function SidebarNavigator({
                   type="button"
                   onClick={() => setActiveRoute(item.id)}
                   className={`w-full text-left p-3.5 rounded-xl transition-all cursor-pointer duration-200 border flex items-start gap-3 relative overflow-hidden group ${
-                    isActive 
-                      ? "bg-slate-900 border-slate-800/80 shadow-md" 
+                    isActive
+                      ? "bg-slate-900 border-slate-800/80 shadow-md"
                       : "bg-transparent border-transparent hover:bg-slate-900/30 hover:border-slate-900 text-slate-400 hover:text-slate-200"
                   }`}
                   id={`nav-item-btn-${item.id}`}
                 >
-                  {/* Subtle active tab edge glow line */}
                   {isActive && (
                     <motion.div
                       layoutId="sidebarActiveBgBar"
@@ -139,11 +132,10 @@ const SidebarNavigator = memo(function SidebarNavigator({
                     />
                   )}
 
-                  {/* Icon layer */}
-                  <div 
+                  <div
                     className={`p-2.5 rounded-lg transition-all ${
-                      isActive 
-                        ? "text-white" 
+                      isActive
+                        ? "text-white"
                         : "bg-slate-900/50 text-slate-500 group-hover:text-slate-350"
                     }`}
                     style={isActive ? { backgroundColor: item.color } : {}}
@@ -151,7 +143,6 @@ const SidebarNavigator = memo(function SidebarNavigator({
                     <IconComponent className="w-4 h-4 shrink-0" />
                   </div>
 
-                  {/* Content textual info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-black tracking-wide uppercase transition-colors ${isActive ? "text-slate-100" : "text-slate-300"}`}>
@@ -172,14 +163,13 @@ const SidebarNavigator = memo(function SidebarNavigator({
             })}
           </div>
 
-          {/* Footer Branding panel */}
           <div className="p-4 border-t border-slate-900/90 bg-slate-900/20 text-center shrink-0" id="sidebar-navigator-footer">
             <div className="flex items-center justify-center gap-1.5 text-[8px] font-bold text-slate-500 tracking-widest uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 md:animate-ping inline-block" />
               <span>{text.systemStatus}</span>
             </div>
             <div className="font-mono text-[9px] text-slate-600 mt-1 font-semibold">
-              v1.0.2 • Electron-Safe • OBS Ready
+              v1.0.3 • Electron-Safe • OBS Ready
             </div>
           </div>
         </motion.div>

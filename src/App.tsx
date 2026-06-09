@@ -921,7 +921,7 @@ export default function App() {
   });
 
   // UI Tabs & Configurations
-  const [activeMainRoute, setActiveMainRoute] = useState<"chat_overlay" | "screen_transition" | "settings">("chat_overlay");
+  const [activeMainRoute, setActiveMainRoute] = useState<"chat_overlay" | "screen_transition" | "settings" | "sprint7">("chat_overlay");
   const [activeTab, setActiveTab] = useState<string>("connect");
   const [newKeyword, setNewKeyword] = useState("");
   const [newKeywordIsRegex, setNewKeywordIsRegex] = useState(false);
@@ -4512,6 +4512,12 @@ export default function App() {
           showToast={showToast}
           accentColor={currentAccent}
         />
+      )}
+
+      {activeMainRoute === "sprint7" && (
+        <div className="w-full h-full overflow-hidden">
+          <Sprint7Widgets />
+        </div>
       )}
     </ScreenTransition>
           </Suspense>
