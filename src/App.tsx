@@ -1665,7 +1665,10 @@ export default function App() {
   // OBS URL BUILDER COMPILER (Fulfills OBS Browser Source Dynamic Customization)
   const compileObsLink = (): string => {
     // Relying on root pathname '/' avoids path resolution errors and 404s on providers like Vercel
-    const rootUrl = window.location.origin;
+    const origin = window.location.origin;
+    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
+      ? origin.replace("127.0.0.1", "localhost")
+      : "http://localhost:3000";
     
     const config = {
       liveChatId: streamStatus.activeLiveChatId || localStorage.getItem("yt_last_connected_chat_id") || "SIMULATED",
@@ -1735,7 +1738,10 @@ export default function App() {
   };
 
   const compileObsTransitionLink = (): string => {
-    const rootUrl = window.location.origin;
+    const origin = window.location.origin;
+    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
+      ? origin.replace("127.0.0.1", "localhost")
+      : "http://localhost:3000";
     const config = {
       mode: "transition",
       apiKey: apiKey || "SANDBOX_MOCK_DRIVEN",
@@ -1762,7 +1768,10 @@ export default function App() {
   };
 
   const compileObsSprint7Link = (route: string) => {
-    const rootUrl = window.location.origin;
+    const origin = window.location.origin;
+    const rootUrl = origin.includes("localhost") || origin.includes("127.0.0.1")
+      ? origin.replace("127.0.0.1", "localhost")
+      : "http://localhost:3000";
     return `${rootUrl}/${route}`;
   };
 

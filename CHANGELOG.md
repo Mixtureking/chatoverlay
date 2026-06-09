@@ -4,6 +4,15 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.7] - 2026-06-09
+
+### 🚀 Tính năng nổi bật & Nâng cấp (Features & Enhancements)
+- **Đồng bộ mặc định link localhost cho OBS Browser Source**: Tất cả liên kết OBS Browser Source khi sao chép từ Dashboard (Live Chat, Screen Transition, Lucky Wheel, Timer, Social Links) đều tự động dùng tiền tố `http://localhost:3000` làm mặc định nếu Dashboard đang chạy ở môi trường ngoài (như Vercel), giúp OBS truy cập chính xác và chia sẻ dữ liệu `localStorage` trên máy local của streamer.
+- **Tự động lưu thiết lập Widget Sprint 7 (Auto-save)**: Kích hoạt cơ chế tự động lưu dữ liệu vào `localStorage` và phát tín hiệu qua Broadcast Channels ngay lập tức khi người dùng thay đổi dữ liệu của Timer (giây, thông báo hết giờ), Wheel Players (người chơi vòng quay) hay Custom CSS (sau khi mất trỏ chuột - `onBlur` hoặc nhấn `Enter`), không còn bắt buộc phải nhấn nút "Lưu tất cả" thủ công.
+- **Tối ưu hóa gõ phím trên Dashboard**: Sửa lỗi giật con trỏ chuột và reset nội dung đang gõ bằng cách so sánh giá trị cũ và mới trước khi đồng bộ draft state.
+
+---
+
 ## [1.0.6] - 2026-06-09
 
 ### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)

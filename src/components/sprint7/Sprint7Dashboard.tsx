@@ -13,7 +13,9 @@ const inputCls = "w-full bg-slate-950/70 border border-white/[0.08] rounded-xl p
 const sectionTitle = "text-[11px] font-semibold uppercase tracking-[0.15em] flex items-center gap-2";
 
 export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
-  const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
+  const rootUrl = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+    ? window.location.origin.replace("127.0.0.1", "localhost")
+    : "http://localhost:3000";
 
   // ---- Local draft states ----
   const [wheelUsersInput, setWheelUsersInput] = useState((state.wheelUsers || []).join(", "));
@@ -27,17 +29,64 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  // Sync drafts when state changes externally
+  // Sync drafts when state changes externally, avoiding cursor jumping on local typing
   useEffect(() => {
-    setWheelUsersInput((state.wheelUsers || []).join(", "));
-    setTimerSec(String(state.timerSeconds ?? 300));
-    setTimerDoneText(state.timerDoneText || "Time is up");
-    setCssDraft(state.customCSS || "");
-  }, [state.wheelUsers, state.timerSeconds, state.timerDoneText, state.customCSS]);
+    const nextWheelText = (state.wheelUsers || []).join(", ");
+    if (nextWheelText !== wheelUsersInput) {
+      setWheelUsersInput(nextWheelText);
+    }
+  }, [state.wheelUsers]);
+
+  useEffect(() => {
+    const nextTimerSec = String(state.timerSeconds ?? 300);
+    if (nextTimerSec !== timerSec) {
+      setTimerSec(nextTimerSec);
+    }
+  }, [state.timerSeconds]);
+
+  useEffect(() => {
+    const nextDoneText = state.timerDoneText || "Time is up";
+    if (nextDoneText !== timerDoneText) {
+      setTimerDoneText(nextDoneText);
+    }
+  }, [state.timerDoneText]);
+
+  useEffect(() => {
+    const nextCss = state.customCSS || "";
+    if (nextCss !== cssDraft) {
+      setCssDraft(nextCss);
+    }
+  }, [state.customCSS]);
 
   const flash = (msg: string) => {
     setSavedMsg(msg);
     setTimeout(() => setSavedMsg(null), 2500);
+  };
+
+  // Helper to sync specific values immediately to parent state & Broadcast Channels
+  const saveField = (key: "timer" | "wheel" | "css", val1: string, val2?: string) => {
+    const next = { ...state };
+    if (key === "timer") {
+      const parsedSec = Number.parseInt(val1, 10);
+      const finalSec = Number.isFinite(parsedSec) && parsedSec >= 0 ? parsedSec : 300;
+      const finalDoneText = val2 || "Time is up";
+      next.timerSeconds = finalSec;
+      next.timerDoneText = finalDoneText;
+
+      const timerChannel = new BroadcastChannel("sprint7_timer_channel");
+      timerChannel.postMessage({ type: "UPDATE_TIMER", seconds: finalSec, doneText: finalDoneText });
+      timerChannel.close();
+    } else if (key === "wheel") {
+      const finalWheelUsers = val1.split(",").map(s => s.trim()).filter(Boolean);
+      next.wheelUsers = finalWheelUsers;
+
+      const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
+      wheelChannel.postMessage({ type: "UPDATE_WHEEL", users: finalWheelUsers });
+      wheelChannel.close();
+    } else if (key === "css") {
+      next.customCSS = val1;
+    }
+    syncState(next);
   };
 
   // ---- Copy OBS link ----
@@ -276,11 +325,28 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   </h4>
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">Thời gian (giây)</label>
-                    <input type="number" className={inputCls} value={timerSec} onChange={(e) => setTimerSec(e.target.value)} placeholder="300" min={0} />
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={timerSec}
+                      onChange={(e) => setTimerSec(e.target.value)}
+                      onBlur={() => saveField("timer", timerSec, timerDoneText)}
+                      onKeyDown={(e) => e.key === "Enter" && saveField("timer", timerSec, timerDoneText)}
+                      placeholder="300"
+                      min={0}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">Thông báo khi hết giờ</label>
-                    <input type="text" className={inputCls} value={timerDoneText} onChange={(e) => setTimerDoneText(e.target.value)} placeholder="Thời gian đã kết thúc" />
+                    <input
+                      type="text"
+                      className={inputCls}
+                      value={timerDoneText}
+                      onChange={(e) => setTimerDoneText(e.target.value)}
+                      onBlur={() => saveField("timer", timerSec, timerDoneText)}
+                      onKeyDown={(e) => e.key === "Enter" && saveField("timer", timerSec, timerDoneText)}
+                      placeholder="Thời gian đã kết thúc"
+                    />
                   </div>
                 </div>
 
@@ -291,7 +357,14 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   </h4>
                   <div className="space-y-1.5">
                     <label className="text-[11px] text-slate-400 font-medium">Tên người chơi, cách nhau bởi dấu phẩy</label>
-                    <textarea className={`${inputCls} resize-y min-h-[68px]`} value={wheelUsersInput} onChange={(e) => setWheelUsersInput(e.target.value)} rows={3} placeholder="Doro, An, Bình, Chi, Dung..." />
+                    <textarea
+                      className={`${inputCls} resize-y min-h-[68px]`}
+                      value={wheelUsersInput}
+                      onChange={(e) => setWheelUsersInput(e.target.value)}
+                      onBlur={() => saveField("wheel", wheelUsersInput)}
+                      rows={3}
+                      placeholder="Doro, An, Bình, Chi, Dung..."
+                    />
                   </div>
                   <p className="text-[10px] text-slate-500 flex items-center gap-1.5">
                     <CircleDot className="w-3 h-3 text-violet-400" />
@@ -403,6 +476,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   rows={5}
                   value={cssDraft}
                   onChange={(e) => setCssDraft(e.target.value)}
+                  onBlur={() => saveField("css", cssDraft)}
                   placeholder="/* Nhập CSS tùy chỉnh ở đây... */"
                 />
                 <p className="text-[10px] text-slate-500 pl-0.5">CSS chỉ được áp dụng khi cú pháp hợp lệ. Cú pháp sai sẽ được bỏ qua an toàn.</p>
