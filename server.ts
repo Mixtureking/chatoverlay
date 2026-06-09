@@ -426,8 +426,10 @@ app.use((err: any, req: any, res: any, next: any) => {
 // Vite & Static file handler initialization for local development and standalone/Electron environments
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const viteModule = "vite";
-    const { createServer: createViteServer } = await import(viteModule);
+    // Use new Function to completely hide "vite" from Vercel NFT / esbuild static analysis.
+    // This prevents the serverless bundler from pulling in vite + esbuild + rollup native modules.
+    const dynamicImport = new Function("m", "return import(m)") as (m: string) => Promise<any>;
+    const { createServer: createViteServer } = await dynamicImport("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

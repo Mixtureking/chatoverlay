@@ -8,10 +8,13 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
 - **Hiển thị Overlay**: Hoàn thành hiển thị giao diện trực quan cho Wheel (Vòng quay), Timer (Đếm ngược thời gian) và Social links (Đường dẫn mạng xã hội).
+- **Thiết kế lại toàn bộ giao diện Sprint 7 Dashboard**: Nâng cấp từ giao diện cơ bản sang thiết kế glassmorphism hiện đại với gradient accent neon xanh-tím-hồng, card OBS link có hiệu ứng hover scale, section settings tổ chức rõ ràng theo nhóm chức năng, todo checkbox tùy chỉnh, social link hiển thị nút thao tác khi hover, toast thông báo dạng floating với animation slide-up, và bảng màu chuyên nghiệp tối ưu cho dark mode.
+- **Gỡ bỏ Social Links trùng lặp**: Xóa khối Social Links thừa ở đầu trang Sprint 7 Dashboard, giữ lại duy nhất phần quản lý link trong panel Settings.
 
 ### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
 - **Đồng bộ link localhost**: Sửa lỗi lưu trữ link bị sai lệch khi chạy trên `127.0.0.1`, đảm bảo link OBS trên web và trên livestream luôn hiển thị thống nhất là `localhost`.
-- **Sửa lỗi sập Serverless Function trên Vercel**: Ẩn module `vite` khỏi hệ thống phân tích tĩnh Vercel NFT (Node File Trace) để tránh bundle các native module nặng, đồng thời tắt tự động ghi file log `server_logs.txt` trên môi trường đám mây nhằm giải quyết triệt để lỗi `FUNCTION_INVOCATION_FAILED` (HTTP 500).
+- **Sửa triệt để lỗi sập Serverless Function trên Vercel (FUNCTION_INVOCATION_FAILED)**: Áp dụng 3 lớp bảo vệ đồng thời: (1) Sử dụng pattern `new Function('m','return import(m)')` để ẩn hoàn toàn module `vite` khỏi mọi static analysis bundler, (2) di chuyển `vite`, `@vitejs/plugin-react`, `@tailwindcss/vite` từ `dependencies` sang `devDependencies` để không cài đặt tại runtime serverless, (3) thêm cấu hình `excludeFiles` trong `vercel.json` loại bỏ dứt khoát các folder `vite`, `esbuild`, `rollup`, `fsevents`, `electron` ra khỏi bundle function.
+- **Tắt ghi file log trên môi trường đám mây**: Bỏ qua `fs.appendFileSync` khi phát hiện biến môi trường `VERCEL` để tránh lỗi ghi file trên hệ thống file chỉ-đọc của Lambda.
 
 ---
 

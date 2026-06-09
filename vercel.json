@@ -1,6 +1,11 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "functions": {
+    "api/index.ts": {
+      "excludeFiles": "{node_modules/vite/**,node_modules/@vitejs/**,node_modules/@tailwindcss/**,node_modules/esbuild/**,node_modules/rollup/**,node_modules/fsevents/**,node_modules/electron/**}"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

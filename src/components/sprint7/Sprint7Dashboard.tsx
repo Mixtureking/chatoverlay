@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Download, Upload, ClipboardCopy } from "lucide-react";
+import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Download, Upload, Timer, CircleDot, MessageSquare, Link2, ListTodo, Palette, CheckCircle2, Clock, Users, ExternalLink, Sparkles } from "lucide-react";
 import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
 
 interface Sprint7DashboardProps {
@@ -7,15 +7,13 @@ interface Sprint7DashboardProps {
   syncState: (next: Sprint7WidgetState) => void;
 }
 
-const inputCls = "bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500 transition-colors";
-const btnPrimary = "bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors";
-const btnSecondary = "bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700";
-const btnDanger = "bg-rose-700/60 hover:bg-rose-600 text-white font-semibold py-1.5 px-3 rounded-lg text-[11px] flex items-center gap-1.5 transition-colors";
-const btnAccent = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors";
+/* ─────────── Shared style tokens ─────────── */
+const glassCard = "relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 backdrop-blur-sm shadow-xl";
+const inputCls = "w-full bg-slate-950/70 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-[13px] text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50 transition-all duration-200";
+const sectionTitle = "text-[11px] font-semibold uppercase tracking-[0.15em] flex items-center gap-2";
 
 export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
-  const rootFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
 
   // ---- Local draft states ----
   const [wheelUsersInput, setWheelUsersInput] = useState((state.wheelUsers || []).join(", "));
@@ -39,13 +37,13 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
   const flash = (msg: string) => {
     setSavedMsg(msg);
-    setTimeout(() => setSavedMsg(null), 2000);
+    setTimeout(() => setSavedMsg(null), 2500);
   };
 
   // ---- Copy OBS link ----
   const handleCopy = (route: string, label: string) => {
     navigator.clipboard.writeText(`${rootUrl}/${route}`);
-    flash(`Copied ${label} link!`);
+    flash(`✅ Đã sao chép link ${label}!`);
   };
 
   // ---- Spin wheel ----
@@ -53,7 +51,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     const channel = new BroadcastChannel("sprint7_wheel_channel");
     channel.postMessage({ type: "SPIN" });
     channel.close();
-    flash("Wheel spin sent!");
+    flash("🎡 Đã gửi lệnh quay!");
   };
 
   // ---- Save all settings ----
@@ -75,7 +73,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
     wheelChannel.postMessage({ type: "UPDATE_WHEEL", users: finalWheelUsers });
     wheelChannel.close();
-    flash("All settings saved.");
+    flash("💾 Đã lưu tất cả thiết lập!");
   };
 
   // ---- Todo helpers ----
@@ -146,7 +144,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    flash("Configuration exported.");
+    flash("📦 Đã xuất cấu hình!");
   };
   const importState = async (file: File | null) => {
     if (!file) return;
@@ -154,257 +152,301 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       const raw = await file.text();
       const parsed = parseSprint7FullState(raw);
       syncState(createSprint7WidgetState({ ...state, todoList: parsed.todoList, customCSS: parsed.customCSS, socialLinks: parsed.socialLinks }));
-      flash("Configuration imported.");
+      flash("📥 Đã nhập cấu hình thành công!");
     } catch {
-      flash("Invalid file.");
+      flash("❌ File không hợp lệ.");
     }
   };
   const resetAll = () => {
     syncState(createSprint7WidgetState());
-    flash("Everything reset.");
+    flash("🔄 Đã reset toàn bộ!");
   };
 
+  /* ─────────── OBS Link Card ─────────── */
+  const ObsLinkCard = ({ emoji, title, desc, route, gradient, extra }: {
+    emoji: string; title: string; desc: string; route: string; gradient: string; extra?: React.ReactNode;
+  }) => (
+    <div className={`${glassCard} group hover:scale-[1.02] transition-all duration-300`}>
+      {/* Gradient accent line at top */}
+      <div className={`h-[2px] w-full ${gradient}`} />
+      <div className="p-4 flex flex-col h-full">
+        <div className="flex items-center gap-2.5 mb-2">
+          <span className="text-xl select-none">{emoji}</span>
+          <h3 className="font-bold text-white text-sm tracking-wide">{title}</h3>
+        </div>
+        <p className="text-[11px] text-slate-400 mb-3 flex-1 leading-relaxed">{desc}</p>
+        <div className="font-mono text-[10px] text-slate-500 break-all p-2 bg-black/30 rounded-lg border border-white/[0.04] mb-3 select-all">
+          {rootUrl}/{route}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleCopy(route, title)}
+            className="flex-1 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-white font-semibold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 hover:border-white/[0.15]"
+          >
+            <Copy className="w-3.5 h-3.5" /> Sao chép
+          </button>
+          {extra}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="w-full h-full overflow-y-auto bg-slate-950 text-slate-100" style={rootFontStyle}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-12">
+    <div className="w-full h-full overflow-y-auto bg-[#0a0a12] text-slate-100" style={{ fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif' }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-16">
 
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">Link</span>
-            <h3 className="font-bold text-amber-300">Social Links</h3>
-          </div>
-          <p className="text-xs text-slate-400 mb-4 flex-1">Links shown in OBS. Enter URLs and copy them.</p>
-          <div className="space-y-2">
-            {Object.entries(state.socialLinks).map(([key, url]) => (
-              <div key={key} className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950 p-2">
-                <label className="text-xs font-bold text-slate-400 w-16 capitalize">{key}</label>
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => {
-                    const newLinks = { ...state.socialLinks, [key]: e.target.value };
-                    syncState({ ...state, socialLinks: newLinks });
-                  }}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(url);
-                    alert("Copied link " + key);
-                  }}
-                  className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-1 px-2 rounded text-xs"
-                >Copy</button>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-cyan-300 underline underline-offset-2 break-all"
-                >
-                  {url}
-                </a>
-              </div>
-            ))}
+        {/* ═══════════ HEADER ═══════════ */}
+        <div className={`${glassCard} p-6`}>
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/[0.07] via-fuchsia-500/[0.05] to-cyan-500/[0.07]" />
+          <div className="relative flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Khu thử nghiệm Sprint 7</h2>
+              <p className="text-sm text-slate-400 mt-0.5">Quản lý widget tương tác OBS — Wheel, Timer, Todo, Social Links & CSS Editor</p>
+            </div>
           </div>
         </div>
+
+        {/* ═══════════ OBS ROUTE CARDS ═══════════ */}
         <div>
-          <h2 className="text-xl font-bold text-amber-400">Sprint 7 Lab</h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Manage settings and copy OBS links for the minigames and interaction tools.
-          </p>
-        </div>
-
-        {/* ========== OBS LINKS ========== */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">Chat</span>
-              <h3 className="font-bold text-amber-300 text-sm">Chat MiniGame & Vote</h3>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-3 flex-1">Chat overlay with A/B voting.</p>
-            <div className="font-mono text-[10px] text-slate-400 break-all p-1.5 bg-slate-950 rounded border border-slate-800 mb-2">{rootUrl}/obs-chat</div>
-            <button onClick={() => handleCopy("obs-chat", "Chat")} className={btnPrimary}>
-              <Copy className="w-3.5 h-3.5" /> Copy Link
-            </button>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">Wheel</span>
-              <h3 className="font-bold text-amber-300 text-sm">Lucky Wheel</h3>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-3 flex-1">Lucky wheel. Click the center or press spin.</p>
-            <div className="font-mono text-[10px] text-slate-400 break-all p-1.5 bg-slate-950 rounded border border-slate-800 mb-2">{rootUrl}/obs-wheel</div>
-            <div className="flex gap-2">
-              <button onClick={() => handleCopy("obs-wheel", "Wheel")} className={`flex-1 ${btnPrimary}`}>
-                <Copy className="w-3.5 h-3.5" /> Copy
-              </button>
-              <button onClick={handleSpinWheel} className={`flex-1 ${btnAccent}`}>
-                <Dices className="w-3.5 h-3.5" /> Spin
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">Links</span>
-              <h3 className="font-bold text-amber-300 text-sm">OBS Links</h3>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-3 flex-1">Social link page for OBS.</p>
-            <div className="font-mono text-[10px] text-slate-400 break-all p-1.5 bg-slate-950 rounded border border-slate-800 mb-2">{rootUrl}/obs-link</div>
-            <button onClick={() => handleCopy("obs-link", "OBS Links")} className={btnPrimary}>
-              <Copy className="w-3.5 h-3.5" /> Copy Link
-            </button>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">Timer</span>
-              <h3 className="font-bold text-amber-300 text-sm">Countdown & Todo</h3>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-3 flex-1">Countdown timer and todo list.</p>
-            <div className="font-mono text-[10px] text-slate-400 break-all p-1.5 bg-slate-950 rounded border border-slate-800 mb-2">{rootUrl}/obs-timer</div>
-            <button onClick={() => handleCopy("obs-timer", "Timer")} className={btnPrimary}>
-              <Copy className="w-3.5 h-3.5" /> Copy Link
-            </button>
-          </div>
-        </div>
-
-        {/* ========== SETTINGS ========== */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-            <h3 className="font-bold text-amber-300 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
-            <Save className="w-4 h-4" /> Settings
+          <h3 className={`${sectionTitle} text-slate-400 mb-3 pl-1`}>
+            <ExternalLink className="w-3.5 h-3.5" /> Đường dẫn OBS Browser Source
           </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <ObsLinkCard
+              emoji="💬"
+              title="Chat & Vote"
+              desc="Overlay chat với bầu chọn A/B, roulette, todo, social links."
+              route="obs-chat"
+              gradient="bg-gradient-to-r from-blue-500 to-cyan-400"
+            />
+            <ObsLinkCard
+              emoji="🎡"
+              title="Lucky Wheel"
+              desc="Vòng quay may mắn. Nhấn Spin hoặc click vào tâm vòng quay."
+              route="obs-wheel"
+              gradient="bg-gradient-to-r from-violet-500 to-fuchsia-500"
+              extra={
+                <button
+                  onClick={handleSpinWheel}
+                  className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-violet-500/20"
+                >
+                  <Dices className="w-3.5 h-3.5" /> Quay
+                </button>
+              }
+            />
+            <ObsLinkCard
+              emoji="🔗"
+              title="Social Links"
+              desc="Trang hiển thị liên kết mạng xã hội dạng marquee."
+              route="obs-link"
+              gradient="bg-gradient-to-r from-amber-500 to-orange-500"
+            />
+            <ObsLinkCard
+              emoji="⏱️"
+              title="Timer & Todo"
+              desc="Đồng hồ đếm ngược và danh sách nhiệm vụ."
+              route="obs-timer"
+              gradient="bg-gradient-to-r from-emerald-500 to-teal-500"
+            />
+          </div>
+        </div>
 
-          <div className="space-y-6">
+        {/* ═══════════ SETTINGS PANEL ═══════════ */}
+        <div className={glassCard}>
+          <div className="h-[2px] w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
+          <div className="p-5 sm:p-6">
+            <h3 className="font-bold text-white mb-6 flex items-center gap-2.5 text-sm">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-md shadow-violet-500/20">
+                <Save className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="tracking-wide">Cài đặt Widget</span>
+            </h3>
 
-            {/* Timer & Wheel Settings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Timer */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Timer</h4>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] text-slate-400">Seconds</label>
-                  <input type="number" className={inputCls} value={timerSec} onChange={(e) => setTimerSec(e.target.value)} placeholder="300" min={0} />
+            <div className="space-y-7">
+
+              {/* ──── Timer & Wheel ──── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Timer */}
+                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                  <h4 className={`${sectionTitle} text-cyan-400`}>
+                    <Clock className="w-3.5 h-3.5" /> Bộ đếm ngược
+                  </h4>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">Thời gian (giây)</label>
+                    <input type="number" className={inputCls} value={timerSec} onChange={(e) => setTimerSec(e.target.value)} placeholder="300" min={0} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">Thông báo khi hết giờ</label>
+                    <input type="text" className={inputCls} value={timerDoneText} onChange={(e) => setTimerDoneText(e.target.value)} placeholder="Thời gian đã kết thúc" />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] text-slate-400">Finish message</label>
-                  <input type="text" className={inputCls} value={timerDoneText} onChange={(e) => setTimerDoneText(e.target.value)} placeholder="Time is up" />
+
+                {/* Wheel Users */}
+                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                  <h4 className={`${sectionTitle} text-violet-400`}>
+                    <Users className="w-3.5 h-3.5" /> Người chơi Wheel
+                  </h4>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-slate-400 font-medium">Tên người chơi, cách nhau bởi dấu phẩy</label>
+                    <textarea className={`${inputCls} resize-y min-h-[68px]`} value={wheelUsersInput} onChange={(e) => setWheelUsersInput(e.target.value)} rows={3} placeholder="Doro, An, Bình, Chi, Dung..." />
+                  </div>
+                  <p className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                    <CircleDot className="w-3 h-3 text-violet-400" />
+                    Hiện có <span className="text-violet-300 font-semibold">{(state.wheelUsers || []).length}</span> người chơi
+                  </p>
                 </div>
               </div>
 
-              {/* Wheel Users */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider">Wheel users</h4>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] text-slate-400">Player names, separated by commas</label>
-                  <textarea className={`${inputCls} resize-y min-h-[60px]`} value={wheelUsersInput} onChange={(e) => setWheelUsersInput(e.target.value)} rows={3} placeholder="Doro, An, Binh, Chi, Dung..." />
+              {/* ──── Todo List ──── */}
+              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <h4 className={`${sectionTitle} text-emerald-400`}>
+                  <ListTodo className="w-3.5 h-3.5" /> Danh sách nhiệm vụ
+                </h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className={`${inputCls} flex-1`}
+                    value={newTodoText}
+                    onChange={(e) => setNewTodoText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addTodo()}
+                    placeholder="Nhập nhiệm vụ mới..."
+                  />
+                  <button onClick={addTodo} className="bg-emerald-600/80 hover:bg-emerald-500 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all duration-200 shrink-0">
+                    <Plus className="w-3.5 h-3.5" /> Thêm
+                  </button>
+                  {state.todoList.length > 0 && (
+                    <button onClick={clearTodos} className="bg-rose-600/40 hover:bg-rose-500/60 text-rose-200 font-semibold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-all duration-200 shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" /> Xóa hết
+                    </button>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  Current: <span className="text-slate-300">{(state.wheelUsers || []).length} users</span>
-                </p>
+                {state.todoList.length > 0 && (
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
+                    {state.todoList.map((todo) => (
+                      <div key={todo.id} className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 transition-all duration-200 ${todo.completed ? "bg-emerald-500/[0.06] border border-emerald-500/10" : "bg-slate-950/50 border border-white/[0.04] hover:border-white/[0.08]"}`}>
+                        <button onClick={() => toggleTodo(todo.id)} className="shrink-0">
+                          {todo.completed ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full border-2 border-slate-600 hover:border-emerald-400 transition-colors" />
+                          )}
+                        </button>
+                        <input
+                          className={`flex-1 bg-transparent text-[13px] text-slate-200 outline-none ${todo.completed ? "line-through opacity-40" : ""}`}
+                          value={todoDrafts[todo.id] ?? todo.text}
+                          onChange={(e) => setTodoDrafts(prev => ({ ...prev, [todo.id]: e.target.value }))}
+                          onBlur={() => saveTodoText(todo.id)}
+                        />
+                        <button onClick={() => deleteTodo(todo.id)} className="text-slate-600 hover:text-rose-400 p-0.5 transition-colors shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {state.todoList.length === 0 && (
+                  <p className="text-[11px] text-slate-500 italic pl-1">Chưa có nhiệm vụ nào.</p>
+                )}
               </div>
-            </div>
 
-            {/* Todo List Management */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Todo list</h4>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className={`${inputCls} flex-1`}
-                  value={newTodoText}
-                  onChange={(e) => setNewTodoText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTodo()}
-                  placeholder="Type a todo item..."
+              {/* ──── Social Links ──── */}
+              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <h4 className={`${sectionTitle} text-amber-400`}>
+                  <Link2 className="w-3.5 h-3.5" /> Liên kết mạng xã hội
+                </h4>
+                <div className="flex gap-2">
+                  <input type="text" className={`${inputCls} w-28 shrink-0`} value={newLinkKey} onChange={(e) => setNewLinkKey(e.target.value)} placeholder="Tên" />
+                  <input type="text" className={`${inputCls} flex-1`} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." onKeyDown={(e) => e.key === "Enter" && addLink()} />
+                  <button onClick={addLink} className="bg-amber-600/80 hover:bg-amber-500 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all duration-200 shrink-0">
+                    <Plus className="w-3.5 h-3.5" /> Thêm
+                  </button>
+                </div>
+                {Object.keys(state.socialLinks).length > 0 && (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                    {Object.entries(state.socialLinks).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2.5 bg-slate-950/50 border border-white/[0.04] hover:border-white/[0.08] rounded-xl px-3.5 py-2 transition-all duration-200 group">
+                        <span className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wider min-w-[48px] shrink-0">{key}</span>
+                        <input
+                          className="flex-1 bg-transparent text-[13px] text-slate-300 outline-none"
+                          value={linkDrafts[key] ?? value}
+                          onChange={(e) => setLinkDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                          onBlur={() => saveLinkText(key)}
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(value);
+                            flash(`✅ Đã sao chép link ${key}`);
+                          }}
+                          className="text-slate-600 hover:text-amber-400 p-0.5 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteLink(key)} className="text-slate-600 hover:text-rose-400 p-0.5 transition-colors shrink-0 opacity-0 group-hover:opacity-100">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ──── Custom CSS ──── */}
+              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <h4 className={`${sectionTitle} text-indigo-400`}>
+                  <Palette className="w-3.5 h-3.5" /> CSS tùy chỉnh
+                </h4>
+                <textarea
+                  className={`${inputCls} font-mono text-[12px] resize-y leading-relaxed`}
+                  rows={5}
+                  value={cssDraft}
+                  onChange={(e) => setCssDraft(e.target.value)}
+                  placeholder="/* Nhập CSS tùy chỉnh ở đây... */"
                 />
-                <button onClick={addTodo} className={btnSecondary}><Plus className="w-3.5 h-3.5" /> Add</button>
-                <button onClick={clearTodos} className={btnDanger}><Trash2 className="w-3.5 h-3.5" /> Clear all</button>
+                <p className="text-[10px] text-slate-500 pl-0.5">CSS chỉ được áp dụng khi cú pháp hợp lệ. Cú pháp sai sẽ được bỏ qua an toàn.</p>
               </div>
-              {state.todoList.length > 0 && (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {state.todoList.map((todo) => (
-                    <div key={todo.id} className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
-                      <input
-                        type="checkbox"
-                        checked={todo.completed}
-                        onChange={() => toggleTodo(todo.id)}
-                        className="accent-emerald-500"
-                      />
-                      <input
-                        className={`flex-1 bg-transparent text-xs text-slate-200 outline-none ${todo.completed ? "line-through opacity-50" : ""}`}
-                        value={todoDrafts[todo.id] ?? todo.text}
-                        onChange={(e) => setTodoDrafts(prev => ({ ...prev, [todo.id]: e.target.value }))}
-                        onBlur={() => saveTodoText(todo.id)}
-                      />
-                      <button onClick={() => deleteTodo(todo.id)} className="text-rose-400 hover:text-rose-300 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {state.todoList.length === 0 && <p className="text-[11px] text-slate-500 italic">No todo items yet.</p>}
-            </div>
 
-            {/* Social Links */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Social links</h4>
-              <div className="flex gap-2">
-                <input type="text" className={`${inputCls} w-28`} value={newLinkKey} onChange={(e) => setNewLinkKey(e.target.value)} placeholder="Name" />
-                <input type="text" className={`${inputCls} flex-1`} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="URL" onKeyDown={(e) => e.key === "Enter" && addLink()} />
-                <button onClick={addLink} className={btnSecondary}><Plus className="w-3.5 h-3.5" /> Add</button>
+              {/* ──── Action Bar ──── */}
+              <div className="flex flex-wrap gap-2.5 pt-4 border-t border-white/[0.04]">
+                <button onClick={handleSaveAll} className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30">
+                  <Save className="w-4 h-4" /> Lưu tất cả
+                </button>
+                <button onClick={exportState} className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-slate-200 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
+                  <Download className="w-4 h-4" /> Xuất file
+                </button>
+                <label className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-slate-200 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer">
+                  <Upload className="w-4 h-4" /> Nhập file
+                  <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
+                </label>
+                <button onClick={resetAll} className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 ml-auto">
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
+                </button>
               </div>
-              {Object.keys(state.socialLinks).length > 0 && (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                  {Object.entries(state.socialLinks).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
-                      <span className="text-[10px] text-slate-500 font-mono min-w-[50px]">{key}</span>
-                      <input
-                        className="flex-1 bg-transparent text-xs text-slate-200 outline-none"
-                        value={linkDrafts[key] ?? value}
-                        onChange={(e) => setLinkDrafts(prev => ({ ...prev, [key]: e.target.value }))}
-                        onBlur={() => saveLinkText(key)}
-                      />
-                      <button onClick={() => deleteLink(key)} className="text-rose-400 hover:text-rose-300 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Custom CSS */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Custom CSS</h4>
-              <textarea
-                className={`${inputCls} w-full font-mono resize-y`}
-                rows={5}
-                value={cssDraft}
-                onChange={(e) => setCssDraft(e.target.value)}
-                placeholder="Enter custom CSS here..."
-              />
-              <p className="text-[10px] text-slate-500">CSS is injected only when the syntax is valid. Invalid CSS is ignored.</p>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-800">
-              <button onClick={handleSaveAll} className={btnPrimary}>
-                <Save className="w-4 h-4" /> Save all settings
-              </button>
-              <button onClick={exportState} className={btnSecondary}>
-                <Download className="w-4 h-4" /> Export file
-              </button>
-              <label className={`${btnSecondary} cursor-pointer`}>
-                <Upload className="w-4 h-4" /> Import file
-                <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
-              </label>
-              <button onClick={resetAll} className={btnDanger}>
-                <RotateCcw className="w-3.5 h-3.5" /> Reset all
-              </button>
-            </div>
-
           </div>
         </div>
 
       </div>
+
+      {/* ═══════════ FLOATING TOAST ═══════════ */}
+      {savedMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
+          <div className="bg-slate-900/95 border border-white/[0.1] backdrop-blur-lg rounded-2xl px-5 py-3 shadow-2xl shadow-black/40">
+            <p className="text-sm text-white font-medium">{savedMsg}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Keyframe for toast animation */}
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translate(-50%, 12px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+      `}</style>
     </div>
   );
 }
-
