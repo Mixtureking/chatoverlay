@@ -10,6 +10,7 @@ export interface Sprint7WidgetState {
   };
   timerSeconds?: number;
   timerDoneText?: string;
+  timerTrigger?: number;
   wheelUsers?: string[];
 }
 
@@ -19,6 +20,7 @@ export interface Sprint7FullState {
   socialLinks: Sprint7WidgetState["socialLinks"];
   timerSeconds?: number;
   timerDoneText?: string;
+  timerTrigger?: number;
   wheelUsers?: string[];
 }
 
@@ -37,6 +39,7 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
     socialLinks: input?.socialLinks && typeof input.socialLinks === "object" && Object.keys(input.socialLinks).length > 0 ? input.socialLinks : { youtube: "https://youtube.com/@YourChannel", discord: "https://discord.gg/example" },
     timerSeconds: typeof input?.timerSeconds === "number" && input.timerSeconds >= 0 ? input.timerSeconds : 5 * 60,
     timerDoneText: typeof input?.timerDoneText === "string" && input.timerDoneText.trim() ? input.timerDoneText : "Thời gian đã kết thúc",
+    timerTrigger: typeof input?.timerTrigger === "number" ? input.timerTrigger : 0,
     wheelUsers: Array.isArray(input?.wheelUsers) && input.wheelUsers.length > 0 ? input.wheelUsers.filter((item) => typeof item === "string" && item.trim()) : ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
   };
 }
@@ -83,6 +86,7 @@ export function createSprint7FullState(input?: Partial<Sprint7FullState>): Sprin
     socialLinks: widgetState.socialLinks,
     timerSeconds: widgetState.timerSeconds,
     timerDoneText: widgetState.timerDoneText,
+    timerTrigger: widgetState.timerTrigger,
     wheelUsers: widgetState.wheelUsers,
   };
 }

@@ -68,11 +68,13 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       const parsedSec = Number.parseInt(val1, 10);
       const finalSec = Number.isFinite(parsedSec) && parsedSec >= 0 ? parsedSec : 300;
       const finalDoneText = val2 || "Time is up";
+      const trigger = Date.now();
       next.timerSeconds = finalSec;
       next.timerDoneText = finalDoneText;
+      next.timerTrigger = trigger;
 
       const timerChannel = new BroadcastChannel("sprint7_timer_channel");
-      timerChannel.postMessage({ type: "UPDATE_TIMER", seconds: finalSec, doneText: finalDoneText });
+      timerChannel.postMessage({ type: "UPDATE_TIMER", seconds: finalSec, doneText: finalDoneText, trigger });
       timerChannel.close();
     } else if (key === "wheel") {
       const finalWheelUsers = val1.split(",").map(s => s.trim()).filter(Boolean);
@@ -100,6 +102,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       socialLinks: state.socialLinks,
       timerSeconds: finalSec,
       timerDoneText: finalDoneText,
+      timerTrigger: state.timerTrigger || 0,
       wheelUsers: finalWheelUsers,
     };
 
@@ -126,19 +129,25 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     const finalSec = Number.isFinite(parsedSec) && parsedSec >= 0 ? parsedSec : 300;
     const finalDoneText = timerDoneText || "Time is up";
     const finalWheelUsers = wheelUsersInput.split(",").map(s => s.trim()).filter(Boolean);
+    const trigger = Date.now();
+    
     syncState({
       ...state,
       wheelUsers: finalWheelUsers,
       timerSeconds: finalSec,
       timerDoneText: finalDoneText,
+      timerTrigger: trigger,
       customCSS: cssDraft,
     });
+    
     const timerChannel = new BroadcastChannel("sprint7_timer_channel");
-    timerChannel.postMessage({ type: "UPDATE_TIMER", seconds: finalSec, doneText: finalDoneText });
+    timerChannel.postMessage({ type: "UPDATE_TIMER", seconds: finalSec, doneText: finalDoneText, trigger });
     timerChannel.close();
+    
     const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
     wheelChannel.postMessage({ type: "UPDATE_WHEEL", users: finalWheelUsers });
     wheelChannel.close();
+    
     flash("💾 Đã lưu tất cả thiết lập!");
   };
 
@@ -178,15 +187,29 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   // ---- Social link helpers ----
   const addLink = () => {
     const key = newLinkKey.trim() || `link${Object.keys(state.socialLinks).length + 1}`;
+    const url = newLinkUrl.trim() || "https://example.com";
+    
+    // Clear any existing draft for this key to prevent old values showing up
+    setLinkDrafts(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+
     syncState({
       ...state,
-      socialLinks: { ...state.socialLinks, [key]: newLinkUrl.trim() || "https://example.com" },
+      socialLinks: { ...state.socialLinks, [key]: url },
     });
     setNewLinkKey("");
     setNewLinkUrl("");
   };
   const deleteLink = (key: string) => {
     const { [key]: _, ...rest } = state.socialLinks;
+    setLinkDrafts(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     syncState({ ...state, socialLinks: rest });
   };
   const saveLinkText = (key: string) => {
@@ -448,7 +471,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   <Link2 className="w-3.5 h-3.5" /> Liên kết mạng xã hội
                 </h4>
                 <div className="flex gap-2">
-                  <input type="text" className={`${inputCls} w-28 shrink-0`} value={newLinkKey} onChange={(e) => setNewLinkKey(e.target.value)} placeholder="Tên" />
+                  <input type="text" className={`${inputCls} w-32 shrink-0`} value={newLinkKey} onChange={(e) => setNewLinkKey(e.target.value)} placeholder="Tên" />
                   <input type="text" className={`${inputCls} flex-1`} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." onKeyDown={(e) => e.key === "Enter" && addLink()} />
                   <button onClick={addLink} className="bg-amber-600/80 hover:bg-amber-500 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all duration-200 shrink-0">
                     <Plus className="w-3.5 h-3.5" /> Thêm
@@ -458,7 +481,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                     {Object.entries(state.socialLinks).map(([key, value]) => (
                       <div key={key} className="flex items-center gap-2.5 bg-slate-950/50 border border-white/[0.04] hover:border-white/[0.08] rounded-xl px-3.5 py-2 transition-all duration-200 group">
-                        <span className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wider min-w-[48px] shrink-0">{key}</span>
+                        <span className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wider min-w-[64px] shrink-0">{key}</span>
                         <input
                           className="flex-1 bg-transparent text-[13px] text-slate-300 outline-none"
                           value={linkDrafts[key] ?? value}

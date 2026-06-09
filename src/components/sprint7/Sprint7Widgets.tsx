@@ -250,6 +250,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
     const parsedSeconds = Number.parseInt(timerDraftSeconds, 10);
     next.timerSeconds = Number.isFinite(parsedSeconds) && parsedSeconds >= 0 ? parsedSeconds : 300;
     next.timerDoneText = timerDraftDoneText || "Time is up";
+    next.timerTrigger = Date.now();
     syncState(next);
   };
   const updateWheelDraft = (index: number, value: string) => setWheelDrafts((prev) => ({ ...prev, [index]: value }));
@@ -365,6 +366,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
                 {Object.entries(widgetState.socialLinks).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950 border border-slate-800">
                     <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wider min-w-[60px] shrink-0">{key}</span>
                       <input
                         value={linkDrafts[key] ?? value}
                         onChange={(e) => updateLinkText(key, e.target.value)}
@@ -458,13 +460,19 @@ function TimerWidget() {
   const [seconds, setSeconds] = useState(widgetState.timerSeconds ?? 5 * 60);
   const [doneText, setDoneText] = useState(widgetState.timerDoneText || "Time is up");
   const [isRunning, setIsRunning] = useState(true);
+  const lastTriggerRef = useRef<number>(widgetState.timerTrigger || 0);
 
   useEffect(() => {
     const applyState = (next: Partial<Sprint7WidgetState>) => {
-      if (typeof next.timerSeconds === "number" && next.timerSeconds >= 0) {
-        setSeconds(next.timerSeconds);
-        setIsRunning(true);
+      const trigger = next.timerTrigger ?? 0;
+      if (trigger > lastTriggerRef.current) {
+        if (typeof next.timerSeconds === "number" && next.timerSeconds >= 0) {
+          setSeconds(next.timerSeconds);
+          setIsRunning(true);
+        }
+        lastTriggerRef.current = trigger;
       }
+      
       if (typeof next.timerDoneText === "string" && next.timerDoneText.trim()) {
         setDoneText(next.timerDoneText);
       }
@@ -480,7 +488,7 @@ function TimerWidget() {
     const channel = new BroadcastChannel("sprint7_timer_channel");
     channel.onmessage = (e) => {
       if (e.data.type === "UPDATE_TIMER") {
-        applyState({ timerSeconds: e.data.seconds, timerDoneText: e.data.doneText });
+        applyState({ timerSeconds: e.data.seconds, timerDoneText: e.data.doneText, timerTrigger: e.data.trigger });
       }
     };
 
