@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Download, Upload, ClipboardCopy } from "lucide-react";
 import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
 
@@ -14,7 +14,7 @@ const btnDanger = "bg-rose-700/60 hover:bg-rose-600 text-white font-semibold py-
 const btnAccent = "bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors";
 
 export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
-  const rootUrl = window.location.origin;
+  const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
   const rootFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
 
   // ---- Local draft states ----

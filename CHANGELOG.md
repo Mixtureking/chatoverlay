@@ -4,6 +4,16 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.5] - 2026-06-09
+
+### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)
+- **Hiển thị Overlay**: Hoàn thành hiển thị giao diện trực quan cho Wheel (Vòng quay), Timer (Đếm ngược thời gian) và Social links (Đường dẫn mạng xã hội).
+
+### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
+- **Đồng bộ link localhost**: Sửa lỗi lưu trữ link bị sai lệch khi chạy trên `127.0.0.1`, đảm bảo link OBS trên web và trên livestream luôn hiển thị thống nhất là `localhost`.
+
+---
+
 ## [1.0.4] - 2026-06-09
 
 ### 🚀 Tính năng nổi bật & Nâng cấp lớn (Major Features)

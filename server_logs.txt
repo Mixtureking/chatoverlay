@@ -97,3 +97,10 @@
 [LOGGER][2026-06-09T05:34:54.777Z] Dữ liệu Google API lấy về thành công: items count = 1
 [LOGGER][2026-06-09T05:34:54.778Z] Thông tin livestream: activeLiveChatId="Cg0KC0UxNl9HcWNCSDJnKicKGFVDZTc5OUFSdHM2QVpRYk10WkxrenVqdxILRTE2X0dxY0JIMmc"
 [LOGGER][2026-06-09T05:34:54.779Z] Thực hiện trả về dữ liệu kết nối thành công: activeLiveChatId="Cg0KC0UxNl9HcWNCSDJnKicKGFVDZTc5OUFSdHM2QVpRYk10WkxrenVqdxILRTE2X0dxY0JIMmc", title="Sự kiện trực tiếp của Sky MC"
+[LOGGER][2026-06-09T09:35:43.712Z] Nhận yêu cầu kết cấu /api/youtube/live-chat-id. Video input: "E16_GqcBH2g", API Key ẩn: "AIzaSy..."
+[LOGGER][2026-06-09T09:35:43.716Z] Trích xuất thành công Video ID: "E16_GqcBH2g"
+[LOGGER][2026-06-09T09:35:43.716Z] Bắt đầu fetch Google API: https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,snippet&id=E16_GqcBH2g&key=HIDDEN
+[LOGGER][2026-06-09T09:35:44.023Z] Google API trả về mã phản hồi: 200 (OK)
+[LOGGER][2026-06-09T09:35:44.035Z] Dữ liệu Google API lấy về thành công: items count = 1
+[LOGGER][2026-06-09T09:35:44.036Z] Thông tin livestream: activeLiveChatId="Cg0KC0UxNl9HcWNCSDJnKicKGFVDZTc5OUFSdHM2QVpRYk10WkxrenVqdxILRTE2X0dxY0JIMmc"
+[LOGGER][2026-06-09T09:35:44.037Z] Thực hiện trả về dữ liệu kết nối thành công: activeLiveChatId="Cg0KC0UxNl9HcWNCSDJnKicKGFVDZTc5OUFSdHM2QVpRYk10WkxrenVqdxILRTE2X0dxY0JIMmc", title="Sự kiện trực tiếp của Sky MC"
