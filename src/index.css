@@ -186,3 +186,11 @@
   white-space: nowrap;
   animation: marqueeRightToLeft 14s linear infinite;
 }
+
+.marquee-track-slow {
+  display: inline-flex;
+  gap: 1.5rem;
+  width: max-content;
+  white-space: nowrap;
+  animation: marqueeRightToLeft 24s linear infinite;
+}

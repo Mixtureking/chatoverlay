@@ -22,11 +22,6 @@ function logToFile(message: string) {
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
-const OBS_WIDGET_ROUTES = [
-  { path: "/obs-chat", route: "obs-chat", title: "OBS Chat" },
-  { path: "/obs-timer", route: "obs-timer", title: "OBS Timer" },
-  { path: "/obs-wheel", route: "obs-wheel", title: "OBS Wheel" },
-] as const;
 
 // Enable CORS for external overlay display integrations (e.g., OBS Browser Source, desktop apps)
 app.use((req, res, next) => {
@@ -63,25 +58,7 @@ function sanitizeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function createObsWidgetHtml(widgetRoute: string, title: string) {
-  const isProd = process.env.NODE_ENV === "production";
-  const baseHtmlPath =
-    isProd && fs.existsSync(path.join(process.cwd(), "dist", "index.html"))
-      ? path.join(process.cwd(), "dist", "index.html")
-      : path.join(process.cwd(), "index.html");
 
-  let html = fs.readFileSync(baseHtmlPath, "utf8");
-  const injectScript = `<script>window.__OBS_WIDGET_ROUTE__=${JSON.stringify(widgetRoute)};</script>`;
-
-  if (html.includes("</head>")) {
-    html = html.replace("</head>", `${injectScript}</head>`);
-  } else {
-    html = `${injectScript}${html}`;
-  }
-
-  html = html.replace(/<title>.*?<\/title>/i, `<title>${sanitizeHtml(title)}</title>`);
-  return html;
-}
 
 // Extract Video ID from popular Youtube URL formats
 function extractVideoId(input: string): string {
@@ -219,13 +196,6 @@ app.post(["/api/interactivity/votes", "/interactivity/votes"], (req, res) => {
 app.delete(["/api/interactivity/votes", "/interactivity/votes"], (_req, res) => {
   res.json({ state: resetVoteState() });
 });
-
-for (const widget of OBS_WIDGET_ROUTES) {
-  app.get(widget.path, (_req, res) => {
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(createObsWidgetHtml(widget.route, widget.title));
-  });
-}
 
 // API Route 2: Fetch Live Chat Messages and Stream Details
 app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res): Promise<any> => {

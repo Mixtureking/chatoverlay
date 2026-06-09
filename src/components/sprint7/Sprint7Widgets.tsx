@@ -1,24 +1,29 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { createSprint7WidgetState, isLikelySafeCss, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+﻿import React, { useEffect, useMemo, useState, useRef } from "react";
+import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number };
-type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel";
+type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel" | "obs-link" | "dashboard";
 
 const sampleComments = [
-  "Clip này đỉnh quá!",
-  "Bạn đẹp thật",
-  "Roll đi anh ơi",
-  "Vote A nào",
-  "Cyberpunk vibe cực mạnh",
-  "Chat đang nóng lên rồi",
+  "This clip is awesome!",
+  "You look amazing",
+  "Let's go!",
+  "Vote A",
+  "Cyberpunk vibes",
+  "Chat is heating up",
 ];
 
+const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
+
 const getRoute = (): WidgetRoute => {
-  if (typeof window === "undefined") return "obs-chat";
+  if (typeof window === "undefined") return "dashboard";
   const path = window.location.pathname;
   if (path.includes("obs-timer")) return "obs-timer";
   if (path.includes("obs-wheel")) return "obs-wheel";
-  return "obs-chat";
+  if (path.includes("obs-link")) return "obs-link";
+  if (path.includes("obs-chat")) return "obs-chat";
+  return "dashboard";
 };
 
 function useVoteState() {
@@ -62,14 +67,15 @@ function getFallbackState(): Sprint7WidgetState {
       discord: "https://discord.com",
     },
     timerSeconds: 5 * 60,
-    timerDoneText: "Thời gian đã kết thúc",
-    wheelUsers: ["Doro", "An", "Bình", "Chi", "Dung", "Em"],
+    timerDoneText: "Time is up",
+    wheelUsers: ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
   };
 }
 
 function getSprint7State(): Sprint7WidgetState {
   const fallback = getFallbackState();
-  const raw = (window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined;
+  const persisted = loadPersistedSprint7WidgetState();
+  const raw = persisted || ((window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined);
   if (!raw || typeof raw !== "object") return fallback;
   return {
     ...fallback,
@@ -145,18 +151,19 @@ interface VoteWidgetProps {
 
 function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
   const vote = useVoteState();
+  const obsChatFontStyle = { fontFamily: '"Segoe UI", Roboto, Arial, sans-serif' };
   const [roulette, setRoulette] = useState<string[]>(sampleComments);
   const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [cssDraft, setCssDraft] = useState("");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState("300");
-  const [timerDraftDoneText, setTimerDraftDoneText] = useState("Thời gian đã kết thúc");
+  const [timerDraftDoneText, setTimerDraftDoneText] = useState("Time is up");
   const [wheelDrafts, setWheelDrafts] = useState<Record<number, string>>({});
 
   useEffect(() => {
     setCssDraft(widgetState.customCSS || "");
     setTimerDraftSeconds(String(widgetState.timerSeconds ?? 300));
-    setTimerDraftDoneText(widgetState.timerDoneText || "Thời gian đã kết thúc");
+    setTimerDraftDoneText(widgetState.timerDoneText || "Time is up");
     setWheelDrafts(
       (widgetState.wheelUsers || []).reduce<Record<number, string>>((acc, value, index) => {
         acc[index] = value;
@@ -167,7 +174,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
 
   const addTodo = () => {
     const next = { ...widgetState };
-    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiệm vụ ${next.todoList.length + 1}`, completed: false });
+    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiá»‡m vá»¥ ${next.todoList.length + 1}`, completed: false });
     syncState(next);
   };
   const toggleFirstTodo = () => {
@@ -221,7 +228,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
     const next = { ...widgetState };
     const parsedSeconds = Number.parseInt(timerDraftSeconds, 10);
     next.timerSeconds = Number.isFinite(parsedSeconds) && parsedSeconds >= 0 ? parsedSeconds : 300;
-    next.timerDoneText = timerDraftDoneText || "Thời gian đã kết thúc";
+    next.timerDoneText = timerDraftDoneText || "Time is up";
     syncState(next);
   };
   const updateWheelDraft = (index: number, value: string) => setWheelDrafts((prev) => ({ ...prev, [index]: value }));
@@ -264,16 +271,16 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
   }, []);
 
   return (
-    <div className="w-full h-full overflow-hidden bg-slate-950 text-slate-100">
+    <div className="w-full h-full overflow-hidden bg-slate-950 text-slate-100" style={obsChatFontStyle}>
       <div className="h-full overflow-y-auto custom-scrollbar px-4 sm:px-6 py-6">
         <div className="max-w-5xl mx-auto space-y-6 pb-10">
           
           {/* Card: Live Vote */}
           <div className="rounded-3xl border border-cyan-500/30 bg-slate-900/50 p-6 shadow-[0_0_20px_rgba(6,182,212,0.05)]">
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-cyan-600" : "text-cyan-300"}`}>
-              Bỏ phiếu trực tiếp
+              Live Vote
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm font-bold text-slate-205">
+            <div className="grid grid-cols-2 gap-3 text-sm font-bold text-slate-200">
               <div>A: {vote.A}</div>
               <div>B: {vote.B}</div>
             </div>
@@ -298,12 +305,12 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
           {/* Card: Todo List */}
           <div className="rounded-3xl border border-emerald-500/30 bg-slate-900/50 p-5">
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-emerald-600" : "text-emerald-300"}`}>
-              Danh sách việc cần làm
+              Todo List
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
-              <button onClick={addTodo} className={getBtnClass("emerald", isLight)}>Thêm</button>
-              <button onClick={toggleFirstTodo} className={getBtnClass("cyan", isLight)}>Đổi trạng thái đầu</button>
-              <button onClick={clearTodos} className={getBtnClass("rose", isLight)}>Xóa hết</button>
+              <button onClick={addTodo} className={getBtnClass("emerald", isLight)}>Add</button>
+              <button onClick={toggleFirstTodo} className={getBtnClass("cyan", isLight)}>Toggle first</button>
+              <button onClick={clearTodos} className={getBtnClass("rose", isLight)}>Clear all</button>
             </div>
             <div className="space-y-2">
               {widgetState.todoList.map((item) => (
@@ -316,7 +323,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
                     className={`w-full bg-slate-900 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-sm outline-none text-slate-100 placeholder-slate-500 focus:border-indigo-500 ${item.completed ? "opacity-60" : ""}`} 
                   />
                   <div className="flex justify-end">
-                    <button onClick={() => deleteTodo(item.id)} className={getBtnClass("rose", isLight)}>Xóa</button>
+                      <button onClick={() => deleteTodo(item.id)} className={getBtnClass("rose", isLight)}>Delete</button>
                   </div>
                 </div>
               ))}
@@ -325,24 +332,26 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
 
           {/* Card: Social Links Marquee */}
           <div className="rounded-3xl border border-yellow-500/30 bg-slate-900/50 p-4 overflow-hidden">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-yellow-600" : "text-yellow-300"}`}>
-              Thanh liên kết mạng xã hội
+              <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-yellow-600" : "text-yellow-300"}`}>
+              Social Links
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
-              <button onClick={addSocialLink} className={getBtnClass("yellow", isLight)}>Thêm liên kết</button>
-              <button onClick={resetSocialLinks} className={getBtnClass("slate", isLight)}>Khôi phục</button>
+              <button onClick={addSocialLink} className={getBtnClass("yellow", isLight)}>Add link</button>
+              <button onClick={resetSocialLinks} className={getBtnClass("slate", isLight)}>Reset</button>
             </div>
             <div className="overflow-hidden whitespace-nowrap">
               <div className="marquee-track items-center">
                 {Object.entries(widgetState.socialLinks).map(([key, value]) => (
-                  <div key={key} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800">
-                    <input 
-                      value={linkDrafts[key] ?? value} 
-                      onChange={(e) => updateLinkText(key, e.target.value)} 
-                      onBlur={() => saveLinkText(key)} 
-                      className="bg-transparent outline-none text-sm min-w-[180px] text-slate-100 placeholder-slate-500" 
-                    />
-                    <button onClick={() => deleteLink(key)} className={getBtnClass("rose", isLight)}>Xóa</button>
+                  <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950 border border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={linkDrafts[key] ?? value}
+                        onChange={(e) => updateLinkText(key, e.target.value)}
+                        onBlur={() => saveLinkText(key)}
+                        className="bg-transparent outline-none text-sm min-w-[180px] text-slate-100"
+                      />
+                      <button onClick={() => deleteLink(key)} className={getBtnClass("rose", isLight)}>Delete</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -352,22 +361,22 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
           {/* Card: JSON state files */}
           <div className="rounded-3xl border border-sky-500/30 bg-slate-900/50 p-5">
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-sky-600" : "text-sky-300"}`}>
-              Tệp trạng thái JSON
+              JSON State
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={exportState} className={getBtnClass("sky", isLight)}>Xuất</button>
-              <button onClick={copyState} className={getBtnClass("indigo", isLight)}>Sao chép</button>
-              <label className={getBtnClass("slate", isLight)}>Nhập
+              <button onClick={exportState} className={getBtnClass("sky", isLight)}>Export</button>
+              <button onClick={copyState} className={getBtnClass("indigo", isLight)}>Copy</button>
+              <label className={getBtnClass("slate", isLight)}>Import
                 <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
               </label>
-              <button onClick={resetAllState} className={getBtnClass("rose", isLight)}>Đặt lại toàn bộ</button>
+              <button onClick={resetAllState} className={getBtnClass("rose", isLight)}>Reset all</button>
             </div>
           </div>
 
           {/* Card: Custom CSS */}
           <div className="rounded-3xl border border-indigo-500/30 bg-slate-900/50 p-5">
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-indigo-600" : "text-indigo-300"}`}>
-              CSS tùy chỉnh
+              Custom CSS
             </div>
             <textarea
               value={cssDraft}
@@ -375,15 +384,15 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
               onBlur={saveCssDraft}
               rows={6}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono outline-none resize-y text-slate-100 focus:border-indigo-500"
-              placeholder="Nhập CSS ở đây..."
+              placeholder="Enter CSS here..."
             />
-            <div className="mt-2 text-[11px] text-slate-400">CSS sẽ được inject nếu dấu ngoặc cân bằng. Sai cú pháp sẽ bị bỏ qua.</div>
+            <div className="mt-2 text-[11px] text-slate-400">CSS is injected only when the syntax is valid. Invalid CSS is ignored.</div>
           </div>
 
           {/* Card: Timer / Wheel */}
           <div className="rounded-3xl border border-amber-500/30 bg-slate-900/50 p-5">
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-amber-600" : "text-amber-300"}`}>
-              Bộ đếm / Vòng quay
+              Timer / Wheel
             </div>
             <div className="grid gap-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -392,17 +401,17 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
                   onChange={(e) => setTimerDraftSeconds(e.target.value)} 
                   onBlur={saveTimerDraft} 
                   className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500" 
-                  placeholder="Số giây đếm ngược" 
+                    placeholder="Countdown seconds" 
                 />
                 <input 
                   value={timerDraftDoneText} 
                   onChange={(e) => setTimerDraftDoneText(e.target.value)} 
                   onBlur={saveTimerDraft} 
                   className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500" 
-                  placeholder="Thông báo khi kết thúc" 
+                    placeholder="Finish message" 
                 />
               </div>
-              <div className="text-[11px] text-slate-400">Sửa nhanh thời gian đếm và nội dung kết thúc, sẽ lưu khi rời ô nhập.</div>
+              <div className="text-[11px] text-slate-400">Edit the timer and finish text quickly, then it saves on blur.</div>
               <div className="space-y-2">
                 {(widgetState.wheelUsers || []).map((user, index) => (
                   <input
@@ -411,7 +420,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
                     onChange={(e) => updateWheelDraft(index, e.target.value)}
                     onBlur={saveWheelDrafts}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500"
-                    placeholder={`Người dùng vòng quay ${index + 1}`}
+                    placeholder={`Wheel user ${index + 1}`}
                   />
                 ))}
               </div>
@@ -425,22 +434,69 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
 
 function TimerWidget() {
   const widgetState = useMemo(() => getSprint7State(), []);
-  const [seconds, setSeconds] = useState(widgetState.timerSeconds || 5 * 60);
+  const [seconds, setSeconds] = useState(widgetState.timerSeconds ?? 5 * 60);
+  const [doneText, setDoneText] = useState(widgetState.timerDoneText || "Time is up");
+  const [isRunning, setIsRunning] = useState(true);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setSeconds((prev) => Math.max(0, prev - 1)), 1000);
-    return () => window.clearInterval(timer);
+    const applyState = (next: Partial<Sprint7WidgetState>) => {
+      if (typeof next.timerSeconds === "number" && next.timerSeconds >= 0) {
+        setSeconds(next.timerSeconds);
+        setIsRunning(true);
+      }
+      if (typeof next.timerDoneText === "string" && next.timerDoneText.trim()) {
+        setDoneText(next.timerDoneText);
+      }
+    };
+
+    const syncFromStorage = () => {
+      const persisted = loadPersistedSprint7WidgetState();
+      if (persisted) applyState(persisted);
+    };
+
+    syncFromStorage();
+
+    const channel = new BroadcastChannel("sprint7_timer_channel");
+    channel.onmessage = (e) => {
+      if (e.data.type === "UPDATE_TIMER") {
+        applyState({ timerSeconds: e.data.seconds, timerDoneText: e.data.doneText });
+      }
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "sprint7_widget_state") syncFromStorage();
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      channel.close();
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
-  const done = seconds === 0;
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => {
+      setSeconds((prev) => {
+        if (prev <= 0) {
+          setIsRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+
+  const done = seconds === 0 && !isRunning;
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="w-screen h-screen grid place-items-center bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="w-screen h-screen grid place-items-center bg-transparent text-slate-100 overflow-hidden" style={obsFontStyle}>
       <div className="text-center animate-in fade-in duration-300">
-        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? widgetState.timerDoneText : `${mins}:${secs}`}</div>
-        <div className="text-cyan-400 uppercase tracking-[0.5em] mt-4 font-bold">{done ? widgetState.timerDoneText : "Bộ đếm thời gian"}</div>
+        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? doneText : `${mins}:${secs}`}</div>
+        <div className="text-cyan-400 uppercase tracking-[0.5em] mt-4 font-bold">{done ? doneText : "Timer"}</div>
       </div>
     </div>
   );
@@ -453,53 +509,165 @@ const DORO_WHEEL_COLORS = [
 
 function WheelWidget() {
   const widgetState = useMemo(() => getSprint7State(), []);
-  const [users, setUsers] = useState<string[]>(
-    widgetState.wheelUsers && widgetState.wheelUsers.length > 0
-      ? widgetState.wheelUsers
-      : getFallbackState().wheelUsers,
-  );
+  const fallbackUsers = widgetState.wheelUsers && widgetState.wheelUsers.length > 0 ? widgetState.wheelUsers : getFallbackState().wheelUsers;
+  const [users, setUsers] = useState<string[]>(fallbackUsers);
   const [angle, setAngle] = useState(0);
+  const angleRef = useRef(0);
+  const isSpinningRef = useRef(false);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
+  const usersRef = useRef(users);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const reloadUsers = async (shuffleOnFallback = false) => {
+    try {
+      const syncRes = await fetch("/api/youtube/settings-sync");
+      const syncData = await syncRes.json().catch(() => ({}));
+      const settings = syncData?.settings;
+      const liveChatId = settings?.activeLiveChatId;
+      const apiKey = settings?.apiKey;
+      if (!liveChatId || !apiKey) {
+        if (shuffleOnFallback && mountedRef.current) {
+          setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
+        }
+        return;
+      }
+      const msgRes = await fetch(
+        `/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`,
+      );
+      const msgData = await msgRes.json().catch(() => ({}));
+      const names = Array.isArray(msgData?.messages)
+        ? Array.from(
+            new Set(
+              msgData.messages
+                .map((m: any) => String(m?.authorName || "").trim())
+                .filter(Boolean),
+            ),
+          ).slice(0, 24)
+        : [];
+      if (!mountedRef.current) return;
+      if (names.length > 0) {
+        setUsers(names);
+      } else if (shuffleOnFallback) {
+        setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
+      }
+    } catch {
+      if (shuffleOnFallback && mountedRef.current) {
+        setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
+      }
+    }
+  };
+
+  const handleReload = async () => {
+    setIsReloading(true);
+    setWinner(null);
+    setUsers((prev) => (prev.length > 1 ? [...prev].sort(() => Math.random() - 0.5) : prev));
+    await reloadUsers(true);
+    setIsReloading(false);
+  };
+
+  useEffect(() => {
+    reloadUsers(false);
+
+    const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
+    wheelChannel.onmessage = (e) => {
+      if (e.data.type === "UPDATE_WHEEL") {
+        const newUsers = e.data.users;
+        if (Array.isArray(newUsers) && newUsers.length > 0) {
+          setUsers(newUsers);
+        }
+      }
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "sprint7_widget_state") {
+        const persisted = loadPersistedSprint7WidgetState();
+        if (persisted?.wheelUsers?.length) {
+          setUsers(persisted.wheelUsers);
+        }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      wheelChannel.close();
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  const updateAngle = (val: number) => {
+    angleRef.current = val;
+    setAngle(val);
+  };
 
   useEffect(() => {
     let alive = true;
     const loadChatUsers = async () => {
-      try {
-        const syncRes = await fetch("/api/youtube/settings-sync");
-        const syncData = await syncRes.json().catch(() => ({}));
-        const settings = syncData?.settings;
-        const liveChatId = settings?.activeLiveChatId;
-        const apiKey = settings?.apiKey;
-        if (!liveChatId || !apiKey) return;
-        const msgRes = await fetch(
-          `/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`,
-        );
-        const msgData = await msgRes.json().catch(() => ({}));
-        const names = Array.isArray(msgData?.messages)
-          ? (Array.from(
-              new Set(
-                msgData.messages
-                  .map((m: any) => String(m?.authorName || "").trim())
-                  .filter(Boolean),
-              ),
-            ) as string[]).slice(0, 24)
-          : [];
-        if (alive && names.length > 0) setUsers(names);
-      } catch {}
+      await reloadUsers(false);
+      if (!alive) return;
     };
     loadChatUsers();
     const refresh = window.setInterval(loadChatUsers, 10000);
-    let raf = 0;
-    const loop = () => {
-      setAngle((prev) => (prev + 1.5) % 360);
-      raf = window.requestAnimationFrame(loop);
-    };
-    raf = window.requestAnimationFrame(loop);
     return () => {
       alive = false;
       window.clearInterval(refresh);
-      window.cancelAnimationFrame(raf);
     };
   }, []);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel("sprint7_wheel_channel");
+    const easeOutQuart = (x: number): number => 1 - Math.pow(1 - x, 4);
+
+    channel.onmessage = (e) => {
+      if (e.data.type === "SPIN" && !isSpinningRef.current && users.length > 0) {
+        isSpinningRef.current = true;
+        setWinner(null);
+
+        const currentUsers = usersRef.current.length > 0 ? usersRef.current : fallbackUsers;
+        const winnerIdx = Math.floor(Math.random() * currentUsers.length);
+        const segAngle = 360 / currentUsers.length;
+        const centerDeg = (winnerIdx + 0.5) * segAngle;
+        
+        // Rotate 5-8 full circles before landing
+        const extraSpins = 5 + Math.floor(Math.random() * 4);
+        const targetAngle = 360 * extraSpins + (360 - centerDeg);
+        
+        const startAngle = angleRef.current % 360;
+        const distance = targetAngle - startAngle;
+        
+        const duration = 6000 + Math.random() * 2000; // 6 to 8 seconds
+        const startTime = performance.now();
+        
+        const animate = (currentTime: number) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          const currentAngle = startAngle + distance * easeOutQuart(progress);
+          updateAngle(currentAngle);
+          
+          if (progress < 1) {
+            window.requestAnimationFrame(animate);
+          } else {
+            isSpinningRef.current = false;
+            updateAngle(currentAngle % 360);
+            setWinner(currentUsers[winnerIdx]);
+            void reloadUsers(true);
+          }
+        };
+        window.requestAnimationFrame(animate);
+      }
+    };
+    return () => channel.close();
+  }, [users]);
 
   const segAngle = 360 / users.length;
   const R = 240; // outer radius
@@ -529,7 +697,15 @@ function WheelWidget() {
   });
 
   return (
-    <div className="w-screen h-screen grid place-items-center bg-slate-950 overflow-hidden">
+    <div className="w-screen h-screen grid place-items-center bg-slate-950 overflow-hidden" style={obsFontStyle}>
+      <button
+        onClick={() => void handleReload()}
+        className="fixed top-4 right-4 z-[60] rounded-full border border-cyan-400/50 bg-slate-900/95 px-4 py-2 text-xs font-bold text-cyan-200 shadow-lg shadow-cyan-500/20 hover:bg-slate-800 transition-colors pointer-events-auto"
+        disabled={isReloading}
+        type="button"
+      >
+        {isReloading ? "Loading..." : "Reload"}
+      </button>
       {/* Outer glow ring behind wheel */}
       <div
         className="absolute"
@@ -588,7 +764,7 @@ function WheelWidget() {
                   transform={`rotate(${rotLabel} ${lp.x} ${lp.y})`}
                   style={{ textShadow: "0 1px 4px #000" }}
                 >
-                  {name.length > 12 ? name.slice(0, 11) + "…" : name}
+                  {name.length > 12 ? name.slice(0, 11) + "â€¦" : name}
                 </text>
                 {/* Divider lines */}
                 <line
@@ -608,9 +784,14 @@ function WheelWidget() {
           <circle cx={CX} cy={CY} r={CENTER_R + 6} fill="#020617" />
         </svg>
 
-        {/* Counter-rotating center — stays upright at all times */}
+        {/* Counter-rotating center â€” stays upright at all times */}
         <div
-          className="absolute"
+          className="absolute cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          onClick={() => {
+            const channel = new BroadcastChannel("sprint7_wheel_channel");
+            channel.postMessage({ type: "SPIN" });
+            channel.close();
+          }}
           style={{
             width: (CENTER_R + 6) * 2,
             height: (CENTER_R + 6) * 2,
@@ -622,6 +803,7 @@ function WheelWidget() {
             border: "4px solid #22d3ee",
             boxShadow: "0 0 24px rgba(34,211,238,0.5), 0 0 8px rgba(168,85,247,0.4)",
             background: "#020617",
+            zIndex: 30,
           }}
         >
           <img
@@ -637,13 +819,12 @@ function WheelWidget() {
           />
         </div>
 
-        {/* Pointer arrow at top */}
+        {/* Pointer Triangle */}
         <div
           className="absolute"
           style={{
-            top: -8,
-            left: "50%",
-            transform: "translateX(-50%)",
+            top: -12,
+            left: 260 - 14,
             width: 0,
             height: 0,
             borderLeft: "14px solid transparent",
@@ -653,6 +834,49 @@ function WheelWidget() {
             zIndex: 10,
           }}
         />
+
+        {/* Winner Announcement Overlay */}
+        {winner && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center animate-in zoom-in fade-in duration-500" style={{ zIndex: 50 }}>
+            <div className="absolute inset-0 bg-slate-950/60 rounded-full backdrop-blur-sm" />
+            <div className="relative flex flex-col items-center bg-indigo-900/90 border-2 border-indigo-400 px-8 py-6 rounded-3xl shadow-2xl shadow-indigo-500/50 transform scale-110">
+              <span className="text-indigo-300 font-bold text-sm uppercase tracking-widest mb-1">Winner</span>
+              <span className="text-white font-black text-4xl truncate max-w-[400px]">{winner}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LinkWidget() {
+  const widgetState = useMemo(() => getSprint7State(), []);
+  const links = Object.entries(widgetState.socialLinks || {});
+  const trackLinks = links.length > 0 ? [...links, ...links, ...links] : [["empty", "Add links in dashboard"]];
+
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent text-slate-100" style={obsFontStyle}>
+      <div className="flex h-full w-full items-center justify-center px-4">
+        <div className="w-[96vw] max-w-[1800px] overflow-hidden rounded-[1.25rem] border border-cyan-500/20 bg-transparent px-3 py-2">
+          <div className="marquee-track marquee-track-slow items-center py-1">
+            {trackLinks.map(([key, value], index) => (
+              <a
+                key={`${key}-${index}`}
+                href={key === "empty" ? "#" : value}
+                target={key === "empty" ? undefined : "_blank"}
+                rel={key === "empty" ? undefined : "noreferrer"}
+                className="mx-2 inline-flex h-[54px] min-w-[160px] max-w-[320px] items-center justify-center rounded-full border border-cyan-900/60 bg-[#0b1023]/85 px-4 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
+                onClick={(e) => {
+                  if (key === "empty") e.preventDefault();
+                }}
+                aria-label={key === "empty" ? "Add links in dashboard" : value}
+              >
+                <span className="truncate text-[14px] font-semibold text-cyan-100">{value}</span>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -692,21 +916,27 @@ export default function Sprint7Widgets() {
 
   const syncState = (next: Sprint7WidgetState) => {
     (window as any).__SPRINT7_STATE__ = next;
+    savePersistedSprint7WidgetState(next);
     setState(next);
   };
 
   const isLight = themeMode === "light";
 
   return (
-    <div className={`w-full h-full ${isLight ? "theme-light" : ""}`}>
+    <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
       <LiveCssInjector customCSS={state.customCSS} />
-      {route === "obs-timer" ? (
+      {route === "dashboard" ? (
+        <Sprint7Dashboard state={state} syncState={syncState} />
+      ) : route === "obs-timer" ? (
         <TimerWidget />
       ) : route === "obs-wheel" ? (
         <WheelWidget />
+      ) : route === "obs-link" ? (
+        <LinkWidget />
       ) : (
         <VoteWidget widgetState={state} syncState={syncState} isLight={isLight} />
       )}
     </div>
   );
 }
+

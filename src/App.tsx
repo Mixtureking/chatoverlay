@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
 import Sprint7Widgets from "./components/sprint7/Sprint7Widgets";
-import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState } from "./components/sprint7/sprint7State";
+import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, type Sprint7WidgetState } from "./components/sprint7/sprint7State";
 import { TRANSLATIONS } from "./translations";
 
 const HelpManual = lazy(() => import("./components/HelpManual"));
@@ -1140,19 +1140,23 @@ export default function App() {
     setStreamStatus((prev) => ({ ...prev, error: null, title: "Đang dò kênh...", isConnected: false }));
 
     try {
-      const res = await fetch("/api/youtube/live-chat-id", {
+      const apiUrl = `${window.location.origin}/api/youtube/live-chat-id`;
+      console.log("[DEBUG] Connecting to API:", apiUrl);
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrlOrId, apiKey }),
       });
 
       const text = await res.text();
+      console.log("[DEBUG] Response status:", res.status, "| Body preview:", text.substring(0, 200));
       let data: any;
       try {
         data = JSON.parse(text);
       } catch (err) {
+        console.error("[DEBUG] JSON parse failed. Raw response:", text.substring(0, 500));
         throw new Error(
-          `Phản hồi từ Máy chủ không hợp lệ (Mã HTTP: ${res.status}). Vui lòng đảm bảo backend đang hoạt động ổn định và đường dẫn API khả dụng.`
+          `Phản hồi từ Máy chủ không hợp lệ (Mã HTTP: ${res.status}). Server trả về: "${text.substring(0, 120)}..." — Hãy đảm bảo bạn đang truy cập http://localhost:3000 và backend đang chạy (npm run dev).`
         );
       }
 
@@ -1545,7 +1549,9 @@ export default function App() {
 
   // 6. BACKUP CONFIGURATOR IMPORT & EXPORT (T3-03, T3-04, AC-30, AC-31, AC-32)
   const handleExportConfig = () => {
+    const currentSprint7 = ((window as any).__SPRINT7_STATE__ || {}) as Partial<Sprint7WidgetState>;
     const sprint7State = createSprint7WidgetState({
+      ...currentSprint7,
       todoList: (settings as any).todoList || [],
       customCSS: settings.customCss || "",
       socialLinks: (settings as any).socialLinks || {},
@@ -1558,6 +1564,9 @@ export default function App() {
         todoList: sprint7State.todoList,
         customCSS: sprint7State.customCSS || "",
         socialLinks: sprint7State.socialLinks || {},
+        timerSeconds: sprint7State.timerSeconds,
+        timerDoneText: sprint7State.timerDoneText,
+        wheelUsers: sprint7State.wheelUsers,
       })),
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
@@ -1750,6 +1759,17 @@ export default function App() {
     const linkStr = compileObsTransitionLink();
     navigator.clipboard.writeText(linkStr);
     showToast("📋 Đã sao chép link OBS Screen Transition Overlay!");
+  };
+
+  const compileObsSprint7Link = (route: string) => {
+    const rootUrl = window.location.origin;
+    return `${rootUrl}/${route}`;
+  };
+
+  const handleCopyObsSprint7Link = (route: string, label: string) => {
+    const linkStr = compileObsSprint7Link(route);
+    navigator.clipboard.writeText(linkStr);
+    showToast(`📋 Đã sao chép link ${label}!`);
   };
 
   const handleCopyObsLink = () => {
@@ -2752,7 +2772,7 @@ export default function App() {
   }, []);
 
   const sprint7Route = typeof window !== "undefined"
-    ? (window.location.pathname.endsWith("/obs-chat") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel"))
+    ? (window.location.pathname.endsWith("/obs-chat") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link"))
       ? window.location.pathname.split("/").pop()
       : null
     : null;
@@ -4224,6 +4244,67 @@ export default function App() {
                         <Copy className="w-3.5 h-3.5" />
                         <span>Sao chép Link OBS Transition Overlay</span>
                       </button>
+                    </div>
+
+                    {/* Link Sprint 7 OBS Widgets */}
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 flex flex-col">
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest pl-0.5">🎯 Link OBS Widget (Sprint 7)</span>
+                      
+                      {/* Chat & Interactivity */}
+                      <div className="flex gap-2">
+                        <div className="flex-1 font-mono text-[10.5px] text-amber-300 break-all p-1.5 bg-slate-900 rounded border border-slate-800 flex items-center">
+                          {compileObsSprint7Link("obs-chat")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyObsSprint7Link("obs-chat", "OBS Chat Sprint 7")}
+                          className="bg-amber-600/90 hover:bg-amber-600 text-white font-bold px-3 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Chat MiniGame
+                        </button>
+                      </div>
+
+                      {/* Wheel */}
+                      <div className="flex gap-2">
+                        <div className="flex-1 font-mono text-[10.5px] text-amber-300 break-all p-1.5 bg-slate-900 rounded border border-slate-800 flex items-center">
+                          {compileObsSprint7Link("obs-wheel")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyObsSprint7Link("obs-wheel", "OBS Vòng Quay")}
+                          className="bg-amber-600/90 hover:bg-amber-600 text-white font-bold px-3 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Vòng Quay
+                        </button>
+                      </div>
+
+                      {/* Timer & Todo */}
+                      <div className="flex gap-2">
+                        <div className="flex-1 font-mono text-[10.5px] text-amber-300 break-all p-1.5 bg-slate-900 rounded border border-slate-800 flex items-center">
+                          {compileObsSprint7Link("obs-timer")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyObsSprint7Link("obs-timer", "OBS Timer & Todo")}
+                          className="bg-amber-600/90 hover:bg-amber-600 text-white font-bold px-3 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Countdown & Todo
+                        </button>
+                      </div>
+
+                      {/* Social Links */}
+                      <div className="flex gap-2">
+                        <div className="flex-1 font-mono text-[10.5px] text-amber-300 break-all p-1.5 bg-slate-900 rounded border border-slate-800 flex items-center">
+                          {compileObsSprint7Link("obs-link")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyObsSprint7Link("obs-link", "OBS Links")}
+                          className="bg-amber-600/90 hover:bg-amber-600 text-white font-bold px-3 rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> MXH Links
+                        </button>
+                      </div>
                     </div>
 
                     {/* Export/Import profiles */}
