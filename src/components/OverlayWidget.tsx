@@ -2,6 +2,7 @@ import React, { useEffect, useState, memo } from "react";
 import { ChatMessage, OverlaySettings } from "../types";
 import { Shield, Sparkles, Star, Award, Heart, Flame, Crown, Gamepad2, Bolt, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { isLikelySafeCss } from "./sprint7/sprint7State";
 
 const getPresetBackgroundStyle = (preset: string): React.CSSProperties => {
   if (preset === "grid") {
@@ -377,8 +378,8 @@ const OverlayWidget = memo(function OverlayWidget({
         className="w-full h-full relative overflow-hidden select-text"
         style={overlayScaleStyle}
       >
-        {debouncedCustomCss && (
-          <style dangerouslySetInnerHTML={{ __html: getCleanedCss() }} />
+        {debouncedCustomCss && isLikelySafeCss(getCleanedCss()) && (
+          <style id="custom-css-injector" dangerouslySetInnerHTML={{ __html: getCleanedCss() }} />
         )}
         <div
           className="w-full h-full"

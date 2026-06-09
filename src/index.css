@@ -114,3 +114,75 @@
     box-shadow: 0 0 30px rgba(233, 30, 99, 0.9);
   }
 }
+
+@keyframes cyberpunkGlitch {
+  0% { transform: translate(0, 0); filter: hue-rotate(0deg); }
+  20% { transform: translate(-2px, 1px); filter: hue-rotate(20deg); }
+  40% { transform: translate(2px, -1px); filter: hue-rotate(-20deg); }
+  60% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  100% { transform: translate(0, 0); filter: hue-rotate(0deg); }
+}
+
+.cyberpunk-glitch {
+  position: relative;
+  color: #d9faff;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.8), 0 0 18px rgba(217, 70, 239, 0.35);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.25), inset 0 0 18px rgba(217, 70, 239, 0.12);
+  animation: cyberpunkGlitch 0.5s linear 1;
+  overflow: hidden;
+}
+
+.cyberpunk-glitch::before,
+.cyberpunk-glitch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: screen;
+}
+
+.cyberpunk-glitch::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(34, 211, 238, 0.35) 50%, transparent 100%);
+  transform: translateX(-120%);
+  animation: glitch-sweep 0.5s linear 1;
+}
+
+.cyberpunk-glitch::after {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08) 0,
+    rgba(255, 255, 255, 0.08) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  animation: glitch-noise 0.5s steps(2, end) 1;
+}
+
+@keyframes glitch-sweep {
+  to { transform: translateX(120%); }
+}
+
+@keyframes glitch-noise {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.5; }
+}
+
+.arwass-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@keyframes marqueeRightToLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-100%); }
+}
+
+.marquee-track {
+  display: inline-flex;
+  gap: 1.5rem;
+  white-space: nowrap;
+  animation: marqueeRightToLeft 14s linear infinite;
+}

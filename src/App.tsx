@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "rea
 import { createPortal } from "react-dom";
 import { ChatMessage, OverlaySettings, FilterKeyword, StreamStatus } from "./types";
 import OverlayWidget from "./components/OverlayWidget";
+import Sprint7Widgets from "./components/sprint7/Sprint7Widgets";
+import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState } from "./components/sprint7/sprint7State";
 import { TRANSLATIONS } from "./translations";
 
 const HelpManual = lazy(() => import("./components/HelpManual"));
@@ -1608,10 +1610,20 @@ export default function App() {
 
   // 6. BACKUP CONFIGURATOR IMPORT & EXPORT (T3-03, T3-04, AC-30, AC-31, AC-32)
   const handleExportConfig = () => {
+    const sprint7State = createSprint7WidgetState({
+      todoList: (settings as any).todoList || [],
+      customCSS: settings.customCss || "",
+      socialLinks: (settings as any).socialLinks || {},
+    });
     const backupObj = {
-      version: "1.0",
+      version: "1.0.3",
       settings,
       blacklist,
+      sprint7: JSON.parse(serializeSprint7FullState({
+        todoList: sprint7State.todoList,
+        customCSS: sprint7State.customCSS || "",
+        socialLinks: sprint7State.socialLinks || {},
+      })),
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
     const downloadAnchor = document.createElement("a");
@@ -1641,6 +1653,14 @@ export default function App() {
         if (Array.isArray(data.blacklist)) {
           setBlacklist(data.blacklist);
           localStorage.setItem("yt_overlay_blacklist", JSON.stringify(data.blacklist));
+        }
+
+        if (data.sprint7) {
+          const sprint7 = parseSprint7FullState(JSON.stringify(data.sprint7));
+          (window as any).__SPRINT7_STATE__ = sprint7;
+          updateSettings({
+            customCss: sprint7.customCSS || loadedSettings.customCss || "",
+          });
         }
 
         showToast("📥 Nhập cấu hình phục hồi thành công!");
@@ -2773,6 +2793,38 @@ export default function App() {
     const randomIndex = Math.floor(Math.random() * SAMPLE_MESSAGES_TEMPLATES.length);
     handleInjectMessage(SAMPLE_MESSAGES_TEMPLATES[randomIndex]);
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!(window as any).__SPRINT7_STATE__) {
+      (window as any).__SPRINT7_STATE__ = createSprint7WidgetState({
+        todoList: [
+          { id: "todo-1", text: "Set scene", completed: false },
+          { id: "todo-2", text: "Check mic", completed: true },
+          { id: "todo-3", text: "Start stream", completed: false },
+        ],
+        customCSS: "",
+        socialLinks: {
+          youtube: "https://youtube.com",
+          tiktok: "https://tiktok.com",
+          discord: "https://discord.com",
+        },
+        timerSeconds: 5 * 60,
+        timerDoneText: "Thời gian đã kết thúc",
+        wheelUsers: ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
+      });
+    }
+  }, []);
+
+  const sprint7Route = typeof window !== "undefined"
+    ? (window.location.pathname.endsWith("/obs-chat") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel"))
+      ? window.location.pathname.split("/").pop()
+      : null
+    : null;
+
+  if (sprint7Route) {
+    return <Sprint7Widgets />;
+  }
 
   return (
     <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.themeMode === 'light' ? 'theme-light' : ''}`}>
