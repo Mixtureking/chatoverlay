@@ -446,9 +446,18 @@ function TimerWidget() {
   );
 }
 
+const DORO_WHEEL_COLORS = [
+  "#7c3aed", "#0e7490", "#be185d", "#15803d", "#c2410c",
+  "#1d4ed8", "#a21caf", "#0f766e", "#b45309", "#1e40af",
+];
+
 function WheelWidget() {
   const widgetState = useMemo(() => getSprint7State(), []);
-  const [users, setUsers] = useState<string[]>(widgetState.wheelUsers && widgetState.wheelUsers.length > 0 ? widgetState.wheelUsers : getFallbackState().wheelUsers);
+  const [users, setUsers] = useState<string[]>(
+    widgetState.wheelUsers && widgetState.wheelUsers.length > 0
+      ? widgetState.wheelUsers
+      : getFallbackState().wheelUsers,
+  );
   const [angle, setAngle] = useState(0);
 
   useEffect(() => {
@@ -461,10 +470,18 @@ function WheelWidget() {
         const liveChatId = settings?.activeLiveChatId;
         const apiKey = settings?.apiKey;
         if (!liveChatId || !apiKey) return;
-        const msgRes = await fetch(`/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`);
+        const msgRes = await fetch(
+          `/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`,
+        );
         const msgData = await msgRes.json().catch(() => ({}));
         const names = Array.isArray(msgData?.messages)
-          ? Array.from(new Set(msgData.messages.map((m: any) => String(m?.authorName || "").trim()).filter(Boolean))).slice(0, 24)
+          ? (Array.from(
+              new Set(
+                msgData.messages
+                  .map((m: any) => String(m?.authorName || "").trim())
+                  .filter(Boolean),
+              ),
+            ) as string[]).slice(0, 24)
           : [];
         if (alive && names.length > 0) setUsers(names);
       } catch {}
@@ -484,36 +501,159 @@ function WheelWidget() {
     };
   }, []);
 
+  const segAngle = 360 / users.length;
+  const R = 240; // outer radius
+  const CX = 260;
+  const CY = 260;
+  const CENTER_R = 80; // doro circle radius
+
+  // Build SVG arc path for each segment
+  const describeSegment = (startDeg: number, endDeg: number, outerR: number, innerR: number) => {
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const x1 = CX + outerR * Math.sin(toRad(startDeg));
+    const y1 = CY - outerR * Math.cos(toRad(startDeg));
+    const x2 = CX + outerR * Math.sin(toRad(endDeg));
+    const y2 = CY - outerR * Math.cos(toRad(endDeg));
+    const ix1 = CX + innerR * Math.sin(toRad(startDeg));
+    const iy1 = CY - innerR * Math.cos(toRad(startDeg));
+    const ix2 = CX + innerR * Math.sin(toRad(endDeg));
+    const iy2 = CY - innerR * Math.cos(toRad(endDeg));
+    const large = endDeg - startDeg > 180 ? 1 : 0;
+    return `M ${ix1} ${iy1} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1} Z`;
+  };
+
+  // Label position midway through segment at 70% of radius
+  const labelPos = (midDeg: number, r: number) => ({
+    x: CX + r * Math.sin((midDeg * Math.PI) / 180),
+    y: CY - r * Math.cos((midDeg * Math.PI) / 180),
+  });
+
   return (
     <div className="w-screen h-screen grid place-items-center bg-slate-950 overflow-hidden">
-      <svg width="520" height="520" viewBox="0 0 520 520" style={{ transform: `rotate(${angle}deg)` }} className="animate-in zoom-in duration-300">
-        <g>
-          {users.map((name, idx) => (
-            <g key={name} transform={`rotate(${idx * (360 / users.length)} 260 260)`}>
-              <path d="M260 260 L260 40 A220 220 0 0 1 440 140 Z" fill={idx % 2 ? "#1d4ed8" : "#0f766e"} opacity="0.85" />
-              <text x="260" y="110" fill="white" fontSize="20" textAnchor="middle">{name}</text>
-            </g>
-          ))}
-        </g>
-        <g id="center">
-          <circle cx="260" cy="260" r="72" fill="#020617" stroke="#22d3ee" strokeWidth="4" />
-          <image
-            href={`data:image/svg+xml;utf8,${encodeURIComponent(`
-              <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-                <rect width="100" height="100" rx="50" fill="#0f172a"/>
-                <circle cx="50" cy="42" r="18" fill="#22d3ee"/>
-                <path d="M28 82c4-16 15-24 22-24s18 8 22 24" fill="#a855f7"/>
-                <text x="50" y="95" font-size="10" text-anchor="middle" fill="#d9faff">Doro</text>
-              </svg>
-            `)}`}
-            x="210"
-            y="210"
-            width="100"
-            height="100"
-            preserveAspectRatio="xMidYMid meet"
+      {/* Outer glow ring behind wheel */}
+      <div
+        className="absolute"
+        style={{
+          width: 560,
+          height: 560,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div className="relative" style={{ width: 520, height: 520 }}>
+        {/* Spinning wheel */}
+        <svg
+          width="520"
+          height="520"
+          viewBox="0 0 520 520"
+          style={{ transform: `rotate(${angle}deg)`, position: "absolute", top: 0, left: 0 }}
+        >
+          {/* Outer decorative ring */}
+          <circle cx={CX} cy={CY} r={R + 10} fill="none" stroke="#a855f7" strokeWidth="3" opacity="0.4" />
+          <circle cx={CX} cy={CY} r={R + 16} fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="8 6" opacity="0.25" />
+
+          {/* Segments */}
+          {users.map((name, idx) => {
+            const startDeg = idx * segAngle;
+            const endDeg = startDeg + segAngle;
+            const mid = startDeg + segAngle / 2;
+            const color = DORO_WHEEL_COLORS[idx % DORO_WHEEL_COLORS.length];
+            const lp = labelPos(mid, CENTER_R + (R - CENTER_R) * 0.58);
+            const rotLabel = mid > 90 && mid < 270 ? mid + 180 : mid;
+            return (
+              <g key={name}>
+                <path
+                  d={describeSegment(startDeg, endDeg, R, CENTER_R + 6)}
+                  fill={color}
+                  opacity="0.88"
+                  stroke="#020617"
+                  strokeWidth="1.5"
+                />
+                {/* Subtle shine */}
+                <path
+                  d={describeSegment(startDeg, endDeg, R - 2, CENTER_R + 28)}
+                  fill="white"
+                  opacity="0.045"
+                />
+                {/* Segment label */}
+                <text
+                  x={lp.x}
+                  y={lp.y}
+                  fill="white"
+                  fontSize={users.length > 12 ? "11" : "14"}
+                  fontWeight="700"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  transform={`rotate(${rotLabel} ${lp.x} ${lp.y})`}
+                  style={{ textShadow: "0 1px 4px #000" }}
+                >
+                  {name.length > 12 ? name.slice(0, 11) + "…" : name}
+                </text>
+                {/* Divider lines */}
+                <line
+                  x1={CX + (CENTER_R + 8) * Math.sin((startDeg * Math.PI) / 180)}
+                  y1={CY - (CENTER_R + 8) * Math.cos((startDeg * Math.PI) / 180)}
+                  x2={CX + R * Math.sin((startDeg * Math.PI) / 180)}
+                  y2={CY - R * Math.cos((startDeg * Math.PI) / 180)}
+                  stroke="#020617"
+                  strokeWidth="2"
+                  opacity="0.6"
+                />
+              </g>
+            );
+          })}
+
+          {/* Center backdrop (spins with wheel) */}
+          <circle cx={CX} cy={CY} r={CENTER_R + 6} fill="#020617" />
+        </svg>
+
+        {/* Counter-rotating center — stays upright at all times */}
+        <div
+          className="absolute"
+          style={{
+            width: (CENTER_R + 6) * 2,
+            height: (CENTER_R + 6) * 2,
+            top: CY - CENTER_R - 6,
+            left: CX - CENTER_R - 6,
+            transform: `rotate(${-angle}deg)`,
+            borderRadius: "50%",
+            overflow: "hidden",
+            border: "4px solid #22d3ee",
+            boxShadow: "0 0 24px rgba(34,211,238,0.5), 0 0 8px rgba(168,85,247,0.4)",
+            background: "#020617",
+          }}
+        >
+          <img
+            src="/doro.png"
+            alt="Doro"
+            className="arwass-logo"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
           />
-        </g>
-      </svg>
+        </div>
+
+        {/* Pointer arrow at top */}
+        <div
+          className="absolute"
+          style={{
+            top: -8,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 0,
+            height: 0,
+            borderLeft: "14px solid transparent",
+            borderRight: "14px solid transparent",
+            borderTop: "28px solid #f472b6",
+            filter: "drop-shadow(0 0 6px rgba(244,114,182,0.8))",
+            zIndex: 10,
+          }}
+        />
+      </div>
     </div>
   );
 }
