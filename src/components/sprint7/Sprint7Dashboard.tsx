@@ -104,7 +104,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     };
 
     const b64 = serializeSprint7StateToBase64(config);
-    navigator.clipboard.writeText(`${rootUrl}/${route}?ob=${b64}`);
+    navigator.clipboard.writeText(`${rootUrl}/${route}?sp7=${b64}`);
     flash(`✅ Đã sao chép link ${label}!`);
   };
 

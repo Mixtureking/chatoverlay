@@ -605,7 +605,9 @@ export default function App() {
     const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay" || decodedParams.mode === "desktop-overlay";
     const hasTransitionParam = searchParams.get("mode") === "transition" || decodedParams.mode === "transition" || path === "/transition-overlay";
     
-    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) {
+    const isSprint7Route = path.endsWith("/obs-chat") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link");
+    
+    if ((path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) && !isSprint7Route) {
       setIsOverlayRoute(true);
       if (hasDesktopOverlayParam) {
         setIsDesktopOverlay(true);
@@ -1777,7 +1779,7 @@ export default function App() {
     const localState = loadPersistedSprint7WidgetState();
     if (localState) {
       const b64 = serializeSprint7StateToBase64(localState);
-      return `${rootUrl}/${route}?ob=${b64}`;
+      return `${rootUrl}/${route}?sp7=${b64}`;
     }
     return `${rootUrl}/${route}`;
   };

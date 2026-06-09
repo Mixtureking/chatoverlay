@@ -78,7 +78,7 @@ function getSprint7State(): Sprint7WidgetState {
   // Try parsing from URL parameter 'ob' first
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
-    const ob = params.get("ob");
+    const ob = params.get("sp7");
     if (ob) {
       const decoded = parseSprint7StateFromBase64(ob);
       if (decoded) {

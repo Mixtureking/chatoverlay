@@ -122,7 +122,7 @@ const SidebarNavigator = memo(function SidebarNavigator({
               <span>{text.systemStatus}</span>
             </div>
             <div className="font-mono text-[9px] text-slate-600 mt-1 font-semibold">
-              v1.0.9 • Electron-Safe • OBS Ready
+              v1.1.0 • Electron-Safe • OBS Ready
             </div>
           </div>
         </motion.div>
