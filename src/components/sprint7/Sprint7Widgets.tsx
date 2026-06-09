@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
@@ -468,9 +468,23 @@ function TimerWidget() {
     };
     window.addEventListener("storage", onStorage);
 
+    // Sync via server polling for remote controllers or isolated browser profiles
+    const pollState = async () => {
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state) {
+          applyState(data.state);
+        }
+      } catch {}
+    };
+    pollState();
+    const pollInterval = setInterval(pollState, 1500);
+
     return () => {
       channel.close();
       window.removeEventListener("storage", onStorage);
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -598,9 +612,23 @@ function WheelWidget() {
     };
     window.addEventListener("storage", onStorage);
 
+    // Sync via server polling for remote controllers or isolated browser profiles
+    const pollWheelState = async () => {
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state?.wheelUsers?.length) {
+          setUsers(data.state.wheelUsers);
+        }
+      } catch {}
+    };
+    pollWheelState();
+    const pollInterval = setInterval(pollWheelState, 2000);
+
     return () => {
       wheelChannel.close();
       window.removeEventListener("storage", onStorage);
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -851,8 +879,37 @@ function WheelWidget() {
 }
 
 function LinkWidget() {
-  const widgetState = useMemo(() => getSprint7State(), []);
-  const links = Object.entries(widgetState.socialLinks || {});
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    // Load initial state
+    const persisted = loadPersistedSprint7WidgetState();
+    if (persisted?.socialLinks) {
+      setSocialLinks(persisted.socialLinks);
+    } else {
+      setSocialLinks({
+        youtube: "https://youtube.com",
+        tiktok: "https://tiktok.com",
+        discord: "https://discord.com",
+      });
+    }
+
+    // Sync via server polling for remote controllers or isolated browser profiles
+    const pollLinks = async () => {
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state?.socialLinks) {
+          setSocialLinks(data.state.socialLinks);
+        }
+      } catch {}
+    };
+    pollLinks();
+    const interval = setInterval(pollLinks, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const links = Object.entries(socialLinks);
   const trackLinks = links.length > 0 ? [...links, ...links, ...links] : [["empty", "Add links in dashboard"]];
 
   return (
@@ -918,6 +975,22 @@ export default function Sprint7Widgets() {
     (window as any).__SPRINT7_STATE__ = next;
     savePersistedSprint7WidgetState(next);
     setState(next);
+
+    // Sync to current origin's backend cache
+    fetch("/api/sprint7/state-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: next }),
+    }).catch(() => {});
+
+    // Sync a copy to localhost:3000 if running on Vercel
+    if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
+      fetch("http://localhost:3000/api/sprint7/state-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: next }),
+      }).catch(() => {});
+    }
   };
 
   const isLight = themeMode === "light";

@@ -9,6 +9,10 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 ### 🚀 Tính năng nổi bật & Nâng cấp (Features & Enhancements)
 - **Đồng bộ mặc định link localhost cho OBS Browser Source**: Tất cả liên kết OBS Browser Source khi sao chép từ Dashboard (Live Chat, Screen Transition, Lucky Wheel, Timer, Social Links) đều tự động dùng tiền tố `http://localhost:3000` làm mặc định nếu Dashboard đang chạy ở môi trường ngoài (như Vercel), giúp OBS truy cập chính xác và chia sẻ dữ liệu `localStorage` trên máy local của streamer.
 - **Tự động lưu thiết lập Widget Sprint 7 (Auto-save)**: Kích hoạt cơ chế tự động lưu dữ liệu vào `localStorage` và phát tín hiệu qua Broadcast Channels ngay lập tức khi người dùng thay đổi dữ liệu của Timer (giây, thông báo hết giờ), Wheel Players (người chơi vòng quay) hay Custom CSS (sau khi mất trỏ chuột - `onBlur` hoặc nhấn `Enter`), không còn bắt buộc phải nhấn nút "Lưu tất cả" thủ công.
+- **Đồng bộ chéo Vercel sang Localhost (Cross-Origin Sync)**: 
+  - Thêm API endpoint `/api/sprint7/state-sync` để quản lý cache trạng thái Sprint 7 trên server.
+  - Khi Dashboard chạy trên Vercel lưu cấu hình (cả Settings YouTube lẫn Widget Sprint 7), nó sẽ tự động gửi bản sao cấu hình đến API tương ứng của local server đang chạy tại `http://localhost:3000`.
+  - Các widget OBS chạy trên localhost sẽ tự động thăm dò (polling) trạng thái từ local server cache định kỳ 1.5 - 2 giây, giúp đồng bộ cài đặt thời gian thực ngay lập tức kể cả khi điều khiển bằng Dashboard từ Vercel.
 - **Tối ưu hóa gõ phím trên Dashboard**: Sửa lỗi giật con trỏ chuột và reset nội dung đang gõ bằng cách so sánh giá trị cũ và mới trước khi đồng bộ draft state.
 
 ---

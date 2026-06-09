@@ -353,6 +353,26 @@ Stack trace: ${error?.stack}`);
       res.status(500).json({ error: `L\u1ED7i \u0111\u1ED3ng b\u1ED9 c\u1EA5u h\xECnh: ${error.message}` });
     }
   });
+  let cachedSprint7State = null;
+  app2.post(["/api/sprint7/state-sync", "/sprint7/state-sync", "*/sprint7/state-sync"], (req, res) => {
+    try {
+      const { state } = req.body || {};
+      if (state) {
+        cachedSprint7State = state;
+        return res.json({ success: true, state: cachedSprint7State });
+      }
+      res.status(400).json({ error: "Missing state payload" });
+    } catch (error) {
+      res.status(500).json({ error: `L\u1ED7i \u0111\u1ED3ng b\u1ED9 c\u1EA5u h\xECnh Sprint 7: ${error.message}` });
+    }
+  });
+  app2.get(["/api/sprint7/state-sync", "/sprint7/state-sync", "*/sprint7/state-sync"], (req, res) => {
+    try {
+      res.json({ state: cachedSprint7State });
+    } catch (error) {
+      res.status(500).json({ error: `L\u1ED7i \u0111\u1ED3ng b\u1ED9 c\u1EA5u h\xECnh Sprint 7: ${error.message}` });
+    }
+  });
   app2.get(["/api/desktop-overlay/status", "/desktop-overlay/status", "/status", "*/status"], (req, res) => {
     const control = global.electronOverlayControl;
     if (control) {

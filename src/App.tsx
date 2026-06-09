@@ -913,6 +913,17 @@ export default function App() {
       } else {
         showToast("⚠️ Máy chủ từ chối thiết lập. Vui lòng thử lại!");
       }
+
+      // Sync a copy to local server running on localhost:3000 if we are on Vercel
+      if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
+        fetch("http://localhost:3000/api/youtube/settings-sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ settings: settingsToSync }),
+        }).catch((e) => console.warn("Failed to sync settings copy to localhost:", e));
+      }
     } catch (err) {
       console.error("Failed to sync settings with OBS:", err);
       showToast("❌ Không kết nối được tới máy chủ để đồng bộ!");

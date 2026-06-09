@@ -346,6 +346,30 @@ export function createApiApp(): express.Express {
     }
   });
 
+  // ─── Server-side Sprint 7 state cache ───
+  let cachedSprint7State: any = null;
+
+  app.post(["/api/sprint7/state-sync", "/sprint7/state-sync", "*/sprint7/state-sync"], (req, res) => {
+    try {
+      const { state } = req.body || {};
+      if (state) {
+        cachedSprint7State = state;
+        return res.json({ success: true, state: cachedSprint7State });
+      }
+      res.status(400).json({ error: "Missing state payload" });
+    } catch (error: any) {
+      res.status(500).json({ error: `Lỗi đồng bộ cấu hình Sprint 7: ${error.message}` });
+    }
+  });
+
+  app.get(["/api/sprint7/state-sync", "/sprint7/state-sync", "*/sprint7/state-sync"], (req, res) => {
+    try {
+      res.json({ state: cachedSprint7State });
+    } catch (error: any) {
+      res.status(500).json({ error: `Lỗi đồng bộ cấu hình Sprint 7: ${error.message}` });
+    }
+  });
+
   // ─── APIs bridging Electron Main Process for desktop overlay ───
   app.get(["/api/desktop-overlay/status", "/desktop-overlay/status", "/status", "*/status"], (req, res) => {
     const control = (global as any).electronOverlayControl;
