@@ -11,6 +11,7 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ### 🛠️ Sửa lỗi & Tối ưu hóa (Bug Fixes)
 - **Đồng bộ link localhost**: Sửa lỗi lưu trữ link bị sai lệch khi chạy trên `127.0.0.1`, đảm bảo link OBS trên web và trên livestream luôn hiển thị thống nhất là `localhost`.
+- **Sửa lỗi sập Serverless Function trên Vercel**: Ẩn module `vite` khỏi hệ thống phân tích tĩnh Vercel NFT (Node File Trace) để tránh bundle các native module nặng, đồng thời tắt tự động ghi file log `server_logs.txt` trên môi trường đám mây nhằm giải quyết triệt để lỗi `FUNCTION_INVOCATION_FAILED` (HTTP 500).
 
 ---
 

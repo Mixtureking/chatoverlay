@@ -11,6 +11,7 @@ function logToFile(message: string) {
   const timestamp = new Date().toISOString();
   const logLine = `[LOGGER][${timestamp}] ${message}\n`;
   console.log(logLine.trim());
+  if (process.env.VERCEL) return;
   try {
     fs.appendFileSync(path.join(process.cwd(), "server_logs.txt"), logLine, "utf8");
   } catch (err) {
@@ -425,7 +426,8 @@ app.use((err: any, req: any, res: any, next: any) => {
 // Vite & Static file handler initialization for local development and standalone/Electron environments
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
+    const viteModule = "vite";
+    const { createServer: createViteServer } = await import(viteModule);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
