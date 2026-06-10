@@ -17,6 +17,7 @@ export interface Sprint7WidgetState {
   flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
+  updatedAt?: number;
 }
 
 export interface Sprint7FullState {
@@ -32,6 +33,7 @@ export interface Sprint7FullState {
   flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
+  updatedAt?: number;
 }
 
 export const SPRINT7_WIDGET_STORAGE_KEY = "sprint7_widget_state";
@@ -56,6 +58,7 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
     flowerType: typeof input?.flowerType === "string" ? input.flowerType : "TUNG_HOA",
     voteKeywordA: typeof input?.voteKeywordA === "string" ? input.voteKeywordA : "A",
     voteKeywordB: typeof input?.voteKeywordB === "string" ? input.voteKeywordB : "B",
+    updatedAt: typeof input?.updatedAt === "number" ? input.updatedAt : Date.now(),
   };
 }
 

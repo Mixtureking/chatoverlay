@@ -266,6 +266,7 @@ export function createApiApp(): express.Express {
             // Update Sprint 7 cached state for instant effects
             if (cachedSprint7State) {
               cachedSprint7State.flowerTrigger = Date.now();
+              cachedSprint7State.updatedAt = Date.now();
               const typeMap: any = {
                 tunghoa: "TUNG_HOA",
                 phaohoa: "PHAO_HOA",

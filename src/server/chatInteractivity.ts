@@ -72,13 +72,22 @@ export function parseChatCommand(messageText: string): ChatCommand | null {
       return { type: "pick" };
     }
 
-    // Strict !vote "keyword" requirement
+    // !vote "keyword" OR !keyword
     const voteMatch = trimmed.match(/^!VOTE\s+"?([^"]+)"?$/i);
     if (voteMatch) {
       const val = voteMatch[1].trim().toUpperCase();
       if (val === kA) return { type: "vote", option: "A" };
       if (val === kB) return { type: "vote", option: "B" };
     }
+    
+    // Support !A or !B directly
+    const commandOnly = trimmed.substring(1);
+    if (commandOnly === kA) return { type: "vote", option: "A" };
+    if (commandOnly === kB) return { type: "vote", option: "B" };
+  } else {
+    // Just keywords (no !)
+    if (trimmed === kA) return { type: "vote", option: "A" };
+    if (trimmed === kB) return { type: "vote", option: "B" };
   }
 
   return null;
