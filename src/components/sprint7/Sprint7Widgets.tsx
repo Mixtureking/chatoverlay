@@ -1,6 +1,24 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
+import { ChatMessage } from "../../types";
+
+/**
+ * Helper to unescape HTML entities from sanitized messages.
+ */
+function unescapeHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&QUOT;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&AMP;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&LT;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&GT;/g, ">");
+}
 
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
 
@@ -20,42 +38,77 @@ const getRoute = (): WidgetRoute => {
 };
 
 /**
- * EmojiEffect component that can trigger independently by polling chat.
+ * EmojiEffect component that can trigger independently or via props.
  */
-function FlowerEffect() {
+function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
   const [items, setItems] = useState<{ id: number; left: number; delay: number; duration: number; size: number; content: string }[]>([]);
   const nextPageTokenRef = useRef<string | null>(null);
+  const processedMessageIds = useRef<Set<string>>(new Set());
 
+  const trigger = (type: string = "TUNG_HOA") => {
+    let emojis = ["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"];
+    if (type === "PHAO_HOA") emojis = ["🎆", "🎇", "✨", "🎊", "🎉"];
+    if (type === "TIM") emojis = ["❤️", "💖", "💗", "💓", "💘", "💝"];
+    if (type === "VO_TAY") emojis = ["👏", "🙌", "🎉", "✨"];
+
+    const newItems = Array.from({ length: 30 }).map((_, i) => ({
+      id: Date.now() + i + Math.random(),
+      left: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 3 + Math.random() * 3,
+      size: 20 + Math.random() * 20,
+      content: emojis[Math.floor(Math.random() * emojis.length)],
+    }));
+    setItems((prev) => [...prev, ...newItems]);
+    setTimeout(() => {
+      setItems((prev) => prev.filter((f) => !newItems.includes(f)));
+    }, 8000);
+  };
+
+  // 1. Listen for triggers from other tabs
   useEffect(() => {
-    const trigger = (type: string = "TUNG_HOA") => {
-      let emojis = ["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"];
-      if (type === "PHAO_HOA") emojis = ["🎆", "🎇", "✨", "🎊", "🎉"];
-      if (type === "TIM") emojis = ["❤️", "💖", "💗", "💓", "💘", "💝"];
-      if (type === "VO_TAY") emojis = ["👏", "🙌", "🎉", "✨"];
-
-      const newItems = Array.from({ length: 30 }).map((_, i) => ({
-        id: Date.now() + i + Math.random(),
-        left: Math.random() * 100,
-        delay: Math.random() * 2,
-        duration: 3 + Math.random() * 3,
-        size: 20 + Math.random() * 20,
-        content: emojis[Math.floor(Math.random() * emojis.length)],
-      }));
-      setItems((prev) => [...prev, ...newItems]);
-      setTimeout(() => {
-        setItems((prev) => prev.filter((f) => !newItems.includes(f)));
-      }, 8000);
-    };
-
-    // Listen for triggers from other tabs (Dashboard or other layers)
     const channel = new BroadcastChannel("sprint7_flower_channel");
     channel.onmessage = (e) => {
       if (["TUNG_HOA", "PHAO_HOA", "TIM", "VO_TAY"].includes(e.data.type)) {
         trigger(e.data.type);
       }
     };
+    return () => channel.close();
+  }, []);
 
-    // Autonomous polling to ensure it works even if ONLY this layer is open in OBS
+  // 2. Process messages from props
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    
+    messages.forEach((m) => {
+      if (processedMessageIds.current.has(m.id)) return;
+      processedMessageIds.current.add(m.id);
+
+      const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
+      let triggeredType = "";
+      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
+      else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
+      else if (text.includes("!TIM")) triggeredType = "TIM";
+      else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
+
+      if (triggeredType) {
+        trigger(triggeredType);
+        const channel = new BroadcastChannel("sprint7_flower_channel");
+        channel.postMessage({ type: triggeredType });
+        channel.close();
+      }
+    });
+
+    if (processedMessageIds.current.size > 1000) {
+      const allIds = Array.from(processedMessageIds.current);
+      processedMessageIds.current = new Set(allIds.slice(allIds.length - 500));
+    }
+  }, [messages]);
+
+  // 3. Autonomous polling (fallback)
+  useEffect(() => {
+    if (messages) return;
+
     let alive = true;
     const poll = async () => {
       try {
@@ -71,7 +124,7 @@ function FlowerEffect() {
           nextPageTokenRef.current = msgData?.nextPageToken || null;
           if (Array.isArray(msgData?.messages)) {
             msgData.messages.forEach((m: any) => {
-              const text = String(m.messageText || "").trim().toUpperCase();
+              const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
               
               let triggeredType = "";
               if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
@@ -81,7 +134,9 @@ function FlowerEffect() {
 
               if (triggeredType) {
                 trigger(triggeredType);
-                channel.postMessage({ type: triggeredType }); // Notify other tabs
+                const channel = new BroadcastChannel("sprint7_flower_channel");
+                channel.postMessage({ type: triggeredType });
+                channel.close();
               }
             });
           }
@@ -89,13 +144,12 @@ function FlowerEffect() {
       } catch {}
     };
 
-    const timer = setInterval(poll, 2000);
+    const timer = setInterval(poll, 4000);
     return () => {
       alive = false;
-      channel.close();
       clearInterval(timer);
     };
-  }, []);
+  }, [messages]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
@@ -137,7 +191,7 @@ interface ClientVoteState {
 /**
  * Hook to manage vote state entirely on the client-side for absolute stability on Vercel.
  */
-function useVoteState(widgetState: Sprint7WidgetState) {
+function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
   const [state, setState] = useState<ClientVoteState>(() => {
     try {
       const saved = localStorage.getItem("sprint7_votes");
@@ -148,21 +202,91 @@ function useVoteState(widgetState: Sprint7WidgetState) {
   });
 
   const nextPageTokenRef = useRef<string | null>(null);
+  const processedMessageIds = useRef<Set<string>>(new Set());
 
+  const processIncomingMessages = (incoming: any[], kA: string, kB: string) => {
+    const savedRaw = localStorage.getItem("sprint7_votes");
+    let current: ClientVoteState;
+    try {
+      current = savedRaw ? JSON.parse(savedRaw) : { A: 0, B: 0, total: 0, voters: {} };
+    } catch {
+      current = { A: 0, B: 0, total: 0, voters: {} };
+    }
+    
+    let updated = false;
+
+    incoming.forEach((m: any) => {
+      if (processedMessageIds.current.has(m.id)) return;
+      processedMessageIds.current.add(m.id);
+
+      let text = unescapeHtml(m.messageText || "").trim().toUpperCase();
+      const userId = String(m.authorChannelId || m.authorName || m.id || "").trim();
+      
+      // Only count the FIRST vote from each user
+      if (userId && !current.voters[userId]) {
+        const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
+        if (voteMatch) {
+          const val = voteMatch[1].trim().toUpperCase();
+          if (val === kA) { current.voters[userId] = "A"; current.A++; updated = true; }
+          else if (val === kB) { current.voters[userId] = "B"; current.B++; updated = true; }
+        }
+      }
+
+      // Effect triggers
+      let triggeredType = "";
+      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HO_A"; // Avoid recursion if triggered by same poll
+      else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
+      else if (text.includes("!TIM")) triggeredType = "TIM";
+      else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
+
+      // Special case: if it's TUNGHOA, use the standard type
+      if (triggeredType === "TUNG_HO_A") triggeredType = "TUNG_HOA";
+
+      if (triggeredType) {
+        const channel = new BroadcastChannel("sprint7_flower_channel");
+        channel.postMessage({ type: triggeredType });
+        channel.close();
+      }
+    });
+
+    if (updated) {
+      current.total = current.A + current.B;
+      localStorage.setItem("sprint7_votes", JSON.stringify(current));
+      setState(current);
+    }
+
+    if (processedMessageIds.current.size > 1000) {
+      const allIds = Array.from(processedMessageIds.current);
+      processedMessageIds.current = new Set(allIds.slice(allIds.length - 500));
+    }
+  };
+
+  // 1. Sync state across tabs
   useEffect(() => {
-    // 1. Sync state across tabs using storage event
     const syncFromLocal = () => {
       try {
         const saved = localStorage.getItem("sprint7_votes");
         if (saved) setState(JSON.parse(saved));
       } catch {}
     };
-
     window.addEventListener("storage", (e) => {
       if (e.key === "sprint7_votes") syncFromLocal();
     });
+    return () => window.removeEventListener("storage", syncFromLocal);
+  }, []);
 
-    // 2. Autonomous polling for votes
+  // 2. Process messages from props
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const kA = (widgetState?.voteKeywordA || "A").trim().toUpperCase();
+    const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
+    processIncomingMessages(messages, kA, kB);
+  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
+
+  // 3. Autonomous polling (fallback)
+  useEffect(() => {
+    if (messages) return;
+
     let alive = true;
     const poll = async () => {
       try {
@@ -179,62 +303,20 @@ function useVoteState(widgetState: Sprint7WidgetState) {
           nextPageTokenRef.current = msgData?.nextPageToken || null;
 
           if (Array.isArray(msgData?.messages)) {
-            const savedRaw = localStorage.getItem("sprint7_votes");
-            const current: ClientVoteState = savedRaw ? JSON.parse(savedRaw) : { A: 0, B: 0, total: 0, voters: {} };
-            let updated = false;
-
             const kA = (widgetState?.voteKeywordA || settings.voteKeywordA || "A").trim().toUpperCase();
             const kB = (widgetState?.voteKeywordB || settings.voteKeywordB || "B").trim().toUpperCase();
-
-            msgData.messages.forEach((m: any) => {
-              let text = String(m.messageText || "").trim().toUpperCase();
-              
-              // Handle escaped quotes from sanitization
-              text = text.replace(/&QUOT;/g, '"').replace(/&#039;/g, "'");
-
-              const userId = String(m.authorChannelId || m.authorName || m.id || "").trim();
-              
-              // Only count the FIRST vote from each user
-              if (userId && !current.voters[userId]) {
-                const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
-                if (voteMatch) {
-                  const val = voteMatch[1].trim().toUpperCase();
-                  if (val === kA) { current.voters[userId] = "A"; current.A++; updated = true; }
-                  else if (val === kB) { current.voters[userId] = "B"; current.B++; updated = true; }
-                }
-              }
-
-              // Effect triggers
-              let triggeredType = "";
-              if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
-              else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
-              else if (text.includes("!TIM")) triggeredType = "TIM";
-              else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
-
-              if (triggeredType) {
-                const channel = new BroadcastChannel("sprint7_flower_channel");
-                channel.postMessage({ type: triggeredType });
-                channel.close();
-              }
-            });
-
-            if (updated) {
-              current.total = current.A + current.B;
-              localStorage.setItem("sprint7_votes", JSON.stringify(current));
-              setState(current);
-            }
+            processIncomingMessages(msgData.messages, kA, kB);
           }
         }
       } catch {}
     };
 
-    const timer = setInterval(poll, 2000);
+    const timer = setInterval(poll, 4000);
     return () => {
       alive = false;
-      window.removeEventListener("storage", syncFromLocal);
       clearInterval(timer);
     };
-  }, [widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
+  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
 
   const aPct = state.total > 0 ? Math.round((state.A / state.total) * 100) : 0;
   const bPct = state.total > 0 ? 100 - aPct : 0;
@@ -416,8 +498,70 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   );
 }
 
-function ObsVoteWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
-  const vote = useVoteState(widgetState);
+export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] }) {
+  const route = getRoute();
+  const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
+  const lastManualSyncRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (messages && messages.length > 0) {
+      console.log(`[Sprint7Widgets] Received ${messages.length} messages from parent.`);
+    }
+  }, [messages]);
+
+  const syncState = (next: Sprint7WidgetState) => {
+    lastManualSyncRef.current = Date.now();
+    (window as any).__SPRINT7_STATE__ = next;
+    savePersistedSprint7WidgetState(next);
+    setState(next);
+    fetch("/api/sprint7/state-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: next }),
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    const poll = async () => {
+      if (Date.now() - lastManualSyncRef.current < 3000) return;
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state) setState(data.state);
+      } catch {}
+    };
+    const interval = setInterval(poll, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const vote = useVoteState(state, messages);
+
+  return (
+    <div className="w-full h-full bg-transparent overflow-hidden relative" style={obsFontStyle}>
+      <CustomCssInjector css={state.customCSS} />
+      <FlowerEffect messages={messages} />
+      {route === "obs-effect" ? (
+        null // FlowerEffect is already rendered globally in this container
+      ) : route === "dashboard" ? (
+        <Sprint7Dashboard state={state} syncState={syncState} />
+      ) : route === "obs-timer" ? (
+        <TimerWidget widgetState={state} />
+      ) : route === "obs-wheel" ? (
+        <WheelWidget widgetState={state} />
+      ) : route === "obs-link" ? (
+        <LinkWidget widgetState={state} />
+      ) : route === "obs-todo" ? (
+        <ObsTodoWidget widgetState={state} />
+      ) : route === "obs-vote" ? (
+        <ObsVoteWidget widgetState={state} vote={vote} />
+      ) : (
+        <div className="p-8 text-white">Route not found: {route}</div>
+      )}
+    </div>
+  );
+}
+
+function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState, vote: any }) {
   const keywordA = widgetState.voteKeywordA || "A";
   const keywordB = widgetState.voteKeywordB || "B";
 
@@ -483,65 +627,4 @@ function ObsVoteWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
 function CustomCssInjector({ css }: { css?: string }) {
   if (!css || !isLikelySafeCss(css)) return null;
   return <style id="custom-css-injector" dangerouslySetInnerHTML={{ __html: css }} />;
-}
-
-export default function Sprint7Widgets() {
-  const route = getRoute();
-  const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
-  const lastManualSyncRef = useRef<number>(0);
-
-  const syncState = (next: Sprint7WidgetState) => {
-    lastManualSyncRef.current = Date.now();
-    (window as any).__SPRINT7_STATE__ = next;
-    savePersistedSprint7WidgetState(next);
-    setState(next);
-    fetch("/api/sprint7/state-sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: next }),
-    }).catch(() => {});
-  };
-
-  useEffect(() => {
-    if (route === "dashboard") {
-      const poll = async () => {
-        if (Date.now() - lastManualSyncRef.current < 3000) return;
-        try {
-          const res = await fetch("/api/sprint7/state-sync");
-          const data = await res.json();
-          if (data?.state) setState(data.state);
-        } catch {}
-      };
-      const interval = setInterval(poll, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [route]);
-
-  const isLight = false; // Could be synced if needed
-
-  return (
-    <div className="w-full h-full bg-transparent overflow-hidden" style={obsFontStyle}>
-      <CustomCssInjector css={state.customCSS} />
-      {route === "obs-effect" ? (
-        <FlowerEffect />
-      ) : route === "dashboard" ? (
-        <>
-          <FlowerEffect />
-          <Sprint7Dashboard state={state} syncState={syncState} />
-        </>
-      ) : route === "obs-timer" ? (
-        <TimerWidget widgetState={state} />
-      ) : route === "obs-wheel" ? (
-        <WheelWidget widgetState={state} />
-      ) : route === "obs-link" ? (
-        <LinkWidget widgetState={state} />
-      ) : route === "obs-todo" ? (
-        <ObsTodoWidget widgetState={state} />
-      ) : route === "obs-vote" ? (
-        <ObsVoteWidget widgetState={state} />
-      ) : (
-        <div className="p-8 text-white">Route not found: {route}</div>
-      )}
-    </div>
-  );
 }

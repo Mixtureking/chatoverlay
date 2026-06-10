@@ -2796,7 +2796,7 @@ export default function App() {
     : null;
 
   if (sprint7Route) {
-    return <Sprint7Widgets />;
+    return <Sprint7Widgets messages={messages} />;
   }
 
   return (
@@ -4550,7 +4550,7 @@ export default function App() {
 
       {activeMainRoute === "sprint7" && (
         <div className="w-full h-full overflow-hidden">
-          <Sprint7Widgets />
+          <Sprint7Widgets messages={messages} />
         </div>
       )}
     </ScreenTransition>
