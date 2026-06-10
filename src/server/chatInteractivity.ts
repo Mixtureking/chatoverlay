@@ -1,13 +1,20 @@
 export type ChatCommand =
   | { type: "roll"; sides: number }
   | { type: "pick" }
-  | { type: "vote"; option: "A" | "B" };
+  | { type: "vote"; option: "A" | "B" }
+  | { type: "tunghoa" }
+  | { type: "phaohoa" }
+  | { type: "tim" }
+  | { type: "votay" };
 
 export type VoteState = {
   A: number;
   B: number;
   voters: Record<string, "A" | "B">;
   updatedAt: number;
+  keywordA: string;
+  keywordB: string;
+  voteStartedAt: number;
 };
 
 const DEFAULT_VOTE_STATE: VoteState = {
@@ -15,6 +22,9 @@ const DEFAULT_VOTE_STATE: VoteState = {
   B: 0,
   voters: {},
   updatedAt: Date.now(),
+  keywordA: "A",
+  keywordB: "B",
+  voteStartedAt: Date.now(),
 };
 
 const voteState: VoteState = {
@@ -22,28 +32,53 @@ const voteState: VoteState = {
   voters: {},
 };
 
+const processedMessageIds = new Set<string>();
+const processedMessageIdQueue: string[] = [];
+const MAX_PROCESSED_IDS = 5000;
+
 export function parseChatCommand(messageText: string): ChatCommand | null {
   if (typeof messageText !== "string") return null;
 
-  const trimmed = messageText.trim();
-  if (!trimmed.startsWith("!")) return null;
+  // Unescape common HTML entities that might come from sanitization
+  const unescaped = messageText
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 
-  const rollMatch = trimmed.match(/^!roll\s+(\d{1,4})$/i);
-  if (rollMatch) {
-    const sides = Number.parseInt(rollMatch[1], 10);
-    if (Number.isFinite(sides) && sides >= 2) {
-      return { type: "roll", sides };
+  const trimmed = unescaped.trim().toUpperCase();
+  const kA = voteState.keywordA;
+  const kB = voteState.keywordB;
+
+  // Explicit command with !
+  if (trimmed.startsWith("!")) {
+    // Effect commands
+    if (/^!TUNGHOA$/i.test(trimmed)) return { type: "tunghoa" };
+    if (/^!PHAOHOA$/i.test(trimmed)) return { type: "phaohoa" };
+    if (/^!TIM$/i.test(trimmed)) return { type: "tim" };
+    if (/^!VOTAY$/i.test(trimmed) || /^!VỖTAY$/i.test(trimmed)) return { type: "votay" };
+
+    const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
+    if (rollMatch) {
+      const sides = Number.parseInt(rollMatch[1], 10);
+      if (Number.isFinite(sides) && sides >= 2) {
+        return { type: "roll", sides };
+      }
+      return null;
     }
-    return null;
-  }
 
-  if (/^!pick$/i.test(trimmed)) {
-    return { type: "pick" };
-  }
+    if (/^!PICK$/i.test(trimmed)) {
+      return { type: "pick" };
+    }
 
-  const voteMatch = trimmed.match(/^!vote\s+([AB])$/i);
-  if (voteMatch) {
-    return { type: "vote", option: voteMatch[1].toUpperCase() as "A" | "B" };
+    // Strict !vote "keyword" requirement
+    const voteMatch = trimmed.match(/^!VOTE\s+"?([^"]+)"?$/i);
+    if (voteMatch) {
+      const val = voteMatch[1].trim().toUpperCase();
+      if (val === kA) return { type: "vote", option: "A" };
+      if (val === kB) return { type: "vote", option: "B" };
+    }
   }
 
   return null;
@@ -56,6 +91,9 @@ export function getVoteState() {
     total: voteState.A + voteState.B,
     voters: { ...voteState.voters },
     updatedAt: voteState.updatedAt,
+    keywordA: voteState.keywordA,
+    keywordB: voteState.keywordB,
+    voteStartedAt: voteState.voteStartedAt,
   };
 }
 
@@ -63,33 +101,84 @@ export function resetVoteState() {
   voteState.A = 0;
   voteState.B = 0;
   voteState.voters = {};
+  voteState.voteStartedAt = Date.now();
+  voteState.updatedAt = Date.now();
+  processedMessageIds.clear();
+  processedMessageIdQueue.length = 0;
+  return getVoteState();
+}
+
+export function setVoteKeywords(keywordA: string, keywordB: string) {
+  voteState.keywordA = (keywordA || "A").trim().toUpperCase();
+  voteState.keywordB = (keywordB || "B").trim().toUpperCase();
   voteState.updatedAt = Date.now();
   return getVoteState();
 }
 
-export function castVote(userId: string, option: "A" | "B") {
+export function castVote(userId: string, option: "A" | "B", messageId?: string, timestamp?: number) {
   if (!userId || typeof userId !== "string") {
     return { accepted: false, reason: "missing_user" as const, state: getVoteState() };
   }
 
-  const normalizedUserId = userId.trim();
-  const previousVote = voteState.voters[normalizedUserId];
-
-  if (previousVote === option) {
-    return { accepted: false, reason: "duplicate_vote" as const, state: getVoteState() };
+  // Deduplicate by messageId
+  if (messageId) {
+    if (processedMessageIds.has(messageId)) {
+      return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
+    }
+    processedMessageIds.add(messageId);
+    processedMessageIdQueue.push(messageId);
+    if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
+      const oldId = processedMessageIdQueue.shift();
+      if (oldId) processedMessageIds.delete(oldId);
+    }
   }
 
-  if (previousVote === "A") voteState.A = Math.max(0, voteState.A - 1);
-  if (previousVote === "B") voteState.B = Math.max(0, voteState.B - 1);
+  if (timestamp && timestamp < voteState.voteStartedAt) {
+    return { accepted: false, reason: "old_message" as const, state: getVoteState() };
+  }
 
+  const normalizedUserId = userId.trim();
   voteState.voters[normalizedUserId] = option;
-  voteState[option] += 1;
+
+  // Derive totals from map
+  const counts = Object.values(voteState.voters).reduce(
+    (acc, val) => {
+      acc[val]++;
+      return acc;
+    },
+    { A: 0, B: 0 }
+  );
+
+  voteState.A = counts.A;
+  voteState.B = counts.B;
   voteState.updatedAt = Date.now();
 
   return {
     accepted: true,
-    reason: previousVote ? "updated_vote" : "new_vote",
+    reason: "new_vote",
     state: getVoteState(),
   };
 }
 
+export function setRawVoteState(newState: Partial<VoteState>) {
+  if (newState.voters) {
+    voteState.voters = { ...newState.voters };
+    const counts = Object.values(voteState.voters).reduce(
+      (acc, val) => {
+        acc[val]++;
+        return acc;
+      },
+      { A: 0, B: 0 }
+    );
+    voteState.A = counts.A;
+    voteState.B = counts.B;
+  } else {
+    if (typeof newState.A === "number") voteState.A = newState.A;
+    if (typeof newState.B === "number") voteState.B = newState.B;
+  }
+  
+  if (newState.keywordA) voteState.keywordA = newState.keywordA;
+  if (newState.keywordB) voteState.keywordB = newState.keywordB;
+  if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
+  voteState.updatedAt = Date.now();
+}

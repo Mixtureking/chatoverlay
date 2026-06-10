@@ -10,7 +10,13 @@ export interface Sprint7WidgetState {
   };
   timerSeconds?: number;
   timerDoneText?: string;
+  timerTrigger?: number;
   wheelUsers?: string[];
+  spinTrigger?: number;
+  flowerTrigger?: number;
+  flowerType?: string;
+  voteKeywordA?: string;
+  voteKeywordB?: string;
 }
 
 export interface Sprint7FullState {
@@ -19,7 +25,13 @@ export interface Sprint7FullState {
   socialLinks: Sprint7WidgetState["socialLinks"];
   timerSeconds?: number;
   timerDoneText?: string;
+  timerTrigger?: number;
   wheelUsers?: string[];
+  spinTrigger?: number;
+  flowerTrigger?: number;
+  flowerType?: string;
+  voteKeywordA?: string;
+  voteKeywordB?: string;
 }
 
 export const SPRINT7_WIDGET_STORAGE_KEY = "sprint7_widget_state";
@@ -34,10 +46,16 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
         }))
       : [],
     customCSS: typeof input?.customCSS === "string" ? input.customCSS : "",
-    socialLinks: input?.socialLinks && typeof input.socialLinks === "object" && Object.keys(input.socialLinks).length > 0 ? input.socialLinks : { youtube: "https://youtube.com/@YourChannel", discord: "https://discord.gg/example" },
+    socialLinks: input?.socialLinks && typeof input.socialLinks === "object" ? input.socialLinks : { youtube: "https://youtube.com/@YourChannel", discord: "https://discord.gg/example" },
     timerSeconds: typeof input?.timerSeconds === "number" && input.timerSeconds >= 0 ? input.timerSeconds : 5 * 60,
     timerDoneText: typeof input?.timerDoneText === "string" && input.timerDoneText.trim() ? input.timerDoneText : "Thời gian đã kết thúc",
+    timerTrigger: typeof input?.timerTrigger === "number" ? input.timerTrigger : 0,
     wheelUsers: Array.isArray(input?.wheelUsers) && input.wheelUsers.length > 0 ? input.wheelUsers.filter((item) => typeof item === "string" && item.trim()) : ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
+    spinTrigger: typeof input?.spinTrigger === "number" ? input.spinTrigger : 0,
+    flowerTrigger: typeof input?.flowerTrigger === "number" ? input.flowerTrigger : 0,
+    flowerType: typeof input?.flowerType === "string" ? input.flowerType : "TUNG_HOA",
+    voteKeywordA: typeof input?.voteKeywordA === "string" ? input.voteKeywordA : "A",
+    voteKeywordB: typeof input?.voteKeywordB === "string" ? input.voteKeywordB : "B",
   };
 }
 
@@ -83,7 +101,13 @@ export function createSprint7FullState(input?: Partial<Sprint7FullState>): Sprin
     socialLinks: widgetState.socialLinks,
     timerSeconds: widgetState.timerSeconds,
     timerDoneText: widgetState.timerDoneText,
+    timerTrigger: widgetState.timerTrigger,
     wheelUsers: widgetState.wheelUsers,
+    spinTrigger: widgetState.spinTrigger,
+    flowerTrigger: widgetState.flowerTrigger,
+    flowerType: widgetState.flowerType,
+    voteKeywordA: widgetState.voteKeywordA,
+    voteKeywordB: widgetState.voteKeywordB,
   };
 }
 

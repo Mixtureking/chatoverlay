@@ -605,9 +605,9 @@ export default function App() {
     const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay" || decodedParams.mode === "desktop-overlay";
     const hasTransitionParam = searchParams.get("mode") === "transition" || decodedParams.mode === "transition" || path === "/transition-overlay";
     
-    const isSprint7Route = path.endsWith("/obs-chat") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link");
+    const isSprint7Route = path.endsWith("/obs-vote") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link") || path.endsWith("/obs-todo") || path.endsWith("/obs-effect");
     
-    if ((path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) && !isSprint7Route) {
+    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam || isSprint7Route) {
       setIsOverlayRoute(true);
       if (hasDesktopOverlayParam) {
         setIsDesktopOverlay(true);
@@ -1883,7 +1883,18 @@ export default function App() {
     }
   };
 
-  // 7. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
+  // 7. RENDER SPRINT 7 WIDGETS (WHEEL, TIMER, VOTE, etc.)
+  const sprint7Route = typeof window !== "undefined"
+    ? (window.location.pathname.endsWith("/obs-vote") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link") || window.location.pathname.endsWith("/obs-todo") || window.location.pathname.endsWith("/obs-effect"))
+      ? window.location.pathname.split("/").pop()
+      : null
+    : null;
+
+  if (sprint7Route) {
+    return <Sprint7Widgets messages={messages} />;
+  }
+
+  // 8. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
   if (isOverlayRoute && (!isDesktopOverlay || !isEmbeddedDashboardOpen)) {
     if (isDesktopOverlay) {
       const shouldHideControls = isMouseDownOnHandle;
@@ -2788,16 +2799,6 @@ export default function App() {
       });
     }
   }, []);
-
-  const sprint7Route = typeof window !== "undefined"
-    ? (window.location.pathname.endsWith("/obs-chat") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link"))
-      ? window.location.pathname.split("/").pop()
-      : null
-    : null;
-
-  if (sprint7Route) {
-    return <Sprint7Widgets />;
-  }
 
   return (
     <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.themeMode === 'light' ? 'theme-light' : ''}`}>
@@ -4550,7 +4551,7 @@ export default function App() {
 
       {activeMainRoute === "sprint7" && (
         <div className="w-full h-full overflow-hidden">
-          <Sprint7Widgets />
+          <Sprint7Widgets messages={messages} />
         </div>
       )}
     </ScreenTransition>

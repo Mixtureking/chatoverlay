@@ -1,20 +1,42 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+import { motion, AnimatePresence } from "motion/react";
+import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
+import { ChatMessage } from "../../types";
 
-type VoteState = { A: number; B: number; total: number };
-type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel" | "obs-link" | "dashboard";
+/**
+ * Helper to unescape HTML entities from sanitized messages.
+ */
+function unescapeHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&QUOT;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&AMP;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&LT;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&GT;/g, ">");
+}
 
-const sampleComments = [
-  "This clip is awesome!",
-  "You look amazing",
-  "Let's go!",
-  "Vote A",
-  "Cyberpunk vibes",
-  "Chat is heating up",
-];
+/**
+ * Robustly get hostname from a URL string.
+ */
+function getHostname(url: string): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+}
 
-const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
+type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
+
+const obsFontStyle = { fontFamily: '"Inter", "Segoe UI", Arial, sans-serif' };
 
 const getRoute = (): WidgetRoute => {
   if (typeof window === "undefined") return "dashboard";
@@ -22,30 +44,167 @@ const getRoute = (): WidgetRoute => {
   if (path.includes("obs-timer")) return "obs-timer";
   if (path.includes("obs-wheel")) return "obs-wheel";
   if (path.includes("obs-link")) return "obs-link";
-  if (path.includes("obs-chat")) return "obs-chat";
+  if (path.includes("obs-vote")) return "obs-vote";
+  if (path.includes("obs-chat")) return "obs-vote"; 
+  if (path.includes("obs-todo")) return "obs-todo";
+  if (path.includes("obs-effect")) return "obs-effect";
   return "dashboard";
 };
 
-function useVoteState() {
-  const [state, setState] = useState<VoteState>({ A: 0, B: 0, total: 0 });
+/**
+ * EmojiEffect component.
+ */
+function FlowerEffect({ state, messages }: { state?: Sprint7WidgetState, messages?: ChatMessage[] }) {
+  const [items, setItems] = useState<{ id: number; left: number; delay: number; duration: number; size: number; content: string }[]>([]);
+  const nextPageTokenRef = useRef<string | null>(null);
+  const processedMessageIds = useRef<Set<string>>(new Set());
+  const lastFlowerTriggerRef = useRef<number>(state?.flowerTrigger || 0);
+
+  const trigger = (type: string = "TUNG_HOA") => {
+    let emojis = ["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"];
+    if (type === "PHAO_HOA") emojis = ["🎆", "🎇", "✨", "🎊", "🎉"];
+    if (type === "TIM") emojis = ["❤️", "💖", "💗", "💓", "💘", "💝"];
+    if (type === "VO_TAY") emojis = ["👏", "🙌", "🎉", "✨"];
+
+    const newItems = Array.from({ length: 30 }).map((_, i) => ({
+      id: Date.now() + i + Math.random(),
+      left: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 3 + Math.random() * 3,
+      size: 20 + Math.random() * 20,
+      content: emojis[Math.floor(Math.random() * emojis.length)],
+    }));
+    setItems((prev) => [...prev, ...newItems]);
+    setTimeout(() => {
+      setItems((prev) => prev.filter((f) => !newItems.includes(f)));
+    }, 8000);
+  };
+
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/interactivity/votes");
-        const data = await res.json();
-        if (!alive) return;
-        setState(data?.state || { A: 0, B: 0, total: 0 });
-      } catch {
-        if (alive) setState({ A: 0, B: 0, total: 0 });
+    const channel = new BroadcastChannel("sprint7_flower_channel");
+    channel.onmessage = (e) => {
+      if (["TUNG_HOA", "PHAO_HOA", "TIM", "VO_TAY"].includes(e.data.type)) {
+        trigger(e.data.type);
       }
     };
-    load();
-    const timer = window.setInterval(load, 900);
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
+    return () => channel.close();
+  }, []);
+
+  useEffect(() => {
+    if (state?.flowerTrigger && state.flowerTrigger > lastFlowerTriggerRef.current) {
+      trigger(state.flowerType || "TUNG_HOA");
+      lastFlowerTriggerRef.current = state.flowerTrigger;
+    }
+  }, [state?.flowerTrigger, state?.flowerType]);
+
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    messages.forEach((m) => {
+      if (processedMessageIds.current.has(m.id)) return;
+      processedMessageIds.current.add(m.id);
+      const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
+      let triggeredType = "";
+      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
+      else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
+      else if (text.includes("!TIM")) triggeredType = "TIM";
+      else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
+      if (triggeredType) trigger(triggeredType);
+    });
+  }, [messages]);
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
+      {items.map((f) => (
+        <div key={f.id} className="absolute text-2xl animate-fall" style={{ left: `${f.left}%`, top: "-50px", animationDelay: `${f.delay}s`, animationDuration: `${f.duration}s`, fontSize: `${f.size}px` }}>{f.content}</div>
+      ))}
+      <style>{`
+        @keyframes fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+        .animate-fall { animation: fall linear forwards; }
+      `}</style>
+    </div>
+  );
+}
+
+interface ClientVoteState {
+  A: number;
+  B: number;
+  total: number;
+  voters: Record<string, "A" | "B">;
+}
+
+/**
+ * Hook to manage vote state.
+ */
+function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
+  const [state, setState] = useState<ClientVoteState>({ A: 0, B: 0, total: 0, voters: {} });
+  const processedIds = useRef(new Set<string>());
+
+  const fetchServerVotes = async () => {
+    try {
+      const res = await fetch("/api/interactivity/votes");
+      const data = await res.json();
+      if (data?.state) {
+        setState(data.state);
+        localStorage.setItem("sprint7_votes_local", JSON.stringify(data.state));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchServerVotes();
+    const timer = setInterval(fetchServerVotes, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const kA = (widgetState?.voteKeywordA || "A").trim().toUpperCase();
+    const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
+
+    let updated = false;
+    const newState = { ...state, voters: { ...state.voters } };
+
+    messages.forEach(m => {
+      if (processedIds.current.has(m.id)) return;
+      processedIds.current.add(m.id);
+
+      const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
+      const userId = String(m.authorName || m.id).trim();
+
+      if (userId && !newState.voters[userId]) {
+        const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
+        if (voteMatch) {
+          const val = voteMatch[1].trim().toUpperCase();
+          if (val === kA) { newState.voters[userId] = "A"; updated = true; }
+          else if (val === kB) { newState.voters[userId] = "B"; updated = true; }
+        }
+      }
+    });
+
+    if (updated) {
+      const counts = (Object.values(newState.voters) as Array<"A" | "B">).reduce((acc, v) => {
+        acc[v]++;
+        return acc;
+      }, { A: 0, B: 0 });
+      newState.A = counts.A;
+      newState.B = counts.B;
+      newState.total = counts.A + counts.B;
+      setState(newState);
+      localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
+    }
+  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "sprint7_votes_local" && e.newValue) {
+        try { setState(JSON.parse(e.newValue)); } catch {}
+      }
     };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const aPct = state.total > 0 ? Math.round((state.A / state.total) * 100) : 0;
@@ -56,471 +215,61 @@ function useVoteState() {
 function getFallbackState(): Sprint7WidgetState {
   return {
     todoList: [
-      { id: "todo-1", text: "Set scene", completed: false },
-      { id: "todo-2", text: "Check mic", completed: true },
-      { id: "todo-3", text: "Start stream", completed: false },
+      { id: "todo-1", text: "Thiết lập cảnh", completed: false },
+      { id: "todo-2", text: "Kiểm tra Mic", completed: true },
+      { id: "todo-3", text: "Bắt đầu Stream", completed: false },
     ],
     customCSS: "",
-    socialLinks: {
-      youtube: "https://youtube.com",
-      tiktok: "https://tiktok.com",
-      discord: "https://discord.com",
-    },
+    socialLinks: { youtube: "https://youtube.com", tiktok: "https://tiktok.com", facebook: "https://facebook.com" },
     timerSeconds: 5 * 60,
-    timerDoneText: "Time is up",
-    wheelUsers: ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
+    timerDoneText: "Thời gian đã kết thúc",
+    wheelUsers: ["Doro", "An", "Bình", "Chi", "Dung", "Em"],
   };
 }
 
 function getSprint7State(): Sprint7WidgetState {
   const fallback = getFallbackState();
-
-  // Try parsing from URL parameter 'ob' first
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     const ob = params.get("sp7");
     if (ob) {
       const decoded = parseSprint7StateFromBase64(ob);
-      if (decoded) {
-        return {
-          ...fallback,
-          ...decoded,
-          todoList: Array.isArray(decoded.todoList) ? decoded.todoList : fallback.todoList,
-          socialLinks: decoded.socialLinks && typeof decoded.socialLinks === "object" ? decoded.socialLinks : fallback.socialLinks,
-          timerSeconds: typeof decoded.timerSeconds === "number" ? decoded.timerSeconds : fallback.timerSeconds,
-          timerDoneText: typeof decoded.timerDoneText === "string" && decoded.timerDoneText.trim() ? decoded.timerDoneText : fallback.timerDoneText,
-          wheelUsers: Array.isArray(decoded.wheelUsers) && decoded.wheelUsers.length > 0 ? decoded.wheelUsers : fallback.wheelUsers,
-        };
-      }
+      if (decoded) return { ...fallback, ...decoded };
     }
   }
-
   const persisted = loadPersistedSprint7WidgetState();
   const raw = persisted || ((window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined);
   if (!raw || typeof raw !== "object") return fallback;
-  return {
-    ...fallback,
-    ...raw,
-    todoList: Array.isArray(raw.todoList) ? raw.todoList : fallback.todoList,
-    socialLinks: raw.socialLinks && typeof raw.socialLinks === "object" ? raw.socialLinks : fallback.socialLinks,
-    timerSeconds: typeof raw.timerSeconds === "number" ? raw.timerSeconds : fallback.timerSeconds,
-    timerDoneText: typeof raw.timerDoneText === "string" && raw.timerDoneText.trim() ? raw.timerDoneText : fallback.timerDoneText,
-    wheelUsers: Array.isArray(raw.wheelUsers) && raw.wheelUsers.length > 0 ? raw.wheelUsers : fallback.wheelUsers,
-  };
+  return { ...fallback, ...raw };
 }
 
-function LiveCssInjector({ customCSS }: { customCSS: string }) {
-  useEffect(() => {
-    const styleId = "custom-css-injector";
-    let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleTag) {
-      styleTag = document.createElement("style");
-      styleTag.id = styleId;
-      document.head.appendChild(styleTag);
-    }
+/* ─────────── Widget Sub-components ─────────── */
 
-    try {
-      const css = customCSS || "";
-      if (!css.trim()) {
-        styleTag.textContent = "";
-        return;
-      }
-      styleTag.textContent = isLikelySafeCss(css) ? css : "";
-    } catch {
-      if (styleTag) styleTag.textContent = "";
-    }
-  }, [customCSS]);
-
-  return null;
-}
-
-const getBtnClass = (color: "cyan" | "fuchsia" | "emerald" | "yellow" | "sky" | "indigo" | "amber" | "rose" | "slate", isLight: boolean) => {
-  const themes = {
-    emerald: isLight 
-      ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" 
-      : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20",
-    cyan: isLight 
-      ? "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100" 
-      : "bg-cyan-500/10 border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20",
-    rose: isLight 
-      ? "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100" 
-      : "bg-rose-500/10 border-rose-500/20 text-rose-300 hover:bg-rose-500/20",
-    yellow: isLight 
-      ? "bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100" 
-      : "bg-yellow-500/10 border-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20",
-    slate: isLight 
-      ? "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200" 
-      : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700",
-    sky: isLight 
-      ? "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100" 
-      : "bg-sky-500/10 border-sky-500/20 text-sky-300 hover:bg-sky-500/20",
-    indigo: isLight 
-      ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" 
-      : "bg-indigo-500/10 border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20",
-    amber: isLight 
-      ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" 
-      : "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20",
-  };
-  return `text-[11px] px-3 py-1.5 rounded-full border font-bold transition-all cursor-pointer ${themes[color]}`;
-};
-
-interface VoteWidgetProps {
-  widgetState: Sprint7WidgetState;
-  syncState: (next: Sprint7WidgetState) => void;
-  isLight: boolean;
-}
-
-function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
-  const vote = useVoteState();
-  const obsChatFontStyle = { fontFamily: '"Segoe UI", Roboto, Arial, sans-serif' };
-  const [roulette, setRoulette] = useState<string[]>(sampleComments);
-  const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
-  const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
-  const [cssDraft, setCssDraft] = useState("");
-  const [timerDraftSeconds, setTimerDraftSeconds] = useState("300");
-  const [timerDraftDoneText, setTimerDraftDoneText] = useState("Time is up");
-  const [wheelDrafts, setWheelDrafts] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    setCssDraft(widgetState.customCSS || "");
-    setTimerDraftSeconds(String(widgetState.timerSeconds ?? 300));
-    setTimerDraftDoneText(widgetState.timerDoneText || "Time is up");
-    setWheelDrafts(
-      (widgetState.wheelUsers || []).reduce<Record<number, string>>((acc, value, index) => {
-        acc[index] = value;
-        return acc;
-      }, {}),
-    );
-  }, [widgetState.customCSS, widgetState.timerSeconds, widgetState.timerDoneText, widgetState.wheelUsers]);
-
-  const addTodo = () => {
-    const next = { ...widgetState };
-    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiá»‡m vá»¥ ${next.todoList.length + 1}`, completed: false });
-    syncState(next);
-  };
-  const toggleFirstTodo = () => {
-    const next = { ...widgetState };
-    if (next.todoList.length === 0) return;
-    next.todoList = next.todoList.map((item, index) => (index === 0 ? { ...item, completed: !item.completed } : item));
-    syncState(next);
-  };
-  const clearTodos = () => {
-    const next = { ...widgetState };
-    next.todoList = [];
-    syncState(next);
-  };
-  const updateTodoText = (id: string, text: string) => setTodoDrafts((prev) => ({ ...prev, [id]: text }));
-  const saveTodoText = (id: string) => {
-    const next = { ...widgetState };
-    next.todoList = next.todoList.map((item) => (item.id === id ? { ...item, text: todoDrafts[id] ?? item.text } : item));
-    syncState(next);
-  };
-  const deleteTodo = (id: string) => {
-    const next = { ...widgetState };
-    next.todoList = next.todoList.filter((item) => item.id !== id);
-    syncState(next);
-  };
-
-  const updateLinkText = (key: string, value: string) => setLinkDrafts((prev) => ({ ...prev, [key]: value }));
-  const saveLinkText = (key: string) => {
-    const next = { ...widgetState };
-    next.socialLinks = { ...next.socialLinks, [key]: linkDrafts[key] ?? next.socialLinks[key] };
-    syncState(next);
-  };
-  const deleteLink = (key: string) => {
-    const next = { ...widgetState };
-    const { [key]: _removed, ...rest } = next.socialLinks;
-    next.socialLinks = rest;
-    syncState(next);
-  };
-  const addSocialLink = () => {
-    const next = { ...widgetState };
-    const count = Object.keys(next.socialLinks).length + 1;
-    next.socialLinks = { ...next.socialLinks, [`link${count}`]: `https://example.com/${count}` };
-    syncState(next);
-  };
-  const resetSocialLinks = () => syncState({ ...widgetState, ...getFallbackState() });
-  const saveCssDraft = () => {
-    const next = { ...widgetState };
-    next.customCSS = cssDraft;
-    syncState(next);
-  };
-  const saveTimerDraft = () => {
-    const next = { ...widgetState };
-    const parsedSeconds = Number.parseInt(timerDraftSeconds, 10);
-    next.timerSeconds = Number.isFinite(parsedSeconds) && parsedSeconds >= 0 ? parsedSeconds : 300;
-    next.timerDoneText = timerDraftDoneText || "Time is up";
-    syncState(next);
-  };
-  const updateWheelDraft = (index: number, value: string) => setWheelDrafts((prev) => ({ ...prev, [index]: value }));
-  const saveWheelDrafts = () => {
-    const next = { ...widgetState };
-    const items = Object.entries(wheelDrafts).sort(([a], [b]) => Number(a) - Number(b)).map(([, value]) => (value as string).trim()).filter(Boolean);
-    next.wheelUsers = items.length > 0 ? items : getFallbackState().wheelUsers;
-    syncState(next);
-  };
-  const resetAllState = () => syncState(getFallbackState());
-  const exportState = () => {
-    const payload = serializeSprint7FullState({ todoList: widgetState.todoList, customCSS: widgetState.customCSS, socialLinks: widgetState.socialLinks });
-    const blob = new Blob([payload], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sprint7-widget-state.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-  const copyState = async () => {
-    try {
-      await navigator.clipboard.writeText(serializeSprint7FullState({ todoList: widgetState.todoList, customCSS: widgetState.customCSS, socialLinks: widgetState.socialLinks }));
-    } catch {}
-  };
-  const importState = async (file: File | null) => {
-    if (!file) return;
-    try {
-      const raw = await file.text();
-      const parsed = parseSprint7FullState(raw);
-      syncState(createSprint7WidgetState({ ...widgetState, todoList: parsed.todoList, customCSS: parsed.customCSS, socialLinks: parsed.socialLinks }));
-    } catch {}
-  };
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setRoulette((prev) => prev.slice(1).concat(prev[0])), 2500);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="w-full h-full overflow-hidden bg-slate-950 text-slate-100" style={obsChatFontStyle}>
-      <div className="h-full overflow-y-auto custom-scrollbar px-4 sm:px-6 py-6">
-        <div className="max-w-5xl mx-auto space-y-6 pb-10">
-          
-          {/* Card: Live Vote */}
-          <div className="rounded-3xl border border-cyan-500/30 bg-slate-900/50 p-6 shadow-[0_0_20px_rgba(6,182,212,0.05)]">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-cyan-600" : "text-cyan-300"}`}>
-              Live Vote
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm font-bold text-slate-200">
-              <div>A: {vote.A}</div>
-              <div>B: {vote.B}</div>
-            </div>
-            <div className="mt-4 h-4 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
-              <div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${vote.aPct}%` }} />
-            </div>
-            <div className={`mt-2 text-xs font-semibold ${isLight ? "text-cyan-700" : "text-cyan-200"}`}>
-              {vote.aPct}% / {vote.bPct}%
-            </div>
-          </div>
-
-          {/* Card: Chat Roulette */}
-          <div className="rounded-3xl border border-fuchsia-500/30 bg-slate-900/50 p-6">
-            <div className="cyberpunk-glitch rounded-2xl border border-fuchsia-400/80 p-4 text-xl font-bold text-fuchsia-200 bg-slate-950/40">
-              {roulette[0]}
-            </div>
-            <div className="mt-4 space-y-2 text-sm text-slate-400 font-medium">
-              {roulette.slice(1, 4).map((item) => <div key={item}>{item}</div>)}
-            </div>
-          </div>
-
-          {/* Card: Todo List */}
-          <div className="rounded-3xl border border-emerald-500/30 bg-slate-900/50 p-5">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-emerald-600" : "text-emerald-300"}`}>
-              Todo List
-            </div>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <button onClick={addTodo} className={getBtnClass("emerald", isLight)}>Add</button>
-              <button onClick={toggleFirstTodo} className={getBtnClass("cyan", isLight)}>Toggle first</button>
-              <button onClick={clearTodos} className={getBtnClass("rose", isLight)}>Clear all</button>
-            </div>
-            <div className="space-y-2">
-              {widgetState.todoList.map((item) => (
-                <div key={item.id} className="rounded-xl px-3 py-2 bg-slate-950 border border-slate-800 space-y-2 flex flex-col">
-                  <input 
-                    value={todoDrafts[item.id] ?? item.text} 
-                    onChange={(e) => updateTodoText(item.id, e.target.value)} 
-                    onBlur={() => saveTodoText(item.id)} 
-                    style={{ textDecoration: item.completed ? "line-through" : "none" }}
-                    className={`w-full bg-slate-900 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-sm outline-none text-slate-100 placeholder-slate-500 focus:border-indigo-500 ${item.completed ? "opacity-60" : ""}`} 
-                  />
-                  <div className="flex justify-end">
-                      <button onClick={() => deleteTodo(item.id)} className={getBtnClass("rose", isLight)}>Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Card: Social Links Marquee */}
-          <div className="rounded-3xl border border-yellow-500/30 bg-slate-900/50 p-4 overflow-hidden">
-              <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-yellow-600" : "text-yellow-300"}`}>
-              Social Links
-            </div>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <button onClick={addSocialLink} className={getBtnClass("yellow", isLight)}>Add link</button>
-              <button onClick={resetSocialLinks} className={getBtnClass("slate", isLight)}>Reset</button>
-            </div>
-            <div className="overflow-hidden whitespace-nowrap">
-              <div className="marquee-track items-center">
-                {Object.entries(widgetState.socialLinks).map(([key, value]) => (
-                  <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950 border border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <input
-                        value={linkDrafts[key] ?? value}
-                        onChange={(e) => updateLinkText(key, e.target.value)}
-                        onBlur={() => saveLinkText(key)}
-                        className="bg-transparent outline-none text-sm min-w-[180px] text-slate-100"
-                      />
-                      <button onClick={() => deleteLink(key)} className={getBtnClass("rose", isLight)}>Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Card: JSON state files */}
-          <div className="rounded-3xl border border-sky-500/30 bg-slate-900/50 p-5">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-sky-600" : "text-sky-300"}`}>
-              JSON State
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={exportState} className={getBtnClass("sky", isLight)}>Export</button>
-              <button onClick={copyState} className={getBtnClass("indigo", isLight)}>Copy</button>
-              <label className={getBtnClass("slate", isLight)}>Import
-                <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
-              </label>
-              <button onClick={resetAllState} className={getBtnClass("rose", isLight)}>Reset all</button>
-            </div>
-          </div>
-
-          {/* Card: Custom CSS */}
-          <div className="rounded-3xl border border-indigo-500/30 bg-slate-900/50 p-5">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-indigo-600" : "text-indigo-300"}`}>
-              Custom CSS
-            </div>
-            <textarea
-              value={cssDraft}
-              onChange={(e) => setCssDraft(e.target.value)}
-              onBlur={saveCssDraft}
-              rows={6}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono outline-none resize-y text-slate-100 focus:border-indigo-500"
-              placeholder="Enter CSS here..."
-            />
-            <div className="mt-2 text-[11px] text-slate-400">CSS is injected only when the syntax is valid. Invalid CSS is ignored.</div>
-          </div>
-
-          {/* Card: Timer / Wheel */}
-          <div className="rounded-3xl border border-amber-500/30 bg-slate-900/50 p-5">
-            <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-amber-600" : "text-amber-300"}`}>
-              Timer / Wheel
-            </div>
-            <div className="grid gap-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input 
-                  value={timerDraftSeconds} 
-                  onChange={(e) => setTimerDraftSeconds(e.target.value)} 
-                  onBlur={saveTimerDraft} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500" 
-                    placeholder="Countdown seconds" 
-                />
-                <input 
-                  value={timerDraftDoneText} 
-                  onChange={(e) => setTimerDraftDoneText(e.target.value)} 
-                  onBlur={saveTimerDraft} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500" 
-                    placeholder="Finish message" 
-                />
-              </div>
-              <div className="text-[11px] text-slate-400">Edit the timer and finish text quickly, then it saves on blur.</div>
-              <div className="space-y-2">
-                {(widgetState.wheelUsers || []).map((user, index) => (
-                  <input
-                    key={`${index}-${user}`}
-                    value={wheelDrafts[index] ?? user}
-                    onChange={(e) => updateWheelDraft(index, e.target.value)}
-                    onBlur={saveWheelDrafts}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-100 focus:border-indigo-500"
-                    placeholder={`Wheel user ${index + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TimerWidget() {
-  const widgetState = useMemo(() => getSprint7State(), []);
-  const [seconds, setSeconds] = useState(widgetState.timerSeconds ?? 5 * 60);
-  const [doneText, setDoneText] = useState(widgetState.timerDoneText || "Time is up");
+function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
+  const [seconds, setSeconds] = useState(initialWidgetState.timerSeconds ?? 300);
+  const [doneText, setDoneText] = useState(initialWidgetState.timerDoneText || "Time is up");
   const [isRunning, setIsRunning] = useState(true);
+  const lastTriggerRef = useRef<number>(initialWidgetState.timerTrigger || 0);
 
   useEffect(() => {
-    const applyState = (next: Partial<Sprint7WidgetState>) => {
-      if (typeof next.timerSeconds === "number" && next.timerSeconds >= 0) {
-        setSeconds(next.timerSeconds);
-        setIsRunning(true);
-      }
-      if (typeof next.timerDoneText === "string" && next.timerDoneText.trim()) {
-        setDoneText(next.timerDoneText);
-      }
-    };
-
-    const syncFromStorage = () => {
-      const persisted = loadPersistedSprint7WidgetState();
-      if (persisted) applyState(persisted);
-    };
-
-    syncFromStorage();
-
-    const channel = new BroadcastChannel("sprint7_timer_channel");
-    channel.onmessage = (e) => {
-      if (e.data.type === "UPDATE_TIMER") {
-        applyState({ timerSeconds: e.data.seconds, timerDoneText: e.data.doneText });
-      }
-    };
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "sprint7_widget_state") syncFromStorage();
-    };
-    window.addEventListener("storage", onStorage);
-
-    // Sync via server polling for remote controllers or isolated browser profiles
-    const pollState = async () => {
-      try {
-        const res = await fetch("/api/sprint7/state-sync");
-        const data = await res.json();
-        if (data?.state) {
-          applyState(data.state);
-        }
-      } catch {}
-    };
-    pollState();
-    const pollInterval = setInterval(pollState, 1500);
-
-    return () => {
-      channel.close();
-      window.removeEventListener("storage", onStorage);
-      clearInterval(pollInterval);
-    };
-  }, []);
+    const trigger = initialWidgetState.timerTrigger ?? 0;
+    if (trigger > lastTriggerRef.current) {
+      setSeconds(initialWidgetState.timerSeconds ?? 300);
+      setDoneText(initialWidgetState.timerDoneText || "Time is up");
+      setIsRunning(true);
+      lastTriggerRef.current = trigger;
+    }
+  }, [initialWidgetState.timerTrigger, initialWidgetState.timerSeconds, initialWidgetState.timerDoneText]);
 
   useEffect(() => {
     if (!isRunning) return;
-    const timer = window.setInterval(() => {
+    const timer = setInterval(() => {
       setSeconds((prev) => {
-        if (prev <= 0) {
-          setIsRunning(false);
-          return 0;
-        }
+        if (prev <= 0) { setIsRunning(false); return 0; }
         return prev - 1;
       });
     }, 1000);
-    return () => window.clearInterval(timer);
+    return () => clearInterval(timer);
   }, [isRunning]);
 
   const done = seconds === 0 && !isRunning;
@@ -529,531 +278,268 @@ function TimerWidget() {
 
   return (
     <div className="w-screen h-screen grid place-items-center bg-transparent text-slate-100 overflow-hidden" style={obsFontStyle}>
-      <div className="text-center animate-in fade-in duration-300">
-        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? doneText : `${mins}:${secs}`}</div>
-        <div className="text-cyan-400 uppercase tracking-[0.5em] mt-4 font-bold">{done ? doneText : "Timer"}</div>
+      <div className="text-center">
+        <div className="text-[12vw] font-black tracking-tighter tabular-nums drop-shadow-[0_0_30px_rgba(34,211,238,0.4)]">
+          {done ? <motion.div initial={false} animate={{ scale: 1, opacity: 1 }}>{doneText}</motion.div> : `${mins}:${secs}`}
+        </div>
+        <div className="text-cyan-400 uppercase tracking-[1em] mt-4 font-bold text-[2vw] opacity-70">{done ? "Timer Ended" : "Coming Soon"}</div>
       </div>
     </div>
   );
 }
 
-const DORO_WHEEL_COLORS = [
-  "#7c3aed", "#0e7490", "#be185d", "#15803d", "#c2410c",
-  "#1d4ed8", "#a21caf", "#0f766e", "#b45309", "#1e40af",
-];
-
-function WheelWidget() {
-  const widgetState = useMemo(() => getSprint7State(), []);
-  const fallbackUsers = widgetState.wheelUsers && widgetState.wheelUsers.length > 0 ? widgetState.wheelUsers : getFallbackState().wheelUsers;
-  const [users, setUsers] = useState<string[]>(fallbackUsers);
-  const [angle, setAngle] = useState(0);
-  const angleRef = useRef(0);
-  const isSpinningRef = useRef(false);
+function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }) {
+  const users = useMemo(() => state.wheelUsers || ["Player"], [state.wheelUsers]);
+  const [rotation, setRotation] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
-  const [isReloading, setIsReloading] = useState(false);
-  const usersRef = useRef(users);
-  const mountedRef = useRef(true);
-  const lastSpinTriggerRef = useRef<number>(0);
+  const lastSpinTriggerRef = useRef<number>(state.spinTrigger || 0);
 
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const reloadUsers = async (shuffleOnFallback = false) => {
-    try {
-      const syncRes = await fetch("/api/youtube/settings-sync");
-      const syncData = await syncRes.json().catch(() => ({}));
-      const settings = syncData?.settings;
-      const liveChatId = settings?.activeLiveChatId;
-      const apiKey = settings?.apiKey;
-      if (!liveChatId || !apiKey) {
-        if (shuffleOnFallback && mountedRef.current) {
-          setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
-        }
-        return;
-      }
-      const msgRes = await fetch(
-        `/api/youtube/messages?liveChatId=${encodeURIComponent(liveChatId)}&apiKey=${encodeURIComponent(apiKey)}`,
-      );
-      const msgData = await msgRes.json().catch(() => ({}));
-      const names = Array.isArray(msgData?.messages)
-        ? Array.from(
-            new Set(
-              msgData.messages
-                .map((m: any) => String(m?.authorName || "").trim())
-                .filter(Boolean),
-            ),
-          ).slice(0, 24)
-        : [];
-      if (!mountedRef.current) return;
-      if (names.length > 0) {
-        setUsers(names);
-      } else if (shuffleOnFallback) {
-        setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
-      }
-    } catch {
-      if (shuffleOnFallback && mountedRef.current) {
-        setUsers((prev) => [...prev].sort(() => Math.random() - 0.5));
-      }
-    }
-  };
-
-  const handleReload = async () => {
-    setIsReloading(true);
+  const startSpin = () => {
+    if (isSpinning) return;
+    setIsSpinning(true);
     setWinner(null);
-    setUsers((prev) => (prev.length > 1 ? [...prev].sort(() => Math.random() - 0.5) : prev));
-    await reloadUsers(true);
-    setIsReloading(false);
+    const extraDegrees = Math.floor(Math.random() * 360);
+    const newRotation = rotation + 1800 + extraDegrees;
+    setRotation(newRotation);
+    setTimeout(() => {
+      setIsSpinning(false);
+      const actualDegrees = newRotation % 360;
+      const segmentAngle = 360 / users.length;
+      const winnerIndex = Math.floor((360 - (actualDegrees % 360)) / segmentAngle) % users.length;
+      setWinner(users[winnerIndex]);
+    }, 6000);
   };
 
   useEffect(() => {
-    reloadUsers(false);
-
-    const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
-    wheelChannel.onmessage = (e) => {
-      if (e.data.type === "UPDATE_WHEEL") {
-        const newUsers = e.data.users;
-        if (Array.isArray(newUsers) && newUsers.length > 0) {
-          setUsers(newUsers);
-        }
-      }
-    };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "sprint7_widget_state") {
-        const persisted = loadPersistedSprint7WidgetState();
-        if (persisted?.wheelUsers?.length) {
-          setUsers(persisted.wheelUsers);
-        }
-        if (persisted?.spinTrigger) {
-          if (lastSpinTriggerRef.current === 0) {
-            lastSpinTriggerRef.current = persisted.spinTrigger;
-          } else if (persisted.spinTrigger > lastSpinTriggerRef.current) {
-            lastSpinTriggerRef.current = persisted.spinTrigger;
-            const localChannel = new BroadcastChannel("sprint7_wheel_channel");
-            localChannel.postMessage({ type: "SPIN" });
-            localChannel.close();
-          }
-        }
-      }
-    };
-    window.addEventListener("storage", onStorage);
-
-    // Sync via server polling for remote controllers or isolated browser profiles
-    const pollWheelState = async () => {
-      try {
-        const res = await fetch("/api/sprint7/state-sync");
-        const data = await res.json();
-        if (data?.state) {
-          if (data.state.wheelUsers && JSON.stringify(data.state.wheelUsers) !== JSON.stringify(usersRef.current)) {
-            setUsers(data.state.wheelUsers);
-          }
-          if (data.state.spinTrigger) {
-            if (lastSpinTriggerRef.current === 0) {
-              lastSpinTriggerRef.current = data.state.spinTrigger;
-            } else if (data.state.spinTrigger > lastSpinTriggerRef.current) {
-              lastSpinTriggerRef.current = data.state.spinTrigger;
-              const localChannel = new BroadcastChannel("sprint7_wheel_channel");
-              localChannel.postMessage({ type: "SPIN" });
-              localChannel.close();
-            }
-          }
-        }
-      } catch {}
-    };
-    pollWheelState();
-    const pollInterval = setInterval(pollWheelState, 750);
-
-    return () => {
-      wheelChannel.close();
-      window.removeEventListener("storage", onStorage);
-      clearInterval(pollInterval);
-    };
-  }, []);
-
-  const updateAngle = (val: number) => {
-    angleRef.current = val;
-    setAngle(val);
-  };
-
-  useEffect(() => {
-    let alive = true;
-    const loadChatUsers = async () => {
-      await reloadUsers(false);
-      if (!alive) return;
-    };
-    loadChatUsers();
-    const refresh = window.setInterval(loadChatUsers, 10000);
-    return () => {
-      alive = false;
-      window.clearInterval(refresh);
-    };
-  }, []);
-
-  useEffect(() => {
-    const channel = new BroadcastChannel("sprint7_wheel_channel");
-    const easeOutQuart = (x: number): number => 1 - Math.pow(1 - x, 4);
-
-    channel.onmessage = (e) => {
-      if (e.data.type === "SPIN" && !isSpinningRef.current && users.length > 0) {
-        isSpinningRef.current = true;
-        setWinner(null);
-
-        const currentUsers = usersRef.current.length > 0 ? usersRef.current : fallbackUsers;
-        const winnerIdx = Math.floor(Math.random() * currentUsers.length);
-        const segAngle = 360 / currentUsers.length;
-        const centerDeg = (winnerIdx + 0.5) * segAngle;
-        
-        // Rotate 5-8 full circles before landing
-        const extraSpins = 5 + Math.floor(Math.random() * 4);
-        const targetAngle = 360 * extraSpins + (360 - centerDeg);
-        
-        const startAngle = angleRef.current % 360;
-        const distance = targetAngle - startAngle;
-        
-        const duration = 6000 + Math.random() * 2000; // 6 to 8 seconds
-        const startTime = performance.now();
-        
-        const animate = (currentTime: number) => {
-          const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          
-          const currentAngle = startAngle + distance * easeOutQuart(progress);
-          updateAngle(currentAngle);
-          
-          if (progress < 1) {
-            window.requestAnimationFrame(animate);
-          } else {
-            isSpinningRef.current = false;
-            updateAngle(currentAngle % 360);
-            setWinner(currentUsers[winnerIdx]);
-            void reloadUsers(true);
-          }
-        };
-        window.requestAnimationFrame(animate);
-      }
-    };
-    return () => channel.close();
-  }, [users]);
-
-  const segAngle = 360 / users.length;
-  const R = 240; // outer radius
-  const CX = 260;
-  const CY = 260;
-  const CENTER_R = 80; // doro circle radius
-
-  // Build SVG arc path for each segment
-  const describeSegment = (startDeg: number, endDeg: number, outerR: number, innerR: number) => {
-    const toRad = (d: number) => (d * Math.PI) / 180;
-    const x1 = CX + outerR * Math.sin(toRad(startDeg));
-    const y1 = CY - outerR * Math.cos(toRad(startDeg));
-    const x2 = CX + outerR * Math.sin(toRad(endDeg));
-    const y2 = CY - outerR * Math.cos(toRad(endDeg));
-    const ix1 = CX + innerR * Math.sin(toRad(startDeg));
-    const iy1 = CY - innerR * Math.cos(toRad(startDeg));
-    const ix2 = CX + innerR * Math.sin(toRad(endDeg));
-    const iy2 = CY - innerR * Math.cos(toRad(endDeg));
-    const large = endDeg - startDeg > 180 ? 1 : 0;
-    return `M ${ix1} ${iy1} L ${x1} ${y1} A ${outerR} ${outerR} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1} Z`;
-  };
-
-  // Label position midway through segment at 70% of radius
-  const labelPos = (midDeg: number, r: number) => ({
-    x: CX + r * Math.sin((midDeg * Math.PI) / 180),
-    y: CY - r * Math.cos((midDeg * Math.PI) / 180),
-  });
-
-  return (
-    <div className="w-screen h-screen grid place-items-center bg-slate-950 overflow-hidden" style={obsFontStyle}>
-      <button
-        onClick={() => void handleReload()}
-        className="fixed top-4 right-4 z-[60] rounded-full border border-cyan-400/50 bg-slate-900/95 px-4 py-2 text-xs font-bold text-cyan-200 shadow-lg shadow-cyan-500/20 hover:bg-slate-800 transition-colors pointer-events-auto"
-        disabled={isReloading}
-        type="button"
-      >
-        {isReloading ? "Loading..." : "Reload"}
-      </button>
-      {/* Outer glow ring behind wheel */}
-      <div
-        className="absolute"
-        style={{
-          width: 560,
-          height: 560,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div className="relative" style={{ width: 520, height: 520 }}>
-        {/* Spinning wheel */}
-        <svg
-          width="520"
-          height="520"
-          viewBox="0 0 520 520"
-          style={{ transform: `rotate(${angle}deg)`, position: "absolute", top: 0, left: 0 }}
-        >
-          {/* Outer decorative ring */}
-          <circle cx={CX} cy={CY} r={R + 10} fill="none" stroke="#a855f7" strokeWidth="3" opacity="0.4" />
-          <circle cx={CX} cy={CY} r={R + 16} fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="8 6" opacity="0.25" />
-
-          {/* Segments */}
-          {users.map((name, idx) => {
-            const startDeg = idx * segAngle;
-            const endDeg = startDeg + segAngle;
-            const mid = startDeg + segAngle / 2;
-            const color = DORO_WHEEL_COLORS[idx % DORO_WHEEL_COLORS.length];
-            const lp = labelPos(mid, CENTER_R + (R - CENTER_R) * 0.58);
-            const rotLabel = mid > 90 && mid < 270 ? mid + 180 : mid;
-            return (
-              <g key={name}>
-                <path
-                  d={describeSegment(startDeg, endDeg, R, CENTER_R + 6)}
-                  fill={color}
-                  opacity="0.88"
-                  stroke="#020617"
-                  strokeWidth="1.5"
-                />
-                {/* Subtle shine */}
-                <path
-                  d={describeSegment(startDeg, endDeg, R - 2, CENTER_R + 28)}
-                  fill="white"
-                  opacity="0.045"
-                />
-                {/* Segment label */}
-                <text
-                  x={lp.x}
-                  y={lp.y}
-                  fill="white"
-                  fontSize={users.length > 12 ? "11" : "14"}
-                  fontWeight="700"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  transform={`rotate(${rotLabel} ${lp.x} ${lp.y})`}
-                  style={{ textShadow: "0 1px 4px #000" }}
-                >
-                  {name.length > 12 ? name.slice(0, 11) + "â€¦" : name}
-                </text>
-                {/* Divider lines */}
-                <line
-                  x1={CX + (CENTER_R + 8) * Math.sin((startDeg * Math.PI) / 180)}
-                  y1={CY - (CENTER_R + 8) * Math.cos((startDeg * Math.PI) / 180)}
-                  x2={CX + R * Math.sin((startDeg * Math.PI) / 180)}
-                  y2={CY - R * Math.cos((startDeg * Math.PI) / 180)}
-                  stroke="#020617"
-                  strokeWidth="2"
-                  opacity="0.6"
-                />
-              </g>
-            );
-          })}
-
-          {/* Center backdrop (spins with wheel) */}
-          <circle cx={CX} cy={CY} r={CENTER_R + 6} fill="#020617" />
-        </svg>
-
-        {/* Counter-rotating center â€” stays upright at all times */}
-        <div
-          className="absolute cursor-pointer hover:scale-105 active:scale-95 transition-transform"
-          onClick={() => {
-            const channel = new BroadcastChannel("sprint7_wheel_channel");
-            channel.postMessage({ type: "SPIN" });
-            channel.close();
-          }}
-          style={{
-            width: (CENTER_R + 6) * 2,
-            height: (CENTER_R + 6) * 2,
-            top: CY - CENTER_R - 6,
-            left: CX - CENTER_R - 6,
-            transform: `rotate(${-angle}deg)`,
-            borderRadius: "50%",
-            overflow: "hidden",
-            border: "4px solid #22d3ee",
-            boxShadow: "0 0 24px rgba(34,211,238,0.5), 0 0 8px rgba(168,85,247,0.4)",
-            background: "#020617",
-            zIndex: 30,
-          }}
-        >
-          <img
-            src="/doro.png"
-            alt="Doro"
-            className="arwass-logo"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              display: "block",
-            }}
-          />
-        </div>
-
-        {/* Pointer Triangle */}
-        <div
-          className="absolute"
-          style={{
-            top: -12,
-            left: 260 - 14,
-            width: 0,
-            height: 0,
-            borderLeft: "14px solid transparent",
-            borderRight: "14px solid transparent",
-            borderTop: "28px solid #f472b6",
-            filter: "drop-shadow(0 0 6px rgba(244,114,182,0.8))",
-            zIndex: 10,
-          }}
-        />
-
-        {/* Winner Announcement Overlay */}
-        {winner && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center animate-in zoom-in fade-in duration-500" style={{ zIndex: 50 }}>
-            <div className="absolute inset-0 bg-slate-950/60 rounded-full backdrop-blur-sm" />
-            <div className="relative flex flex-col items-center bg-indigo-900/90 border-2 border-indigo-400 px-8 py-6 rounded-3xl shadow-2xl shadow-indigo-500/50 transform scale-110">
-              <span className="text-indigo-300 font-bold text-sm uppercase tracking-widest mb-1">Winner</span>
-              <span className="text-white font-black text-4xl truncate max-w-[400px]">{winner}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LinkWidget() {
-  const [socialLinks, setSocialLinks] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    // Load initial state
-    const persisted = loadPersistedSprint7WidgetState();
-    if (persisted?.socialLinks) {
-      setSocialLinks(persisted.socialLinks);
-    } else {
-      setSocialLinks({
-        youtube: "https://youtube.com",
-        tiktok: "https://tiktok.com",
-        discord: "https://discord.com",
-      });
+    const trigger = state.spinTrigger ?? 0;
+    if (trigger > lastSpinTriggerRef.current) {
+      startSpin();
+      lastSpinTriggerRef.current = trigger;
     }
+  }, [state.spinTrigger]);
 
-    // Sync via server polling for remote controllers or isolated browser profiles
-    const pollLinks = async () => {
-      try {
-        const res = await fetch("/api/sprint7/state-sync");
-        const data = await res.json();
-        if (data?.state?.socialLinks) {
-          setSocialLinks(data.state.socialLinks);
-        }
-      } catch {}
-    };
-    pollLinks();
-    const interval = setInterval(pollLinks, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const links = Object.entries(socialLinks);
-  const trackLinks = links.length > 0 ? [...links, ...links, ...links] : [["empty", "Add links in dashboard"]];
+  const size = 600;
+  const radius = 280;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const segmentAngle = 360 / users.length;
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-transparent text-slate-100" style={obsFontStyle}>
-      <div className="flex h-full w-full items-center justify-center px-4">
-        <div className="w-[96vw] max-w-[1800px] overflow-hidden rounded-[1.25rem] border border-cyan-500/20 bg-transparent px-3 py-2">
-          <div className="marquee-track marquee-track-slow items-center py-1">
-            {trackLinks.map(([key, value], index) => (
-              <a
-                key={`${key}-${index}`}
-                href={key === "empty" ? "#" : value}
-                target={key === "empty" ? undefined : "_blank"}
-                rel={key === "empty" ? undefined : "noreferrer"}
-                className="mx-2 inline-flex h-[54px] min-w-[160px] max-w-[320px] items-center justify-center rounded-full border border-cyan-900/60 bg-[#0b1023]/85 px-4 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
-                onClick={(e) => {
-                  if (key === "empty") e.preventDefault();
-                }}
-                aria-label={key === "empty" ? "Add links in dashboard" : value}
-              >
-                <span className="truncate text-[14px] font-semibold text-cyan-100">{value}</span>
-              </a>
-            ))}
-          </div>
+    <div className="w-screen h-screen grid place-items-center bg-transparent overflow-hidden" style={obsFontStyle}>
+      <div className="relative">
+        <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 z-20 drop-shadow-lg">
+          <div className="w-12 h-16 bg-white" style={{ clipPath: "polygon(50% 100%, 0 0, 100% 0)" }} />
         </div>
+        <div className="relative drop-shadow-2xl" style={{ width: size, height: size }}>
+          <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible">
+            <motion.g animate={{ rotate: rotation }} transition={{ duration: 6, ease: [0.2, 0, 0.1, 1] }} style={{ originX: `${centerX}px`, originY: `${centerY}px` }}>
+              <circle cx={centerX} cy={centerY} r={radius + 10} fill="#1e293b" />
+              {users.map((user, i) => {
+                const startAngle = i * segmentAngle;
+                const endAngle = (i + 1) * segmentAngle;
+                const x1 = centerX + radius * Math.cos((Math.PI * (startAngle - 90)) / 180);
+                const y1 = centerY + radius * Math.sin((Math.PI * (startAngle - 90)) / 180);
+                const x2 = centerX + radius * Math.cos((Math.PI * (endAngle - 90)) / 180);
+                const y2 = centerY + radius * Math.sin((Math.PI * (endAngle - 90)) / 180);
+                const largeArc = segmentAngle > 180 ? 1 : 0;
+                const pathData = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+                const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f59e0b", "#10b981", "#06b6d4"];
+                const color = colors[i % colors.length];
+                return (
+                  <g key={i}>
+                    <path d={pathData} fill={color} stroke="#1e293b" strokeWidth="2" />
+                    <g transform={`rotate(${startAngle + segmentAngle / 2} ${centerX} ${centerY})`}>
+                      <text x={centerX} y={centerY - radius * 0.7} fill="white" fontSize={Math.max(12, 24 - users.length)} fontWeight="bold" textAnchor="middle" style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.5))" }}>{user}</text>
+                    </g>
+                  </g>
+                );
+              })}
+            </motion.g>
+            <circle cx={centerX} cy={centerY} r="60" fill="white" stroke="#1e293b" strokeWidth="6" />
+            <image href="/doro.png" x={centerX - 45} y={centerY - 45} width="90" height="90" />
+          </svg>
+        </div>
+        <AnimatePresence>
+          {winner && !isSpinning && (
+            <motion.div initial={{ scale: 0.5, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.5, opacity: 0 }} className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+              <div className="bg-white/10 backdrop-blur-2xl border-2 border-white/20 p-12 rounded-[50px] shadow-[0_0_100px_rgba(236,72,153,0.5)] text-center">
+                <div className="text-pink-400 uppercase tracking-[0.5em] font-black text-xl mb-4">WINNER</div>
+                <div className="text-white text-7xl font-black drop-shadow-lg">{winner}</div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
-function useThemeMode() {
-  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
+function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
+  const links = Object.entries(widgetState.socialLinks || {});
+  if (links.length === 0) return null;
+  // Duplicate for seamless marquee
+  const items = useMemo(() => [...links, ...links, ...links, ...links], [links]);
+
+  return (
+    <div className="fixed bottom-0 left-0 w-full bg-black/60 backdrop-blur-md py-6 border-t border-white/10 overflow-hidden" style={obsFontStyle}>
+      <div className="marquee-track flex items-center">
+        {items.map(([key, value], i) => (
+          <div key={`${key}-${i}`} className="flex items-center gap-4 px-12 shrink-0">
+             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white text-xs uppercase shadow-lg shadow-indigo-500/20">
+               {key[0]}
+             </div>
+             <div className="flex flex-col">
+               <span className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-0.5">{key}</span>
+               <span className="text-white font-bold text-lg tracking-tight">{getHostname(value)}</span>
+             </div>
+             <span className="text-white/20 ml-12 text-2xl">•</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
+  return (
+    <div className="w-screen h-screen p-12 bg-transparent" style={obsFontStyle}>
+      <motion.div initial={false} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md ml-auto bg-slate-900/80 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-2xl">
+        <h2 className="text-2xl font-black uppercase tracking-[0.3em] mb-8 text-white flex items-center gap-4"><span className="w-2 h-8 bg-emerald-500 rounded-full" />Mission</h2>
+        <div className="space-y-4">
+          {widgetState.todoList.map((t, i) => (
+            <motion.div key={t.id} initial={false} animate={{ opacity: 1, y: 0 }} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40" : "bg-white/5 border-white/5"}`}>
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${t.completed ? "bg-emerald-500 border-emerald-500" : "border-white/20"}`}>{t.completed && <div className="w-2 h-2 bg-white rounded-full" />}</div>
+              <span className={`font-bold text-lg ${t.completed ? "line-through text-slate-400" : "text-white"}`}>{t.text}</span>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] }) {
+  const route = useMemo(() => getRoute(), []);
+  const [state, setState] = useState<Sprint7WidgetState>(() => getSprint7State());
+  const lastManualSyncRef = useRef<number>(0);
+  const stateRef = useRef(state);
+
   useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const syncStateFromServer = async () => {
+    // If we just saved locally, don't overwrite with server state for 4 seconds
+    if (Date.now() - lastManualSyncRef.current < 4000) return;
     try {
-      const saved = localStorage.getItem("yt_overlay_settings");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.themeMode) setThemeMode(parsed.themeMode);
+      const res = await fetch("/api/sprint7/state-sync");
+      const data = await res.json();
+      if (data?.state) {
+        // Deep compare (simple JSON stringify) to avoid unnecessary re-renders
+        if (JSON.stringify(data.state) !== JSON.stringify(stateRef.current)) {
+          setState(data.state);
+        }
       }
     } catch {}
-
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/youtube/settings-sync");
-        const data = await res.json();
-        if (data?.settings?.themeMode) {
-          setThemeMode(data.settings.themeMode);
-        }
-      } catch {}
-    };
-    poll();
-    const interval = setInterval(poll, 1500);
-    return () => clearInterval(interval);
-  }, []);
-  return themeMode;
-}
-
-export default function Sprint7Widgets() {
-  const route = getRoute();
-  const themeMode = useThemeMode();
-  const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
-
-  const syncState = (next: Sprint7WidgetState) => {
-    (window as any).__SPRINT7_STATE__ = next;
-    savePersistedSprint7WidgetState(next);
-    setState(next);
-
-    // Sync to current origin's backend cache
-    fetch("/api/sprint7/state-sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: next }),
-    }).catch(() => {});
-
-    // Sync a copy to localhost:3000 if running on Vercel
-    if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
-      fetch("http://localhost:3000/api/sprint7/state-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state: next }),
-      }).catch(() => {});
-    }
   };
 
-  const isLight = themeMode === "light";
+  useEffect(() => {
+    syncStateFromServer();
+    const interval = setInterval(syncStateFromServer, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      const persisted = loadPersistedSprint7WidgetState();
+      if (persisted && JSON.stringify(persisted) !== JSON.stringify(stateRef.current)) {
+        setState(persisted);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const vote = useVoteState(state, messages);
 
   return (
-    <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
-      <LiveCssInjector customCSS={state.customCSS} />
+    <div className="w-full h-full bg-transparent overflow-hidden relative" style={obsFontStyle}>
+      <CustomCssInjector css={state.customCSS} />
+      <FlowerEffect state={state} messages={messages} />
       {route === "dashboard" ? (
-        <Sprint7Dashboard state={state} syncState={syncState} />
+        <Sprint7Dashboard state={state} syncState={(next) => {
+          lastManualSyncRef.current = Date.now();
+          setState(next);
+          savePersistedSprint7WidgetState(next);
+          fetch("/api/sprint7/state-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state: next }) }).catch(() => {});
+        }} />
       ) : route === "obs-timer" ? (
-        <TimerWidget />
+        <TimerWidget widgetState={state} />
       ) : route === "obs-wheel" ? (
-        <WheelWidget />
+        <WheelWidget widgetState={state} />
       ) : route === "obs-link" ? (
-        <LinkWidget />
+        <LinkWidget widgetState={state} />
+      ) : route === "obs-todo" ? (
+        <ObsTodoWidget widgetState={state} />
+      ) : route === "obs-vote" ? (
+        <ObsVoteWidget widgetState={state} vote={vote} />
+      ) : route === "obs-effect" ? (
+        null
       ) : (
-        <VoteWidget widgetState={state} syncState={syncState} isLight={isLight} />
+        <div className="p-8 text-white">Route not found: {route}</div>
       )}
     </div>
   );
 }
 
+function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState, vote: any }) {
+  const keywordA = widgetState.voteKeywordA || "A";
+  const keywordB = widgetState.voteKeywordB || "B";
+  return (
+    <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
+      <motion.div initial={false} animate={{ y: 0, opacity: 1 }} className="w-full max-w-4xl bg-black/60 backdrop-blur-2xl border border-white/10 p-8 rounded-[40px] shadow-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-white text-3xl font-black uppercase tracking-[0.2em] flex items-center gap-4"><span className="w-3 h-8 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />Live Vote</h2>
+          <div className="bg-white/10 px-6 py-2 rounded-full border border-white/5"><span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Total: {vote.total}</span></div>
+        </div>
+        <div className="grid grid-cols-2 gap-12">
+          <div className="space-y-4">
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col"><span className="text-cyan-400 text-xs font-black uppercase tracking-widest mb-1">Option A</span><span className="text-white text-6xl font-black tracking-tight">{keywordA}</span></div>
+              <div className="flex flex-col items-end"><span className="text-cyan-400 text-4xl font-black tabular-nums">{vote.aPct}%</span><span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.A} votes</span></div>
+            </div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <motion.div 
+                initial={false} 
+                animate={{ width: `${vote.aPct}%` }} 
+                transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" 
+              />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col"><span className="text-fuchsia-400 text-xs font-black uppercase tracking-widest mb-1">Option B</span><span className="text-white text-6xl font-black tracking-tight">{keywordB}</span></div>
+              <div className="flex flex-col items-end"><span className="text-fuchsia-400 text-4xl font-black tabular-nums">{vote.bPct}%</span><span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.B} votes</span></div>
+            </div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <motion.div 
+                initial={false} 
+                animate={{ width: `${vote.bPct}%` }} 
+                transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full" 
+              />
+            </div>
+          </div>
+        </div>
+        <div className="mt-8 pt-6 border-t border-white/5 text-center"><p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">Type <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span> in chat</p></div>
+      </motion.div>
+    </div>
+  );
+}
+
+function CustomCssInjector({ css }: { css?: string }) {
+  if (!css || !isLikelySafeCss(css)) return null;
+  return <style id="custom-css-injector" dangerouslySetInnerHTML={{ __html: css }} />;
+}
