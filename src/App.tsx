@@ -605,7 +605,7 @@ export default function App() {
     const hasDesktopOverlayParam = searchParams.get("mode") === "desktop-overlay" || decodedParams.mode === "desktop-overlay";
     const hasTransitionParam = searchParams.get("mode") === "transition" || decodedParams.mode === "transition" || path === "/transition-overlay";
     
-    const isSprint7Route = path.endsWith("/obs-vote") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link") || path.endsWith("/obs-todo");
+    const isSprint7Route = path.endsWith("/obs-vote") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link") || path.endsWith("/obs-todo") || path.endsWith("/obs-effect");
     
     if ((path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) && !isSprint7Route) {
       setIsOverlayRoute(true);
@@ -2790,7 +2790,7 @@ export default function App() {
   }, []);
 
   const sprint7Route = typeof window !== "undefined"
-    ? (window.location.pathname.endsWith("/obs-vote") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link") || window.location.pathname.endsWith("/obs-todo"))
+    ? (window.location.pathname.endsWith("/obs-vote") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link") || window.location.pathname.endsWith("/obs-todo") || window.location.pathname.endsWith("/obs-effect"))
       ? window.location.pathname.split("/").pop()
       : null
     : null;

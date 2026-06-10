@@ -118,9 +118,11 @@ function useVoteState() {
         const res = await fetch("/api/interactivity/votes");
         const data = await res.json();
         if (!alive) return;
-        setState(data?.state || { A: 0, B: 0, total: 0 });
-      } catch {
-        if (alive) setState({ A: 0, B: 0, total: 0 });
+        if (data?.state) {
+          setState(data.state);
+        }
+      } catch (err) {
+        console.warn("Failed to load vote state:", err);
       }
     };
     load();
@@ -1300,28 +1302,22 @@ export default function Sprint7Widgets() {
     savePersistedSprint7WidgetState(next);
     setState(next);
 
-    // Get current vote state to include in sync
-    fetch("/api/interactivity/votes")
-      .then(r => r.json())
-      .then(voteData => {
-        const payload = { state: { ...next, voteState: voteData?.state } };
-        // Sync to current origin's backend cache
-        fetch("/api/sprint7/state-sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }).catch(() => {});
+    const payload = { state: next };
+    // Sync to current origin's backend cache
+    fetch("/api/sprint7/state-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
 
-        // Sync a copy to localhost:3000 if running on Vercel
-        if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
-          fetch("http://localhost:3000/api/sprint7/state-sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    // Sync a copy to localhost:3000 if running on Vercel
+    if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
+      fetch("http://localhost:3000/api/sprint7/state-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    }
   };
 
   useEffect(() => {

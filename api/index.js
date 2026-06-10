@@ -17,12 +17,17 @@ var voteState = {
   voters: {}
 };
 var processedMessageIds = /* @__PURE__ */ new Set();
+var processedMessageIdQueue = [];
+var MAX_PROCESSED_IDS = 5e3;
 function parseChatCommand(messageText) {
   if (typeof messageText !== "string") return null;
   const trimmed = messageText.trim().toUpperCase();
   const kA = voteState.keywordA;
   const kB = voteState.keywordB;
   if (trimmed.startsWith("!")) {
+    if (/^!TUNGHOA$/i.test(trimmed)) {
+      return { type: "tunghoa" };
+    }
     const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
     if (rollMatch) {
       const sides = Number.parseInt(rollMatch[1], 10);
@@ -34,24 +39,12 @@ function parseChatCommand(messageText) {
     if (/^!PICK$/i.test(trimmed)) {
       return { type: "pick" };
     }
-    const voteMatch = trimmed.match(/^!VOTE\s+(.+)$/i);
+    const voteMatch = trimmed.match(/^!VOTE\s+"?([^"]+)"?$/i);
     if (voteMatch) {
-      const val = voteMatch[1].trim();
+      const val = voteMatch[1].trim().toUpperCase();
       if (val === kA) return { type: "vote", option: "A" };
       if (val === kB) return { type: "vote", option: "B" };
     }
-  }
-  const voteWordMatch = trimmed.match(/^VOTE\s+(.+)$/i);
-  if (voteWordMatch) {
-    const val = voteWordMatch[1].trim();
-    if (val === kA) return { type: "vote", option: "A" };
-    if (val === kB) return { type: "vote", option: "B" };
-  }
-  if (trimmed === kA) {
-    return { type: "vote", option: "A" };
-  }
-  if (trimmed === kB) {
-    return { type: "vote", option: "B" };
   }
   return null;
 }
@@ -74,6 +67,7 @@ function resetVoteState() {
   voteState.voteStartedAt = Date.now();
   voteState.updatedAt = Date.now();
   processedMessageIds.clear();
+  processedMessageIdQueue.length = 0;
   return getVoteState();
 }
 function setVoteKeywords(keywordA, keywordB) {
@@ -90,29 +84,31 @@ function castVote(userId, option, messageId, timestamp) {
     if (processedMessageIds.has(messageId)) {
       return { accepted: false, reason: "duplicate_message", state: getVoteState() };
     }
+    processedMessageIds.add(messageId);
+    processedMessageIdQueue.push(messageId);
+    if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
+      const oldId = processedMessageIdQueue.shift();
+      if (oldId) processedMessageIds.delete(oldId);
+    }
   }
   if (timestamp && timestamp < voteState.voteStartedAt) {
     return { accepted: false, reason: "old_message", state: getVoteState() };
   }
   const normalizedUserId = userId.trim();
-  const previousVote = voteState.voters[normalizedUserId];
-  if (previousVote === option) {
-    if (messageId) {
-      processedMessageIds.add(messageId);
-    }
-    return { accepted: false, reason: "duplicate_vote", state: getVoteState() };
-  }
-  if (previousVote === "A") voteState.A = Math.max(0, voteState.A - 1);
-  if (previousVote === "B") voteState.B = Math.max(0, voteState.B - 1);
   voteState.voters[normalizedUserId] = option;
-  voteState[option] += 1;
+  const counts = Object.values(voteState.voters).reduce(
+    (acc, val) => {
+      acc[val]++;
+      return acc;
+    },
+    { A: 0, B: 0 }
+  );
+  voteState.A = counts.A;
+  voteState.B = counts.B;
   voteState.updatedAt = Date.now();
-  if (messageId) {
-    processedMessageIds.add(messageId);
-  }
   return {
     accepted: true,
-    reason: previousVote ? "updated_vote" : "new_vote",
+    reason: "new_vote",
     state: getVoteState()
   };
 }

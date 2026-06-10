@@ -366,10 +366,6 @@ export function createApiApp(): express.Express {
         if (state.voteKeywordA && state.voteKeywordB) {
           setVoteKeywords(state.voteKeywordA, state.voteKeywordB);
         }
-        // Persist vote state if provided in the sync payload
-        if (state.voteState) {
-          setRawVoteState(state.voteState);
-        }
         return res.json({ success: true, state: cachedSprint7State });
       }
       res.status(400).json({ error: "Missing state payload" });
