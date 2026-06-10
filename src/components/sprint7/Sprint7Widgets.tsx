@@ -175,11 +175,27 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
       const userId = String(m.authorName || m.id).trim();
 
       if (userId && !newState.voters[userId]) {
+        // Lenient parsing: !VOTE keyword, !keyword, or just keyword
+        let voteOption: "A" | "B" | null = null;
+        
         const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
         if (voteMatch) {
           const val = voteMatch[1].trim().toUpperCase();
-          if (val === kA) { newState.voters[userId] = "A"; updated = true; }
-          else if (val === kB) { newState.voters[userId] = "B"; updated = true; }
+          if (val === kA) voteOption = "A";
+          else if (val === kB) voteOption = "B";
+        } else if (text.startsWith("!")) {
+          const cmd = text.substring(1).trim();
+          if (cmd === kA) voteOption = "A";
+          else if (cmd === kB) voteOption = "B";
+        } else if (text === kA) {
+          voteOption = "A";
+        } else if (text === kB) {
+          voteOption = "B";
+        }
+
+        if (voteOption) {
+          newState.voters[userId] = voteOption;
+          updated = true;
         }
       }
     });
@@ -241,13 +257,13 @@ function getSprint7State(): Sprint7WidgetState {
     const ob = params.get("sp7");
     if (ob) {
       const decoded = parseSprint7StateFromBase64(ob);
-      if (decoded) return { ...fallback, ...decoded };
+      if (decoded) return { ...fallback, ...decoded, updatedAt: decoded.updatedAt || Date.now() };
     }
   }
   const persisted = loadPersistedSprint7WidgetState();
   const raw = persisted || ((window as any).__SPRINT7_STATE__ as Partial<Sprint7WidgetState> | undefined);
   if (!raw || typeof raw !== "object") return fallback;
-  return { ...fallback, ...raw };
+  return { ...fallback, ...raw, updatedAt: raw.updatedAt || Date.now() };
 }
 
 /* ─────────── Widget Sub-components ─────────── */
@@ -306,9 +322,13 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
     if (isSpinning) return;
     setIsSpinning(true);
     setWinner(null);
+    
+    // Normal rotation: smooth easeOut
     const extraDegrees = Math.floor(Math.random() * 360);
     const newRotation = rotation + (5 * 360) + extraDegrees;
+    
     setRotation(newRotation);
+
     setTimeout(() => {
       setIsSpinning(false);
       const actualDegrees = newRotation % 360;
@@ -340,7 +360,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
         </div>
         <div className="relative drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" style={{ width: size, height: size }}>
           <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible">
-            <motion.g animate={{ rotate: rotation }} transition={{ duration: 6, ease: [0.15, 0, 0.1, 1] }} style={{ originX: `${centerX}px`, originY: `${centerY}px` }}>
+            <motion.g animate={{ rotate: rotation }} transition={{ duration: 6, ease: "easeOut" }} style={{ originX: `${centerX}px`, originY: `${centerY}px` }}>
               <circle cx={centerX} cy={centerY} r={radius + 8} fill="#0f172a" />
               {users.map((user, i) => {
                 const startAngle = i * segmentAngle;
@@ -447,19 +467,23 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
       const data = await res.json();
       if (data?.state) {
         const incoming = data.state as Sprint7WidgetState;
-        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+        const current = stateRef.current;
+        // ONLY update if incoming state is strictly newer
+        if ((incoming.updatedAt || 0) > (current.updatedAt || 0)) {
           setState(incoming);
         }
       }
     } catch {}
   };
 
+  // BroadcastChannel for instant local sync
   useEffect(() => {
     const channel = new BroadcastChannel("sprint7_global_sync");
     channel.onmessage = (e) => {
       if (e.data?.type === "STATE_UPDATE" && e.data.state) {
         const incoming = e.data.state as Sprint7WidgetState;
-        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+        const current = stateRef.current;
+        if ((incoming.updatedAt || 0) > (current.updatedAt || 0)) {
           setState(incoming);
         }
       }
@@ -476,8 +500,11 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       const persisted = loadPersistedSprint7WidgetState();
-      if (persisted && (persisted.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
-        setState(persisted);
+      if (persisted) {
+        const current = stateRef.current;
+        if ((persisted.updatedAt || 0) > (current.updatedAt || 0)) {
+          setState(persisted);
+        }
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -491,10 +518,12 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
     setState(stamped);
     savePersistedSprint7WidgetState(stamped);
     
+    // Broadcast locally instantly
     const channel = new BroadcastChannel("sprint7_global_sync");
     channel.postMessage({ type: "STATE_UPDATE", state: stamped });
     channel.close();
 
+    // Sync to server
     fetch("/api/sprint7/state-sync", { 
       method: "POST", 
       headers: { "Content-Type": "application/json" }, 
@@ -573,7 +602,7 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-white/5 text-center">
-           <p className="text-slate-500 font-black text-sm uppercase tracking-[0.6em] animate-pulse">Join by typing <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span></p>
+           <p className="text-slate-500 font-black text-sm uppercase tracking-[0.6em] animate-pulse">Join by typing <span className="text-white">{keywordA}</span> hoặc <span className="text-white">{keywordB}</span></p>
         </div>
       </motion.div>
     </div>
