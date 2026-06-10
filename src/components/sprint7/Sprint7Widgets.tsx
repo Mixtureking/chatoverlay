@@ -510,8 +510,8 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
   );
 }
 
-function TimerWidget() {
-  const widgetState = useMemo(() => getSprint7State(), []);
+function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
+  const widgetState = useMemo(() => initialWidgetState || getSprint7State(), [initialWidgetState]);
   const [seconds, setSeconds] = useState(widgetState.timerSeconds ?? 5 * 60);
   const [doneText, setDoneText] = useState(widgetState.timerDoneText || "Time is up");
   const [isRunning, setIsRunning] = useState(true);
@@ -605,8 +605,8 @@ const DORO_WHEEL_COLORS = [
   "#1d4ed8", "#a21caf", "#0f766e", "#b45309", "#1e40af",
 ];
 
-function WheelWidget() {
-  const widgetState = useMemo(() => getSprint7State(), []);
+function WheelWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
+  const widgetState = useMemo(() => initialWidgetState || getSprint7State(), [initialWidgetState]);
   const fallbackUsers = widgetState.wheelUsers && widgetState.wheelUsers.length > 0 ? widgetState.wheelUsers : getFallbackState().wheelUsers;
   const [users, setUsers] = useState<string[]>(fallbackUsers);
   const [angle, setAngle] = useState(0);
@@ -985,20 +985,28 @@ function WheelWidget() {
   );
 }
 
-function LinkWidget() {
-  const [socialLinks, setSocialLinks] = useState<Record<string, string>>({});
+function LinkWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>(initialWidgetState?.socialLinks || {});
 
   useEffect(() => {
-    // Load initial state
-    const persisted = loadPersistedSprint7WidgetState();
-    if (persisted?.socialLinks) {
-      setSocialLinks(persisted.socialLinks);
-    } else {
-      setSocialLinks({
-        youtube: "https://youtube.com",
-        tiktok: "https://tiktok.com",
-        discord: "https://discord.com",
-      });
+    if (initialWidgetState?.socialLinks) {
+        setSocialLinks(initialWidgetState.socialLinks);
+    }
+  }, [initialWidgetState]);
+
+  useEffect(() => {
+    // Load initial state if not provided
+    if (!initialWidgetState) {
+        const persisted = loadPersistedSprint7WidgetState();
+        if (persisted?.socialLinks) {
+          setSocialLinks(persisted.socialLinks);
+        } else {
+          setSocialLinks({
+            youtube: "https://youtube.com",
+            tiktok: "https://tiktok.com",
+            discord: "https://discord.com",
+          });
+        }
     }
 
     // Sync via server polling for remote controllers or isolated browser profiles
@@ -1054,8 +1062,14 @@ function LinkWidget() {
   );
 }
 
-function ObsTodoWidget() {
-  const [todos, setTodos] = useState<{ id: string; text: string; completed: boolean }[]>([]);
+function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
+  const [todos, setTodos] = useState<{ id: string; text: string; completed: boolean }[]>(widgetState?.todoList || []);
+
+  useEffect(() => {
+    if (widgetState?.todoList) {
+        setTodos(widgetState.todoList);
+    }
+  }, [widgetState]);
 
   useEffect(() => {
     const sync = () => {
@@ -1102,8 +1116,10 @@ function ObsTodoWidget() {
   );
 }
 
-function ObsVoteWidget() {
-  const vote = useVoteState() as any; // Using any to access keywordA/keywordB if added
+function ObsVoteWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
+  const vote = useVoteState();
+  const keywordA = widgetState.voteKeywordA || "A";
+  const keywordB = widgetState.voteKeywordB || "B";
 
   return (
     <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
@@ -1124,7 +1140,7 @@ function ObsVoteWidget() {
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
                 <span className="text-cyan-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
-                <span className="text-white text-6xl font-black tracking-tight">{vote.keywordA || "A"}</span>
+                <span className="text-white text-6xl font-black tracking-tight">{keywordA}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-cyan-400 text-4xl font-black">{vote.aPct}%</span>
@@ -1144,7 +1160,7 @@ function ObsVoteWidget() {
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
                 <span className="text-fuchsia-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
-                <span className="text-white text-6xl font-black tracking-tight">{vote.keywordB || "B"}</span>
+                <span className="text-white text-6xl font-black tracking-tight">{keywordB}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-fuchsia-400 text-4xl font-black">{vote.bPct}%</span>
@@ -1162,7 +1178,7 @@ function ObsVoteWidget() {
         
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
           <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">
-            Type <span className="text-white">{vote.keywordA || "A"}</span> or <span className="text-white">{vote.keywordB || "B"}</span> in chat to vote
+            Type <span className="text-white">{keywordA}</span> or <span className="text-white">{keywordB}</span> in chat to vote
           </p>
         </div>
       </div>
@@ -1261,6 +1277,20 @@ export default function Sprint7Widgets() {
             (window as any).__SPRINT7_STATE__ = data.state;
           }
         }
+
+        // Auto-resync keywords to backend if they were lost (e.g. server restart)
+        // We only do this in dashboard mode to avoid multiple widgets fighting
+        if (state.voteKeywordA || state.voteKeywordB) {
+            const voteRes = await fetch("/api/interactivity/votes");
+            const voteData = await voteRes.json();
+            if (voteData?.state && (voteData.state.keywordA !== state.voteKeywordA || voteData.state.keywordB !== state.voteKeywordB)) {
+                fetch("/api/interactivity/vote-keywords", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keywordA: state.voteKeywordA, keywordB: state.voteKeywordB }),
+                });
+            }
+        }
       } catch {}
     };
 
@@ -1278,15 +1308,15 @@ export default function Sprint7Widgets() {
       {route === "dashboard" ? (
         <Sprint7Dashboard state={state} syncState={syncState} />
       ) : route === "obs-timer" ? (
-        <TimerWidget />
+        <TimerWidget widgetState={state} />
       ) : route === "obs-wheel" ? (
-        <WheelWidget />
+        <WheelWidget widgetState={state} />
       ) : route === "obs-link" ? (
-        <LinkWidget />
+        <LinkWidget widgetState={state} />
       ) : route === "obs-todo" ? (
-        <ObsTodoWidget />
+        <ObsTodoWidget widgetState={state} />
       ) : route === "obs-vote" ? (
-        <ObsVoteWidget />
+        <ObsVoteWidget widgetState={state} />
       ) : (
         <VoteWidget widgetState={state} syncState={syncState} isLight={isLight} />
       )}
