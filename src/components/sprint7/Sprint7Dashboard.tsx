@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Download, Upload, Timer, CircleDot, MessageSquare, Link2, ListTodo, Palette, CheckCircle2, Clock, Users, ExternalLink, Sparkles } from "lucide-react";
-import { createSprint7WidgetState, parseSprint7FullState, serializeSprint7FullState, serializeSprint7StateToBase64, type Sprint7WidgetState } from "./sprint7State";
+import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Timer, CircleDot, MessageSquare, Link2, ListTodo, CheckCircle2, Clock, Users, ExternalLink, Sparkles } from "lucide-react";
+import { createSprint7WidgetState, serializeSprint7StateToBase64, type Sprint7WidgetState } from "./sprint7State";
 
 interface Sprint7DashboardProps {
   state: Sprint7WidgetState;
@@ -19,7 +19,6 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   const [wheelUsersInput, setWheelUsersInput] = useState((state.wheelUsers || []).join(", "));
   const [timerSec, setTimerSec] = useState(String(state.timerSeconds ?? 300));
   const [timerDoneText, setTimerDoneText] = useState(state.timerDoneText || "Time is up");
-  const [cssDraft, setCssDraft] = useState(state.customCSS || "");
   const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [newTodoText, setNewTodoText] = useState("");
@@ -49,20 +48,13 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     }
   }, [state.timerDoneText]);
 
-  useEffect(() => {
-    const nextCss = state.customCSS || "";
-    if (nextCss !== cssDraft) {
-      setCssDraft(nextCss);
-    }
-  }, [state.customCSS]);
-
   const flash = (msg: string) => {
     setSavedMsg(msg);
     setTimeout(() => setSavedMsg(null), 2500);
   };
 
   // Helper to sync specific values immediately to parent state & Broadcast Channels
-  const saveField = (key: "timer" | "wheel" | "css", val1: string, val2?: string) => {
+  const saveField = (key: "timer" | "wheel", val1: string, val2?: string) => {
     const next = { ...state };
     if (key === "timer") {
       const parsedSec = Number.parseInt(val1, 10);
@@ -83,8 +75,6 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
       wheelChannel.postMessage({ type: "UPDATE_WHEEL", users: finalWheelUsers });
       wheelChannel.close();
-    } else if (key === "css") {
-      next.customCSS = val1;
     }
     syncState(next);
   };
@@ -97,12 +87,9 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     const finalWheelUsers = wheelUsersInput.split(",").map(s => s.trim()).filter(Boolean);
 
     const config = {
-      todoList: state.todoList,
-      customCSS: cssDraft,
-      socialLinks: state.socialLinks,
+      ...state,
       timerSeconds: finalSec,
       timerDoneText: finalDoneText,
-      timerTrigger: state.timerTrigger || 0,
       wheelUsers: finalWheelUsers,
     };
 
@@ -137,7 +124,6 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       timerSeconds: finalSec,
       timerDoneText: finalDoneText,
       timerTrigger: trigger,
-      customCSS: cssDraft,
     });
     
     const timerChannel = new BroadcastChannel("sprint7_timer_channel");
@@ -224,31 +210,6 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     });
   };
 
-  // ---- Export / Import / Reset ----
-  const exportState = () => {
-    const payload = serializeSprint7FullState({ todoList: state.todoList, customCSS: state.customCSS, socialLinks: state.socialLinks });
-    const blob = new Blob([payload], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sprint7-widget-state.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    flash("📦 Đã xuất cấu hình!");
-  };
-  const importState = async (file: File | null) => {
-    if (!file) return;
-    try {
-      const raw = await file.text();
-      const parsed = parseSprint7FullState(raw);
-      syncState(createSprint7WidgetState({ ...state, todoList: parsed.todoList, customCSS: parsed.customCSS, socialLinks: parsed.socialLinks }));
-      flash("📥 Đã nhập cấu hình thành công!");
-    } catch {
-      flash("❌ File không hợp lệ.");
-    }
-  };
   const resetAll = () => {
     syncState(createSprint7WidgetState());
     flash("🔄 Đã reset toàn bộ!");
@@ -295,8 +256,8 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Khu thử nghiệm Sprint 7</h2>
-              <p className="text-sm text-slate-400 mt-0.5">Quản lý widget tương tác OBS — Wheel, Timer, Todo, Social Links & CSS Editor</p>
+              <h2 className="text-xl font-bold text-white tracking-tight">Tính năng tương tác Stream</h2>
+              <p className="text-sm text-slate-400 mt-0.5">Quản lý widget tương tác OBS — Wheel, Timer, Todo & Social Links</p>
             </div>
           </div>
         </div>
@@ -342,6 +303,13 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               desc="Đồng hồ đếm ngược và danh sách nhiệm vụ."
               route="obs-timer"
               gradient="bg-gradient-to-r from-emerald-500 to-teal-500"
+            />
+            <ObsLinkCard
+              emoji="✅"
+              title="OBS Todo"
+              desc="Danh sách nhiệm vụ tối giản dành riêng cho OBS."
+              route="obs-todo"
+              gradient="bg-gradient-to-r from-slate-500 to-slate-700"
             />
           </div>
         </div>
@@ -509,34 +477,11 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                 )}
               </div>
 
-              {/* ──── Custom CSS ──── */}
-              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
-                <h4 className={`${sectionTitle} text-indigo-400`}>
-                  <Palette className="w-3.5 h-3.5" /> CSS tùy chỉnh
-                </h4>
-                <textarea
-                  className={`${inputCls} w-full font-mono text-[12px] resize-y leading-relaxed`}
-                  rows={5}
-                  value={cssDraft}
-                  onChange={(e) => setCssDraft(e.target.value)}
-                  onBlur={() => saveField("css", cssDraft)}
-                  placeholder="/* Nhập CSS tùy chỉnh ở đây... */"
-                />
-                <p className="text-[10px] text-slate-500 pl-0.5">CSS chỉ được áp dụng khi cú pháp hợp lệ. Cú pháp sai sẽ được bỏ qua an toàn.</p>
-              </div>
-
               {/* ──── Action Bar ──── */}
               <div className="flex flex-wrap gap-2.5 pt-4 border-t border-white/[0.04]">
                 <button onClick={handleSaveAll} className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30">
                   <Save className="w-4 h-4" /> Lưu tất cả
                 </button>
-                <button onClick={exportState} className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-slate-200 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200">
-                  <Download className="w-4 h-4" /> Xuất file
-                </button>
-                <label className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-slate-200 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer">
-                  <Upload className="w-4 h-4" /> Nhập file
-                  <input type="file" accept=".json" className="hidden" onChange={(e) => { void importState(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
-                </label>
                 <button onClick={resetAll} className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 ml-auto">
                   <RotateCcw className="w-3.5 h-3.5" /> Reset
                 </button>

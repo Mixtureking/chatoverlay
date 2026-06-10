@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { createSprint7WidgetState, isLikelySafeCss, loadPersistedSprint7WidgetState, parseSprint7FullState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, serializeSprint7FullState, type Sprint7WidgetState } from "./sprint7State";
+import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number };
-type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel" | "obs-link" | "dashboard";
+type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
 
 const sampleComments = [
   "This clip is awesome!",
@@ -23,6 +23,7 @@ const getRoute = (): WidgetRoute => {
   if (path.includes("obs-wheel")) return "obs-wheel";
   if (path.includes("obs-link")) return "obs-link";
   if (path.includes("obs-chat")) return "obs-chat";
+  if (path.includes("obs-todo")) return "obs-todo";
   return "dashboard";
 };
 
@@ -60,7 +61,6 @@ function getFallbackState(): Sprint7WidgetState {
       { id: "todo-2", text: "Check mic", completed: true },
       { id: "todo-3", text: "Start stream", completed: false },
     ],
-    customCSS: "",
     socialLinks: {
       youtube: "https://youtube.com",
       tiktok: "https://tiktok.com",
@@ -107,31 +107,6 @@ function getSprint7State(): Sprint7WidgetState {
     timerDoneText: typeof raw.timerDoneText === "string" && raw.timerDoneText.trim() ? raw.timerDoneText : fallback.timerDoneText,
     wheelUsers: Array.isArray(raw.wheelUsers) && raw.wheelUsers.length > 0 ? raw.wheelUsers : fallback.wheelUsers,
   };
-}
-
-function LiveCssInjector({ customCSS }: { customCSS: string }) {
-  useEffect(() => {
-    const styleId = "custom-css-injector";
-    let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleTag) {
-      styleTag = document.createElement("style");
-      styleTag.id = styleId;
-      document.head.appendChild(styleTag);
-    }
-
-    try {
-      const css = customCSS || "";
-      if (!css.trim()) {
-        styleTag.textContent = "";
-        return;
-      }
-      styleTag.textContent = isLikelySafeCss(css) ? css : "";
-    } catch {
-      if (styleTag) styleTag.textContent = "";
-    }
-  }, [customCSS]);
-
-  return null;
 }
 
 const getBtnClass = (color: "cyan" | "fuchsia" | "emerald" | "yellow" | "sky" | "indigo" | "amber" | "rose" | "slate", isLight: boolean) => {
@@ -1021,6 +996,52 @@ function LinkWidget() {
   );
 }
 
+function ObsTodoWidget() {
+  const [todos, setTodos] = useState<{ id: string; text: string; completed: boolean }[]>([]);
+
+  useEffect(() => {
+    const sync = () => {
+      const persisted = loadPersistedSprint7WidgetState();
+      if (persisted?.todoList) setTodos(persisted.todoList);
+    };
+    sync();
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/sprint7/state-sync");
+        const data = await res.json();
+        if (data?.state?.todoList) setTodos(data.state.todoList);
+      } catch {}
+    }, 2000);
+    window.addEventListener("storage", sync);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  return (
+    <div className="w-screen h-screen bg-transparent p-8 flex flex-col items-start justify-start" style={obsFontStyle}>
+      <div className="bg-black/60 backdrop-blur-md border-l-4 border-emerald-500 p-6 rounded-r-2xl shadow-2xl min-w-[320px] max-w-[600px] animate-in slide-in-from-left duration-500">
+        <h2 className="text-emerald-400 text-xl font-black uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+          <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+          Todo List
+        </h2>
+        <div className="space-y-3">
+          {todos.filter(t => !t.completed).length === 0 && (
+            <p className="text-slate-400 italic text-sm">All tasks completed!</p>
+          )}
+          {todos.map((todo) => (
+            <div key={todo.id} className={`flex items-center gap-3 transition-all duration-300 ${todo.completed ? "opacity-0 h-0 overflow-hidden" : "opacity-100 h-auto"}`}>
+              <div className="w-5 h-5 rounded-full border-2 border-emerald-500/50 flex-shrink-0" />
+              <span className="text-white text-lg font-bold tracking-wide drop-shadow-md">{todo.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function useThemeMode() {
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
   useEffect(() => {
@@ -1103,7 +1124,6 @@ export default function Sprint7Widgets() {
 
   return (
     <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
-      <LiveCssInjector customCSS={state.customCSS} />
       {route === "dashboard" ? (
         <Sprint7Dashboard state={state} syncState={syncState} />
       ) : route === "obs-timer" ? (
@@ -1112,6 +1132,8 @@ export default function Sprint7Widgets() {
         <WheelWidget />
       ) : route === "obs-link" ? (
         <LinkWidget />
+      ) : route === "obs-todo" ? (
+        <ObsTodoWidget />
       ) : (
         <VoteWidget widgetState={state} syncState={syncState} isLight={isLight} />
       )}
