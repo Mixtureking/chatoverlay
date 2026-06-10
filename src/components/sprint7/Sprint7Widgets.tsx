@@ -127,13 +127,16 @@ function useVoteState(widgetState: Sprint7WidgetState) {
         const data = await res.json();
         if (!alive) return;
         if (data?.state) {
-            setState({
+            const nextState = {
                 A: data.state.A,
                 B: data.state.B,
                 total: data.state.total || (data.state.A + data.state.B),
                 keywordA: data.state.keywordA,
                 keywordB: data.state.keywordB,
-            });
+            };
+            setState(nextState);
+            // Backup to localStorage for Authority Restoration
+            localStorage.setItem("sprint7_votes", JSON.stringify(nextState));
         }
       } catch {
         if (alive) setState({ A: 0, B: 0, total: 0 });
@@ -1364,6 +1367,34 @@ export default function Sprint7Widgets() {
             setState(data.state);
             (window as any).__SPRINT7_STATE__ = data.state;
           }
+        }
+
+        // AUTHORITY RESTORATION: Dashboard is the keeper of the session state.
+        // If the backend resets (e.g. server restart), we push our local state back.
+        const voteRes = await fetch("/api/interactivity/votes");
+        const voteData = await voteRes.json();
+        if (voteData?.state) {
+            // Restore keywords if they differ
+            if (voteData.state.keywordA !== state.voteKeywordA || voteData.state.keywordB !== state.voteKeywordB) {
+                fetch("/api/interactivity/vote-keywords", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keywordA: state.voteKeywordA, keywordB: state.voteKeywordB }),
+                });
+            }
+
+            // Restore counts if backend is empty but we have a local backup
+            const savedVotesRaw = localStorage.getItem("sprint7_votes");
+            if (savedVotesRaw) {
+                const savedVotes = JSON.parse(savedVotesRaw);
+                if (voteData.state.total === 0 && (savedVotes.A > 0 || savedVotes.B > 0)) {
+                    fetch("/api/interactivity/votes/restore", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ A: savedVotes.A, B: savedVotes.B }),
+                    });
+                }
+            }
         }
       } catch {}
     };
