@@ -175,16 +175,16 @@
   object-fit: contain;
 }
 
-@keyframes marqueeRightToLeft {
-  from { transform: translateX(100%); }
-  to { transform: translateX(-100%); }
+@keyframes marqueeSeamless {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 .marquee-track {
   display: inline-flex;
   gap: 1.5rem;
   white-space: nowrap;
-  animation: marqueeRightToLeft 14s linear infinite;
+  animation: marqueeSeamless 20s linear infinite;
 }
 
 .marquee-track-slow {
@@ -192,5 +192,5 @@
   gap: 1.5rem;
   width: max-content;
   white-space: nowrap;
-  animation: marqueeRightToLeft 24s linear infinite;
+  animation: marqueeSeamless 40s linear infinite;
 }

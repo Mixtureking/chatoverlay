@@ -10,6 +10,7 @@ export type VoteState = {
   updatedAt: number;
   keywordA: string;
   keywordB: string;
+  voteStartedAt: number;
 };
 
 const DEFAULT_VOTE_STATE: VoteState = {
@@ -19,12 +20,17 @@ const DEFAULT_VOTE_STATE: VoteState = {
   updatedAt: Date.now(),
   keywordA: "A",
   keywordB: "B",
+  voteStartedAt: Date.now(),
 };
 
 const voteState: VoteState = {
   ...DEFAULT_VOTE_STATE,
   voters: {},
 };
+
+const processedMessageIds = new Set<string>();
+const processedMessageIdQueue: string[] = [];
+const MAX_PROCESSED_IDS = 5000;
 
 export function parseChatCommand(messageText: string): ChatCommand | null {
   if (typeof messageText !== "string") return null;
@@ -83,6 +89,7 @@ export function getVoteState() {
     updatedAt: voteState.updatedAt,
     keywordA: voteState.keywordA,
     keywordB: voteState.keywordB,
+    voteStartedAt: voteState.voteStartedAt,
   };
 }
 
@@ -90,7 +97,10 @@ export function resetVoteState() {
   voteState.A = 0;
   voteState.B = 0;
   voteState.voters = {};
+  voteState.voteStartedAt = Date.now();
   voteState.updatedAt = Date.now();
+  processedMessageIds.clear();
+  processedMessageIdQueue.length = 0;
   return getVoteState();
 }
 
@@ -101,15 +111,37 @@ export function setVoteKeywords(keywordA: string, keywordB: string) {
   return getVoteState();
 }
 
-export function castVote(userId: string, option: "A" | "B") {
+export function castVote(userId: string, option: "A" | "B", messageId?: string, timestamp?: number) {
   if (!userId || typeof userId !== "string") {
     return { accepted: false, reason: "missing_user" as const, state: getVoteState() };
+  }
+
+  // If a messageId is provided, check if we've already processed it
+  if (messageId) {
+    if (processedMessageIds.has(messageId)) {
+      return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
+    }
+  }
+
+  // If a timestamp is provided, verify it is not before the vote started
+  if (timestamp && timestamp < voteState.voteStartedAt) {
+    return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
   const normalizedUserId = userId.trim();
   const previousVote = voteState.voters[normalizedUserId];
 
   if (previousVote === option) {
+    if (messageId) {
+      if (!processedMessageIds.has(messageId)) {
+        processedMessageIds.add(messageId);
+        processedMessageIdQueue.push(messageId);
+        if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
+          const oldId = processedMessageIdQueue.shift();
+          if (oldId) processedMessageIds.delete(oldId);
+        }
+      }
+    }
     return { accepted: false, reason: "duplicate_vote" as const, state: getVoteState() };
   }
 
@@ -120,10 +152,20 @@ export function castVote(userId: string, option: "A" | "B") {
   voteState[option] += 1;
   voteState.updatedAt = Date.now();
 
+  if (messageId) {
+    if (!processedMessageIds.has(messageId)) {
+      processedMessageIds.add(messageId);
+      processedMessageIdQueue.push(messageId);
+      if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
+        const oldId = processedMessageIdQueue.shift();
+        if (oldId) processedMessageIds.delete(oldId);
+      }
+    }
+  }
+
   return {
     accepted: true,
     reason: previousVote ? "updated_vote" : "new_vote",
     state: getVoteState(),
   };
 }
-

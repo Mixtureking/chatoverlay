@@ -7,30 +7,51 @@ var DEFAULT_VOTE_STATE = {
   A: 0,
   B: 0,
   voters: {},
-  updatedAt: Date.now()
+  updatedAt: Date.now(),
+  keywordA: "A",
+  keywordB: "B",
+  voteStartedAt: Date.now()
 };
 var voteState = {
   ...DEFAULT_VOTE_STATE,
   voters: {}
 };
+var processedMessageIds = /* @__PURE__ */ new Set();
 function parseChatCommand(messageText) {
   if (typeof messageText !== "string") return null;
-  const trimmed = messageText.trim();
-  if (!trimmed.startsWith("!")) return null;
-  const rollMatch = trimmed.match(/^!roll\s+(\d{1,4})$/i);
-  if (rollMatch) {
-    const sides = Number.parseInt(rollMatch[1], 10);
-    if (Number.isFinite(sides) && sides >= 2) {
-      return { type: "roll", sides };
+  const trimmed = messageText.trim().toUpperCase();
+  const kA = voteState.keywordA;
+  const kB = voteState.keywordB;
+  if (trimmed.startsWith("!")) {
+    const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
+    if (rollMatch) {
+      const sides = Number.parseInt(rollMatch[1], 10);
+      if (Number.isFinite(sides) && sides >= 2) {
+        return { type: "roll", sides };
+      }
+      return null;
     }
-    return null;
+    if (/^!PICK$/i.test(trimmed)) {
+      return { type: "pick" };
+    }
+    const voteMatch = trimmed.match(/^!VOTE\s+(.+)$/i);
+    if (voteMatch) {
+      const val = voteMatch[1].trim();
+      if (val === kA) return { type: "vote", option: "A" };
+      if (val === kB) return { type: "vote", option: "B" };
+    }
   }
-  if (/^!pick$/i.test(trimmed)) {
-    return { type: "pick" };
+  const voteWordMatch = trimmed.match(/^VOTE\s+(.+)$/i);
+  if (voteWordMatch) {
+    const val = voteWordMatch[1].trim();
+    if (val === kA) return { type: "vote", option: "A" };
+    if (val === kB) return { type: "vote", option: "B" };
   }
-  const voteMatch = trimmed.match(/^!vote\s+([AB])$/i);
-  if (voteMatch) {
-    return { type: "vote", option: voteMatch[1].toUpperCase() };
+  if (trimmed === kA) {
+    return { type: "vote", option: "A" };
+  }
+  if (trimmed === kB) {
+    return { type: "vote", option: "B" };
   }
   return null;
 }
@@ -40,23 +61,45 @@ function getVoteState() {
     B: voteState.B,
     total: voteState.A + voteState.B,
     voters: { ...voteState.voters },
-    updatedAt: voteState.updatedAt
+    updatedAt: voteState.updatedAt,
+    keywordA: voteState.keywordA,
+    keywordB: voteState.keywordB,
+    voteStartedAt: voteState.voteStartedAt
   };
 }
 function resetVoteState() {
   voteState.A = 0;
   voteState.B = 0;
   voteState.voters = {};
+  voteState.voteStartedAt = Date.now();
+  voteState.updatedAt = Date.now();
+  processedMessageIds.clear();
+  return getVoteState();
+}
+function setVoteKeywords(keywordA, keywordB) {
+  voteState.keywordA = (keywordA || "A").trim().toUpperCase();
+  voteState.keywordB = (keywordB || "B").trim().toUpperCase();
   voteState.updatedAt = Date.now();
   return getVoteState();
 }
-function castVote(userId, option) {
+function castVote(userId, option, messageId, timestamp) {
   if (!userId || typeof userId !== "string") {
     return { accepted: false, reason: "missing_user", state: getVoteState() };
+  }
+  if (messageId) {
+    if (processedMessageIds.has(messageId)) {
+      return { accepted: false, reason: "duplicate_message", state: getVoteState() };
+    }
+  }
+  if (timestamp && timestamp < voteState.voteStartedAt) {
+    return { accepted: false, reason: "old_message", state: getVoteState() };
   }
   const normalizedUserId = userId.trim();
   const previousVote = voteState.voters[normalizedUserId];
   if (previousVote === option) {
+    if (messageId) {
+      processedMessageIds.add(messageId);
+    }
     return { accepted: false, reason: "duplicate_vote", state: getVoteState() };
   }
   if (previousVote === "A") voteState.A = Math.max(0, voteState.A - 1);
@@ -64,6 +107,9 @@ function castVote(userId, option) {
   voteState.voters[normalizedUserId] = option;
   voteState[option] += 1;
   voteState.updatedAt = Date.now();
+  if (messageId) {
+    processedMessageIds.add(messageId);
+  }
   return {
     accepted: true,
     reason: previousVote ? "updated_vote" : "new_vote",
@@ -193,11 +239,11 @@ Stack trace: ${error?.stack}`);
   });
   app2.post(["/api/interactivity/votes", "/interactivity/votes"], (req, res) => {
     try {
-      const { userId, option } = req.body || {};
+      const { userId, option, messageId, timestamp } = req.body || {};
       if (option !== "A" && option !== "B") {
         return res.status(400).json({ error: "option must be A or B" });
       }
-      const result = castVote(String(userId || ""), option);
+      const result = castVote(String(userId || ""), option, messageId, timestamp);
       return res.status(result.accepted ? 200 : 409).json(result);
     } catch (error) {
       return res.status(500).json({ error: `Vote update failed: ${error?.message || error}` });
@@ -205,6 +251,15 @@ Stack trace: ${error?.stack}`);
   });
   app2.delete(["/api/interactivity/votes", "/interactivity/votes"], (_req, res) => {
     res.json({ state: resetVoteState() });
+  });
+  app2.post(["/api/interactivity/vote-keywords", "/interactivity/vote-keywords"], (req, res) => {
+    try {
+      const { keywordA, keywordB } = req.body || {};
+      const result = setVoteKeywords(keywordA, keywordB);
+      return res.json({ success: true, state: result });
+    } catch (error) {
+      return res.status(500).json({ error: `Failed to set vote keywords: ${error?.message || error}` });
+    }
   });
   app2.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res) => {
     try {
@@ -263,14 +318,14 @@ Stack trace: ${error?.stack}`);
         }
         const cleanMessageText = sanitizeHtml(snippet.textMessageDetails?.messageText || snippet.displayMessage || "");
         const channelId = author.channelId || author.displayName || "anonymous";
-        if (cleanMessageText.trim().startsWith("!")) {
-          const cmd = parseChatCommand(cleanMessageText);
-          if (cmd && cmd.type === "vote") {
-            castVote(channelId, cmd.option);
-          }
+        const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
+        const cmd = parseChatCommand(cleanMessageText);
+        if (cmd && cmd.type === "vote") {
+          castVote(channelId, cmd.option, messageId, timestamp);
         }
         return {
-          id: item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: messageId,
           authorName: sanitizeHtml(author.displayName || "Viewer"),
           authorPhotoUrl: author.profileImageUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80",
           messageText: cleanMessageText,
@@ -282,7 +337,7 @@ Stack trace: ${error?.stack}`);
           superChatColor,
           superChatAmountText: isSuperChat ? snippet.superChatDetails?.amountDisplayString || "" : "",
           tier,
-          timestamp: snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now()
+          timestamp
         };
       });
       res.json({
@@ -359,6 +414,9 @@ Stack trace: ${error?.stack}`);
       const { state } = req.body || {};
       if (state) {
         cachedSprint7State = state;
+        if (state.voteKeywordA && state.voteKeywordB) {
+          setVoteKeywords(state.voteKeywordA, state.voteKeywordB);
+        }
         return res.json({ success: true, state: cachedSprint7State });
       }
       res.status(400).json({ error: "Missing state payload" });

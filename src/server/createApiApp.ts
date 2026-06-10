@@ -176,11 +176,11 @@ export function createApiApp(): express.Express {
 
   app.post(["/api/interactivity/votes", "/interactivity/votes"], (req, res) => {
     try {
-      const { userId, option } = req.body || {};
+      const { userId, option, messageId, timestamp } = req.body || {};
       if (option !== "A" && option !== "B") {
         return res.status(400).json({ error: "option must be A or B" });
       }
-      const result = castVote(String(userId || ""), option);
+      const result = castVote(String(userId || ""), option, messageId, timestamp);
       return res.status(result.accepted ? 200 : 409).json(result);
     } catch (error: any) {
       return res.status(500).json({ error: `Vote update failed: ${error?.message || error}` });
@@ -255,14 +255,16 @@ export function createApiApp(): express.Express {
 
         const cleanMessageText = sanitizeHtml(snippet.textMessageDetails?.messageText || snippet.displayMessage || "");
         const channelId = author.channelId || author.displayName || "anonymous";
+        const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
 
         const cmd = parseChatCommand(cleanMessageText);
         if (cmd && cmd.type === "vote") {
-          castVote(channelId, cmd.option);
+          castVote(channelId, cmd.option, messageId, timestamp);
         }
 
         return {
-          id: item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: messageId,
           authorName: sanitizeHtml(author.displayName || "Viewer"),
           authorPhotoUrl: author.profileImageUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=64&h=64&q=80",
           messageText: cleanMessageText,
@@ -274,7 +276,7 @@ export function createApiApp(): express.Express {
           superChatColor,
           superChatAmountText: isSuperChat ? snippet.superChatDetails?.amountDisplayString || "" : "",
           tier,
-          timestamp: snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now(),
+          timestamp,
         };
       });
 

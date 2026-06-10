@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState } from "./sprint7State";
+import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState, serializeSprint7FullState, parseSprint7FullState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number; keywordA?: string; keywordB?: string };
@@ -54,7 +54,7 @@ function useVoteState() {
       }
     };
     load();
-    const timer = window.setInterval(load, 3500);
+    const timer = window.setInterval(load, 1000);
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -73,6 +73,7 @@ function getFallbackState(): Sprint7WidgetState {
       { id: "todo-2", text: "Check mic", completed: true },
       { id: "todo-3", text: "Start stream", completed: false },
     ],
+    customCSS: "",
     socialLinks: {
       youtube: "https://youtube.com",
       tiktok: "https://tiktok.com",
@@ -157,6 +158,14 @@ interface VoteWidgetProps {
   isLight: boolean;
 }
 
+const sampleComments = [
+  "Stream mượt quá anh ơi! 🔥🕹️",
+  "Game này tên gì vậy mọi người ơi? Đẹp mắt thế.",
+  "Chào cả nhà nha, chúc buổi tối stream vui vẻ!",
+  "Mọi người nhớ nhấn Like và Đăng ký kênh ủng hộ streamer nhé! 👍🔔",
+  "Làm trận Custom với người xem đi anh trai ơi!"
+];
+
 function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
   const vote = useVoteState();
   const obsChatFontStyle = { fontFamily: '"Segoe UI", Roboto, Arial, sans-serif' };
@@ -184,7 +193,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
 
   const addTodo = () => {
     const next = { ...widgetState };
-    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiá»‡m vá»¥ ${next.todoList.length + 1}`, completed: false });
+    next.todoList = next.todoList.concat({ id: `todo-${Date.now()}`, text: `Nhiệm vụ ${next.todoList.length + 1}`, completed: false });
     syncState(next);
   };
   const toggleFirstTodo = () => {
@@ -525,7 +534,7 @@ function TimerWidget() {
       } catch {}
     };
     pollState();
-    const pollInterval = setInterval(pollState, 1500);
+    const pollInterval = setInterval(pollState, 1000);
 
     return () => {
       channel.close();
@@ -692,7 +701,7 @@ function WheelWidget() {
       } catch {}
     };
     pollWheelState();
-    const pollInterval = setInterval(pollWheelState, 750);
+    const pollInterval = setInterval(pollWheelState, 500);
 
     return () => {
       wheelChannel.close();
@@ -979,12 +988,12 @@ function LinkWidget() {
   }, []);
 
   const links = Object.entries(socialLinks);
-  const trackLinks = links.length > 0 ? [...links, ...links, ...links] : [["empty", "Add links in dashboard"]];
+  const trackLinks = links.length > 0 ? [...links, ...links, ...links, ...links] : [["empty", "Add links in dashboard"]];
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-transparent text-slate-100" style={obsFontStyle}>
       <div className="flex h-full w-full items-center justify-center px-4">
-        <div className="w-[96vw] max-w-[1800px] overflow-hidden rounded-[1.25rem] border border-cyan-500/20 bg-transparent px-3 py-2">
+        <div className="w-[96vw] max-w-[1800px] overflow-hidden rounded-[1.25rem] border border-cyan-500/20 bg-black/40 backdrop-blur-md px-3 py-2">
           <div className="marquee-track marquee-track-slow items-center py-1">
             {trackLinks.map(([key, value], index) => (
               <a
@@ -992,13 +1001,18 @@ function LinkWidget() {
                 href={key === "empty" ? "#" : value}
                 target={key === "empty" ? undefined : "_blank"}
                 rel={key === "empty" ? undefined : "noreferrer"}
-                className="mx-2 inline-flex h-[54px] min-w-[160px] max-w-[320px] items-center justify-center rounded-full border border-cyan-900/60 bg-[#0b1023]/85 px-4 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]"
+                className="mx-4 inline-flex h-[54px] min-w-[200px] items-center justify-between rounded-full border border-cyan-900/60 bg-[#0b1023]/85 px-5 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] group transition-all hover:border-cyan-400/50"
                 onClick={(e) => {
                   if (key === "empty") e.preventDefault();
                 }}
-                aria-label={key === "empty" ? "Add links in dashboard" : value}
               >
-                <span className="truncate text-[14px] font-semibold text-cyan-100">{value}</span>
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 flex-shrink-0 mr-3 border border-white/10 group-hover:border-cyan-500/30 transition-colors">
+                    <img src="/doro.png" alt="Arwass" className="arwass-logo" style={{ objectFit: "contain" }} />
+                </div>
+                <span className="truncate text-[15px] font-bold tracking-wide text-cyan-100 group-hover:text-white transition-colors uppercase">{key}</span>
+                <div className="ml-3 px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20">
+                    <span className="text-[10px] font-black text-cyan-400">FOLLOW</span>
+                </div>
               </a>
             ))}
           </div>
@@ -1039,13 +1053,15 @@ function ObsTodoWidget() {
           Todo List
         </h2>
         <div className="space-y-3">
-          {todos.filter(t => !t.completed).length === 0 && (
-            <p className="text-slate-400 italic text-sm">All tasks completed!</p>
+          {todos.length === 0 && (
+            <p className="text-slate-400 italic text-sm">No tasks added.</p>
           )}
           {todos.map((todo) => (
-            <div key={todo.id} className={`flex items-center gap-3 transition-all duration-300 ${todo.completed ? "opacity-0 h-0 overflow-hidden" : "opacity-100 h-auto"}`}>
-              <div className="w-5 h-5 rounded-full border-2 border-emerald-500/50 flex-shrink-0" />
-              <span className="text-white text-lg font-bold tracking-wide drop-shadow-md">{todo.text}</span>
+            <div key={todo.id} className="flex items-center gap-3 transition-all duration-300">
+              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${todo.completed ? "border-emerald-500 bg-emerald-500/20" : "border-emerald-500/50"}`}>
+                {todo.completed && <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full" />}
+              </div>
+              <span className={`text-white text-lg font-bold tracking-wide drop-shadow-md transition-all ${todo.completed ? "line-through opacity-50" : "opacity-100"}`}>{todo.text}</span>
             </div>
           ))}
         </div>
