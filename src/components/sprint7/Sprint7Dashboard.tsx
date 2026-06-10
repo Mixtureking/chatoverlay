@@ -269,10 +269,10 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <ObsLinkCard
-              emoji="💬"
-              title="Chat & Vote"
-              desc="Overlay chat với bầu chọn A/B, roulette, todo, social links."
-              route="obs-chat"
+              emoji="📊"
+              title="Live Vote"
+              desc="Overlay bầu chọn A/B dựa trên tin nhắn chat của người xem."
+              route="obs-vote"
               gradient="bg-gradient-to-r from-blue-500 to-cyan-400"
             />
             <ObsLinkCard

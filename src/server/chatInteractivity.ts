@@ -25,25 +25,36 @@ const voteState: VoteState = {
 export function parseChatCommand(messageText: string): ChatCommand | null {
   if (typeof messageText !== "string") return null;
 
-  const trimmed = messageText.trim();
-  if (!trimmed.startsWith("!")) return null;
+  const trimmed = messageText.trim().toUpperCase();
 
-  const rollMatch = trimmed.match(/^!roll\s+(\d{1,4})$/i);
-  if (rollMatch) {
-    const sides = Number.parseInt(rollMatch[1], 10);
-    if (Number.isFinite(sides) && sides >= 2) {
-      return { type: "roll", sides };
+  // Explicit command with !
+  if (trimmed.startsWith("!")) {
+    const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
+    if (rollMatch) {
+      const sides = Number.parseInt(rollMatch[1], 10);
+      if (Number.isFinite(sides) && sides >= 2) {
+        return { type: "roll", sides };
+      }
+      return null;
     }
-    return null;
+
+    if (/^!PICK$/i.test(trimmed)) {
+      return { type: "pick" };
+    }
+
+    const voteMatch = trimmed.match(/^!VOTE\s+([AB])$/i);
+    if (voteMatch) {
+      return { type: "vote", option: voteMatch[1] as "A" | "B" };
+    }
   }
 
-  if (/^!pick$/i.test(trimmed)) {
-    return { type: "pick" };
+  // Flexible voting: "VOTE A", "VOTE B", or just "A", "B"
+  if (/^VOTE\s+[AB]$/i.test(trimmed)) {
+    return { type: "vote", option: trimmed.slice(-1) as "A" | "B" };
   }
 
-  const voteMatch = trimmed.match(/^!vote\s+([AB])$/i);
-  if (voteMatch) {
-    return { type: "vote", option: voteMatch[1].toUpperCase() as "A" | "B" };
+  if (trimmed === "A" || trimmed === "B") {
+    return { type: "vote", option: trimmed as "A" | "B" };
   }
 
   return null;

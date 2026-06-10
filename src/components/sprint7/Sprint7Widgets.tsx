@@ -3,7 +3,7 @@ import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number };
-type WidgetRoute = "obs-chat" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
+type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
 
 const sampleComments = [
   "This clip is awesome!",
@@ -22,7 +22,8 @@ const getRoute = (): WidgetRoute => {
   if (path.includes("obs-timer")) return "obs-timer";
   if (path.includes("obs-wheel")) return "obs-wheel";
   if (path.includes("obs-link")) return "obs-link";
-  if (path.includes("obs-chat")) return "obs-chat";
+  if (path.includes("obs-vote")) return "obs-vote";
+  if (path.includes("obs-chat")) return "obs-vote"; // Legacy support
   if (path.includes("obs-todo")) return "obs-todo";
   return "dashboard";
 };
@@ -1042,6 +1043,74 @@ function ObsTodoWidget() {
   );
 }
 
+function ObsVoteWidget() {
+  const vote = useVoteState();
+
+  return (
+    <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
+      <div className="w-full max-w-4xl bg-black/60 backdrop-blur-xl border border-white/10 p-8 rounded-[40px] shadow-[0_24px_48px_rgba(0,0,0,0.4)] animate-in slide-in-from-bottom-12 duration-700">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-white text-3xl font-black uppercase tracking-[0.2em] flex items-center gap-4">
+            <span className="w-3 h-8 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />
+            Live Vote
+          </h2>
+          <div className="bg-white/10 px-6 py-2 rounded-full border border-white/5">
+            <span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Total: {vote.total}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-12">
+          {/* Option A */}
+          <div className="space-y-4">
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col">
+                <span className="text-cyan-400 text-sm font-black uppercase tracking-widest mb-1">Option</span>
+                <span className="text-white text-6xl font-black tracking-tight">A</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-cyan-400 text-4xl font-black">{vote.aPct}%</span>
+                <span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.A} votes</span>
+              </div>
+            </div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                style={{ width: `${vote.aPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Option B */}
+          <div className="space-y-4">
+            <div className="flex items-end justify-between">
+              <div className="flex flex-col">
+                <span className="text-fuchsia-400 text-sm font-black uppercase tracking-widest mb-1">Option</span>
+                <span className="text-white text-6xl font-black tracking-tight">B</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-fuchsia-400 text-4xl font-black">{vote.bPct}%</span>
+                <span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.B} votes</span>
+              </div>
+            </div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <div 
+                className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(217,70,239,0.4)]"
+                style={{ width: `${vote.bPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-8 pt-6 border-t border-white/5 text-center">
+          <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">
+            Type <span className="text-white">A</span> or <span className="text-white">B</span> in chat to vote
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function useThemeMode() {
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
   useEffect(() => {
@@ -1134,6 +1203,8 @@ export default function Sprint7Widgets() {
         <LinkWidget />
       ) : route === "obs-todo" ? (
         <ObsTodoWidget />
+      ) : route === "obs-vote" ? (
+        <ObsVoteWidget />
       ) : (
         <VoteWidget widgetState={state} syncState={syncState} isLight={isLight} />
       )}

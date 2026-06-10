@@ -246,11 +246,9 @@ export function createApiApp(): express.Express {
         const cleanMessageText = sanitizeHtml(snippet.textMessageDetails?.messageText || snippet.displayMessage || "");
         const channelId = author.channelId || author.displayName || "anonymous";
 
-        if (cleanMessageText.trim().startsWith("!")) {
-          const cmd = parseChatCommand(cleanMessageText);
-          if (cmd && cmd.type === "vote") {
-            castVote(channelId, cmd.option);
-          }
+        const cmd = parseChatCommand(cleanMessageText);
+        if (cmd && cmd.type === "vote") {
+          castVote(channelId, cmd.option);
         }
 
         return {
