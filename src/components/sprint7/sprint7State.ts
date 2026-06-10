@@ -12,6 +12,8 @@ export interface Sprint7WidgetState {
   timerDoneText?: string;
   timerTrigger?: number;
   wheelUsers?: string[];
+  voteKeywordA?: string;
+  voteKeywordB?: string;
 }
 
 export interface Sprint7FullState {
@@ -22,6 +24,8 @@ export interface Sprint7FullState {
   timerDoneText?: string;
   timerTrigger?: number;
   wheelUsers?: string[];
+  voteKeywordA?: string;
+  voteKeywordB?: string;
 }
 
 export const SPRINT7_WIDGET_STORAGE_KEY = "sprint7_widget_state";
@@ -41,6 +45,8 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
     timerDoneText: typeof input?.timerDoneText === "string" && input.timerDoneText.trim() ? input.timerDoneText : "Thời gian đã kết thúc",
     timerTrigger: typeof input?.timerTrigger === "number" ? input.timerTrigger : 0,
     wheelUsers: Array.isArray(input?.wheelUsers) && input.wheelUsers.length > 0 ? input.wheelUsers.filter((item) => typeof item === "string" && item.trim()) : ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
+    voteKeywordA: typeof input?.voteKeywordA === "string" ? input.voteKeywordA : "A",
+    voteKeywordB: typeof input?.voteKeywordB === "string" ? input.voteKeywordB : "B",
   };
 }
 
@@ -88,6 +94,8 @@ export function createSprint7FullState(input?: Partial<Sprint7FullState>): Sprin
     timerDoneText: widgetState.timerDoneText,
     timerTrigger: widgetState.timerTrigger,
     wheelUsers: widgetState.wheelUsers,
+    voteKeywordA: widgetState.voteKeywordA,
+    voteKeywordB: widgetState.voteKeywordB,
   };
 }
 

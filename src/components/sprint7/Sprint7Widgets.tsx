@@ -1044,7 +1044,7 @@ function ObsTodoWidget() {
 }
 
 function ObsVoteWidget() {
-  const vote = useVoteState();
+  const vote = useVoteState() as any; // Using any to access keywordA/keywordB if added
 
   return (
     <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
@@ -1064,8 +1064,8 @@ function ObsVoteWidget() {
           <div className="space-y-4">
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
-                <span className="text-cyan-400 text-sm font-black uppercase tracking-widest mb-1">Option</span>
-                <span className="text-white text-6xl font-black tracking-tight">A</span>
+                <span className="text-cyan-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
+                <span className="text-white text-6xl font-black tracking-tight">{vote.keywordA || "A"}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-cyan-400 text-4xl font-black">{vote.aPct}%</span>
@@ -1084,8 +1084,8 @@ function ObsVoteWidget() {
           <div className="space-y-4">
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
-                <span className="text-fuchsia-400 text-sm font-black uppercase tracking-widest mb-1">Option</span>
-                <span className="text-white text-6xl font-black tracking-tight">B</span>
+                <span className="text-fuchsia-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
+                <span className="text-white text-6xl font-black tracking-tight">{vote.keywordB || "B"}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-fuchsia-400 text-4xl font-black">{vote.bPct}%</span>
@@ -1103,7 +1103,7 @@ function ObsVoteWidget() {
         
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
           <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">
-            Type <span className="text-white">A</span> or <span className="text-white">B</span> in chat to vote
+            Type <span className="text-white">{vote.keywordA || "A"}</span> or <span className="text-white">{vote.keywordB || "B"}</span> in chat to vote
           </p>
         </div>
       </div>

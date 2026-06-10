@@ -19,6 +19,8 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   const [wheelUsersInput, setWheelUsersInput] = useState((state.wheelUsers || []).join(", "));
   const [timerSec, setTimerSec] = useState(String(state.timerSeconds ?? 300));
   const [timerDoneText, setTimerDoneText] = useState(state.timerDoneText || "Time is up");
+  const [voteKeywordA, setVoteKeywordA] = useState(state.voteKeywordA || "A");
+  const [voteKeywordB, setVoteKeywordB] = useState(state.voteKeywordB || "B");
   const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
   const [newTodoText, setNewTodoText] = useState("");
@@ -54,7 +56,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   };
 
   // Helper to sync specific values immediately to parent state & Broadcast Channels
-  const saveField = (key: "timer" | "wheel", val1: string, val2?: string) => {
+  const saveField = (key: "timer" | "wheel" | "vote", val1: string, val2?: string) => {
     const next = { ...state };
     if (key === "timer") {
       const parsedSec = Number.parseInt(val1, 10);
@@ -75,6 +77,16 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       const wheelChannel = new BroadcastChannel("sprint7_wheel_state");
       wheelChannel.postMessage({ type: "UPDATE_WHEEL", users: finalWheelUsers });
       wheelChannel.close();
+    } else if (key === "vote") {
+      next.voteKeywordA = val1 || "A";
+      next.voteKeywordB = val2 || "B";
+      
+      // Sync to server immediately
+      fetch("/api/interactivity/vote-keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywordA: next.voteKeywordA, keywordB: next.voteKeywordB }),
+      }).catch(console.error);
     }
     syncState(next);
   };
@@ -380,6 +392,42 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                   <p className="text-[10px] text-slate-500 flex items-center gap-1.5">
                     <CircleDot className="w-3 h-3 text-violet-400" />
                     Hiện có <span className="text-violet-300 font-semibold">{(state.wheelUsers || []).length}</span> người chơi
+                  </p>
+                </div>
+
+                {/* Vote Keywords */}
+                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                  <h4 className={`${sectionTitle} text-blue-400`}>
+                    <MessageSquare className="w-3.5 h-3.5" /> Từ khóa bầu chọn (Live Vote)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-slate-400 font-medium">Từ khóa Lựa chọn A</label>
+                      <input
+                        type="text"
+                        className={`${inputCls} w-full`}
+                        value={voteKeywordA}
+                        onChange={(e) => setVoteKeywordA(e.target.value)}
+                        onBlur={() => saveField("vote", voteKeywordA, voteKeywordB)}
+                        onKeyDown={(e) => e.key === "Enter" && saveField("vote", voteKeywordA, voteKeywordB)}
+                        placeholder="A"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-slate-400 font-medium">Từ khóa Lựa chọn B</label>
+                      <input
+                        type="text"
+                        className={`${inputCls} w-full`}
+                        value={voteKeywordB}
+                        onChange={(e) => setVoteKeywordB(e.target.value)}
+                        onBlur={() => saveField("vote", voteKeywordA, voteKeywordB)}
+                        onKeyDown={(e) => e.key === "Enter" && saveField("vote", voteKeywordA, voteKeywordB)}
+                        placeholder="B"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 italic">
+                    Người xem chat đúng từ khóa này (ví dụ: "{voteKeywordA}") để tăng điểm vote.
                   </p>
                 </div>
               </div>

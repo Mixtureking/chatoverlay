@@ -11,7 +11,7 @@
 
 import express from "express";
 import dns from "dns";
-import { castVote, getVoteState, parseChatCommand, resetVoteState } from "./chatInteractivity.ts";
+import { castVote, getVoteState, parseChatCommand, resetVoteState, setVoteKeywords } from "./chatInteractivity.ts";
 
 // Ensure DNS resolution works correctly in sandboxed environments
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
@@ -191,6 +191,16 @@ export function createApiApp(): express.Express {
     res.json({ state: resetVoteState() });
   });
 
+  app.post(["/api/interactivity/vote-keywords", "/interactivity/vote-keywords"], (req, res) => {
+    try {
+      const { keywordA, keywordB } = req.body || {};
+      const result = setVoteKeywords(keywordA, keywordB);
+      return res.json({ success: true, state: result });
+    } catch (error: any) {
+      return res.status(500).json({ error: `Failed to set vote keywords: ${error?.message || error}` });
+    }
+  });
+
   // ─── API Route 2: Fetch Live Chat Messages and Stream Details ───
   app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res): Promise<any> => {
     try {
@@ -352,6 +362,9 @@ export function createApiApp(): express.Express {
       const { state } = req.body || {};
       if (state) {
         cachedSprint7State = state;
+        if (state.voteKeywordA && state.voteKeywordB) {
+          setVoteKeywords(state.voteKeywordA, state.voteKeywordB);
+        }
         return res.json({ success: true, state: cachedSprint7State });
       }
       res.status(400).json({ error: "Missing state payload" });

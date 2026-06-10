@@ -8,6 +8,8 @@ export type VoteState = {
   B: number;
   voters: Record<string, "A" | "B">;
   updatedAt: number;
+  keywordA: string;
+  keywordB: string;
 };
 
 const DEFAULT_VOTE_STATE: VoteState = {
@@ -15,6 +17,8 @@ const DEFAULT_VOTE_STATE: VoteState = {
   B: 0,
   voters: {},
   updatedAt: Date.now(),
+  keywordA: "A",
+  keywordB: "B",
 };
 
 const voteState: VoteState = {
@@ -26,6 +30,8 @@ export function parseChatCommand(messageText: string): ChatCommand | null {
   if (typeof messageText !== "string") return null;
 
   const trimmed = messageText.trim().toUpperCase();
+  const kA = voteState.keywordA;
+  const kB = voteState.keywordB;
 
   // Explicit command with !
   if (trimmed.startsWith("!")) {
@@ -42,19 +48,27 @@ export function parseChatCommand(messageText: string): ChatCommand | null {
       return { type: "pick" };
     }
 
-    const voteMatch = trimmed.match(/^!VOTE\s+([AB])$/i);
+    const voteMatch = trimmed.match(/^!VOTE\s+(.+)$/i);
     if (voteMatch) {
-      return { type: "vote", option: voteMatch[1] as "A" | "B" };
+      const val = voteMatch[1].trim();
+      if (val === kA) return { type: "vote", option: "A" };
+      if (val === kB) return { type: "vote", option: "B" };
     }
   }
 
-  // Flexible voting: "VOTE A", "VOTE B", or just "A", "B"
-  if (/^VOTE\s+[AB]$/i.test(trimmed)) {
-    return { type: "vote", option: trimmed.slice(-1) as "A" | "B" };
+  // Flexible voting: "VOTE [KEYWORD]", or just "[KEYWORD]"
+  const voteWordMatch = trimmed.match(/^VOTE\s+(.+)$/i);
+  if (voteWordMatch) {
+    const val = voteWordMatch[1].trim();
+    if (val === kA) return { type: "vote", option: "A" };
+    if (val === kB) return { type: "vote", option: "B" };
   }
 
-  if (trimmed === "A" || trimmed === "B") {
-    return { type: "vote", option: trimmed as "A" | "B" };
+  if (trimmed === kA) {
+    return { type: "vote", option: "A" };
+  }
+  if (trimmed === kB) {
+    return { type: "vote", option: "B" };
   }
 
   return null;
@@ -67,6 +81,8 @@ export function getVoteState() {
     total: voteState.A + voteState.B,
     voters: { ...voteState.voters },
     updatedAt: voteState.updatedAt,
+    keywordA: voteState.keywordA,
+    keywordB: voteState.keywordB,
   };
 }
 
@@ -74,6 +90,13 @@ export function resetVoteState() {
   voteState.A = 0;
   voteState.B = 0;
   voteState.voters = {};
+  voteState.updatedAt = Date.now();
+  return getVoteState();
+}
+
+export function setVoteKeywords(keywordA: string, keywordB: string) {
+  voteState.keywordA = (keywordA || "A").trim().toUpperCase();
+  voteState.keywordB = (keywordB || "B").trim().toUpperCase();
   voteState.updatedAt = Date.now();
   return getVoteState();
 }
