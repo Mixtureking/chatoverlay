@@ -332,6 +332,13 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               gradient="bg-gradient-to-r from-emerald-500 to-teal-500"
             />
             <ObsLinkCard
+              emoji="🌸"
+              title="Effect Layer"
+              desc="Layer dành riêng cho hiệu ứng (Tung hoa !tunghoa)."
+              route="obs-effect"
+              gradient="bg-gradient-to-r from-rose-400 to-pink-500"
+            />
+            <ObsLinkCard
               emoji="✅"
               title="OBS Todo"
               desc="Danh sách nhiệm vụ tối giản dành riêng cho OBS."

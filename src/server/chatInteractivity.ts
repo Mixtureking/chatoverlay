@@ -109,12 +109,11 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "missing_user" as const, state: getVoteState() };
   }
 
-  // If a messageId is provided, check if we've already processed it
+  // Deduplicate by messageId
   if (messageId) {
     if (processedMessageIds.has(messageId)) {
       return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
     }
-    
     processedMessageIds.add(messageId);
     processedMessageIdQueue.push(messageId);
     if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
@@ -123,22 +122,26 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     }
   }
 
-  // If a timestamp is provided, verify it is not before the vote started
   if (timestamp && timestamp < voteState.voteStartedAt) {
     return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
   const normalizedUserId = userId.trim();
   
-  // "First-vote-counts" logic to prevent jumping/fluctuation
-  if (voteState.voters[normalizedUserId]) {
-    return { accepted: false, reason: "already_voted" as const, state: getVoteState() };
-  }
-
+  // Update voter map
   voteState.voters[normalizedUserId] = option;
 
-  // Update totals
-  voteState[option] += 1;
+  // Derive totals from map to avoid cumulative errors/jumping
+  const counts = Object.values(voteState.voters).reduce(
+    (acc, val) => {
+      acc[val]++;
+      return acc;
+    },
+    { A: 0, B: 0 }
+  );
+
+  voteState.A = counts.A;
+  voteState.B = counts.B;
   voteState.updatedAt = Date.now();
 
   return {
@@ -149,9 +152,23 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
 }
 
 export function setRawVoteState(newState: Partial<VoteState>) {
-  if (typeof newState.A === "number") voteState.A = newState.A;
-  if (typeof newState.B === "number") voteState.B = newState.B;
-  if (newState.voters) voteState.voters = { ...newState.voters };
+  if (newState.voters) {
+    voteState.voters = { ...newState.voters };
+    // Always sync totals from map
+    const counts = Object.values(voteState.voters).reduce(
+      (acc, val) => {
+        acc[val]++;
+        return acc;
+      },
+      { A: 0, B: 0 }
+    );
+    voteState.A = counts.A;
+    voteState.B = counts.B;
+  } else {
+    if (typeof newState.A === "number") voteState.A = newState.A;
+    if (typeof newState.B === "number") voteState.B = newState.B;
+  }
+  
   if (newState.keywordA) voteState.keywordA = newState.keywordA;
   if (newState.keywordB) voteState.keywordB = newState.keywordB;
   if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
