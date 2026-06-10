@@ -314,15 +314,44 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
             <div className={`text-xs uppercase tracking-[0.35em] mb-3 font-bold ${isLight ? "text-cyan-600" : "text-cyan-300"}`}>
               Live Vote
             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 uppercase font-bold">Keyword A</label>
+                <input 
+                  value={widgetState.voteKeywordA || "A"} 
+                  onChange={(e) => syncState({ ...widgetState, voteKeywordA: e.target.value.toUpperCase() })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm outline-none text-cyan-400 focus:border-cyan-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 uppercase font-bold">Keyword B</label>
+                <input 
+                  value={widgetState.voteKeywordB || "B"} 
+                  onChange={(e) => syncState({ ...widgetState, voteKeywordB: e.target.value.toUpperCase() })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm outline-none text-fuchsia-400 focus:border-fuchsia-500"
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3 text-sm font-bold text-slate-200">
-              <div>A: {vote.A}</div>
-              <div>B: {vote.B}</div>
+              <div>{widgetState.voteKeywordA || "A"}: {vote.A}</div>
+              <div>{widgetState.voteKeywordB || "B"}: {vote.B}</div>
             </div>
             <div className="mt-4 h-4 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
               <div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${vote.aPct}%` }} />
             </div>
             <div className={`mt-2 text-xs font-semibold ${isLight ? "text-cyan-700" : "text-cyan-200"}`}>
               {vote.aPct}% / {vote.bPct}%
+            </div>
+            <div className="mt-4 flex justify-end">
+                <button 
+                  onClick={async () => {
+                    await fetch("/api/interactivity/votes", { method: "DELETE" });
+                    window.location.reload();
+                  }} 
+                  className={getBtnClass("rose", isLight)}
+                >
+                  Reset Votes
+                </button>
             </div>
           </div>
 
@@ -701,7 +730,7 @@ function WheelWidget() {
       } catch {}
     };
     pollWheelState();
-    const pollInterval = setInterval(pollWheelState, 500);
+    const pollInterval = setInterval(pollWheelState, 750);
 
     return () => {
       wheelChannel.close();
@@ -1009,7 +1038,10 @@ function LinkWidget() {
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 flex-shrink-0 mr-3 border border-white/10 group-hover:border-cyan-500/30 transition-colors">
                     <img src="/doro.png" alt="Arwass" className="arwass-logo" style={{ objectFit: "contain" }} />
                 </div>
-                <span className="truncate text-[15px] font-bold tracking-wide text-cyan-100 group-hover:text-white transition-colors uppercase">{key}</span>
+                <div className="flex flex-col items-start overflow-hidden">
+                    <span className="text-[10px] font-black text-cyan-500/70 uppercase tracking-tighter">{key}</span>
+                    <span className="truncate text-[14px] font-bold tracking-tight text-cyan-100 group-hover:text-white transition-colors">{value}</span>
+                </div>
                 <div className="ml-3 px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20">
                     <span className="text-[10px] font-black text-cyan-400">FOLLOW</span>
                 </div>
