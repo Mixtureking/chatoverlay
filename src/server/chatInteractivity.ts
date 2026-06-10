@@ -1,7 +1,8 @@
 export type ChatCommand =
   | { type: "roll"; sides: number }
   | { type: "pick" }
-  | { type: "vote"; option: "A" | "B" };
+  | { type: "vote"; option: "A" | "B" }
+  | { type: "tunghoa" };
 
 export type VoteState = {
   A: number;
@@ -41,6 +42,11 @@ export function parseChatCommand(messageText: string): ChatCommand | null {
 
   // Explicit command with !
   if (trimmed.startsWith("!")) {
+    // !tunghoa command
+    if (/^!TUNGHOA$/i.test(trimmed)) {
+      return { type: "tunghoa" };
+    }
+
     const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
     if (rollMatch) {
       const sides = Number.parseInt(rollMatch[1], 10);
@@ -54,29 +60,16 @@ export function parseChatCommand(messageText: string): ChatCommand | null {
       return { type: "pick" };
     }
 
-    const voteMatch = trimmed.match(/^!VOTE\s+(.+)$/i);
+    // Strict !vote "keyword" requirement
+    const voteMatch = trimmed.match(/^!VOTE\s+"?([^"]+)"?$/i);
     if (voteMatch) {
-      const val = voteMatch[1].trim();
+      const val = voteMatch[1].trim().toUpperCase();
       if (val === kA) return { type: "vote", option: "A" };
       if (val === kB) return { type: "vote", option: "B" };
     }
   }
 
-  // Flexible voting: "VOTE [KEYWORD]", or just "[KEYWORD]"
-  const voteWordMatch = trimmed.match(/^VOTE\s+(.+)$/i);
-  if (voteWordMatch) {
-    const val = voteWordMatch[1].trim();
-    if (val === kA) return { type: "vote", option: "A" };
-    if (val === kB) return { type: "vote", option: "B" };
-  }
-
-  if (trimmed === kA) {
-    return { type: "vote", option: "A" };
-  }
-  if (trimmed === kB) {
-    return { type: "vote", option: "B" };
-  }
-
+  // Legacy flexible voting removed as per user request
   return null;
 }
 
@@ -117,13 +110,11 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
   }
 
   // If a messageId is provided, check if we've already processed it
-  // This is the ONLY deduplication we want: one message = one vote.
   if (messageId) {
     if (processedMessageIds.has(messageId)) {
       return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
     }
     
-    // Track message ID to prevent double-counting on poll retries
     processedMessageIds.add(messageId);
     processedMessageIdQueue.push(messageId);
     if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
@@ -137,14 +128,22 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
-  // Cumulative counting: Every valid message counts as a vote
-  // We no longer subtract previous votes to prevent "jumping" fluctuations
-  voteState[option] += 1;
-  voteState.updatedAt = Date.now();
-
-  // Optional: Track who voted for logs, but don't use it for counting logic
+  // One user = One vote logic
   const normalizedUserId = userId.trim();
   voteState.voters[normalizedUserId] = option;
+
+  // Recalculate totals from voters map to ensure consistency
+  const counts = Object.values(voteState.voters).reduce(
+    (acc, val) => {
+      acc[val]++;
+      return acc;
+    },
+    { A: 0, B: 0 }
+  );
+
+  voteState.A = counts.A;
+  voteState.B = counts.B;
+  voteState.updatedAt = Date.now();
 
   return {
     accepted: true,

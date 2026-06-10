@@ -19,6 +19,63 @@ const getRoute = (): WidgetRoute => {
   return "dashboard";
 };
 
+function FlowerEffect() {
+  const [flowers, setFlowers] = useState<{ id: number; left: number; delay: number; duration: number; size: number }[]>([]);
+
+  useEffect(() => {
+    const trigger = () => {
+      const newFlowers = Array.from({ length: 30 }).map((_, i) => ({
+        id: Date.now() + i,
+        left: Math.random() * 100,
+        delay: Math.random() * 2,
+        duration: 3 + Math.random() * 3,
+        size: 20 + Math.random() * 20,
+      }));
+      setFlowers((prev) => [...prev, ...newFlowers]);
+      setTimeout(() => {
+        setFlowers((prev) => prev.filter((f) => !newFlowers.includes(f)));
+      }, 8000);
+    };
+
+    const channel = new BroadcastChannel("sprint7_flower_channel");
+    channel.onmessage = (e) => {
+      if (e.data.type === "TUNG_HOA") {
+        trigger();
+      }
+    };
+    return () => channel.close();
+  }, []);
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
+      {flowers.map((f) => (
+        <div
+          key={f.id}
+          className="absolute text-2xl animate-fall"
+          style={{
+            left: `${f.left}%`,
+            top: "-50px",
+            animationDelay: `${f.delay}s`,
+            animationDuration: `${f.duration}s`,
+            fontSize: `${f.size}px`,
+          }}
+        >
+          {["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"][f.id % 6]}
+        </div>
+      ))}
+      <style>{`
+        @keyframes fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+        .animate-fall {
+          animation: fall linear forwards;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function useVoteState() {
   const [state, setState] = useState<VoteState>({ A: 0, B: 0, total: 0 });
   const nextPageTokenRef = useRef<string | null>(null);
@@ -42,6 +99,18 @@ function useVoteState() {
           const msgData = await msgRes.json();
           if (msgData?.nextPageToken) {
             nextPageTokenRef.current = msgData.nextPageToken;
+          }
+
+          // Check for !tunghoa command in incoming messages
+          if (Array.isArray(msgData?.messages)) {
+            const hasTunghoa = msgData.messages.some((m: any) => 
+              String(m.messageText || "").trim().toUpperCase().includes("!TUNGHOA")
+            );
+            if (hasTunghoa) {
+              const channel = new BroadcastChannel("sprint7_flower_channel");
+              channel.postMessage({ type: "TUNG_HOA" });
+              channel.close();
+            }
           }
         }
 
@@ -1178,7 +1247,7 @@ function ObsVoteWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
         
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
           <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">
-            Type <span className="text-white">{keywordA}</span> or <span className="text-white">{keywordB}</span> in chat to vote
+            Type <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span> in chat to vote
           </p>
         </div>
       </div>
@@ -1305,6 +1374,7 @@ export default function Sprint7Widgets() {
   return (
     <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
       <CustomCssInjector css={state.customCSS} />
+      <FlowerEffect />
       {route === "dashboard" ? (
         <Sprint7Dashboard state={state} syncState={syncState} />
       ) : route === "obs-timer" ? (
