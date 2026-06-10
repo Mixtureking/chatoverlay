@@ -112,6 +112,27 @@ function castVote(userId, option, messageId, timestamp) {
     state: getVoteState()
   };
 }
+function setRawVoteState(newState) {
+  if (newState.voters) {
+    voteState.voters = { ...newState.voters };
+    const counts = Object.values(voteState.voters).reduce(
+      (acc, val) => {
+        acc[val]++;
+        return acc;
+      },
+      { A: 0, B: 0 }
+    );
+    voteState.A = counts.A;
+    voteState.B = counts.B;
+  } else {
+    if (typeof newState.A === "number") voteState.A = newState.A;
+    if (typeof newState.B === "number") voteState.B = newState.B;
+  }
+  if (newState.keywordA) voteState.keywordA = newState.keywordA;
+  if (newState.keywordB) voteState.keywordB = newState.keywordB;
+  if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
+  voteState.updatedAt = Date.now();
+}
 
 // src/server/createApiApp.ts
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
@@ -257,6 +278,15 @@ Stack trace: ${error?.stack}`);
       return res.status(500).json({ error: `Failed to set vote keywords: ${error?.message || error}` });
     }
   });
+  app2.post(["/api/interactivity/votes/restore", "/interactivity/votes/restore"], (req, res) => {
+    try {
+      const { A, B } = req.body || {};
+      setRawVoteState({ A, B });
+      return res.json({ success: true, state: getVoteState() });
+    } catch (error) {
+      return res.status(500).json({ error: `Failed to restore votes: ${error?.message || error}` });
+    }
+  });
   app2.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res) => {
     try {
       const { liveChatId, apiKey, pageToken } = req.query || {};
@@ -316,9 +346,9 @@ Stack trace: ${error?.stack}`);
         const channelId = author.channelId || author.displayName || "anonymous";
         const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
-        const cmd = parseChatCommand(cleanMessageText);
-        if (cmd && cmd.type === "vote") {
-          castVote(channelId, cmd.option, messageId, timestamp);
+        const command = parseChatCommand(cleanMessageText);
+        if (command && command.type === "vote") {
+          castVote(channelId, command.option, messageId, timestamp);
         }
         return {
           id: messageId,
