@@ -6,19 +6,21 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ## [1.0.8] - 2026-06-10
 
-### [Ngày 10/06/2026] - Ổn định hóa Widget & Tối ưu hóa Đồng bộ hóa Toàn diện
+### [Ngày 10/06/2026] - Ổn định hóa Widget & Hoàn thiện Tương tác OBS Toàn diện
 **Thay đổi (Changed)**
-- **Cơ chế đồng bộ hóa trạng thái (State Sync Logic):** Tích hợp so sánh sâu (Deep Equality Check) và ngưỡng chặn đồng bộ ngược 4 giây sau khi lưu thủ công. Điều này ngăn chặn việc dữ liệu cũ từ server ghi đè lên các thay đổi vừa thực hiện tại Dashboard, loại bỏ hoàn toàn hiện tượng nhấp nháy reset trạng thái (ví dụ: vote từ 100% về 0% hoặc task tự bỏ hoàn thành).
-- **Tối ưu hóa hiệu ứng Framer Motion:** Vô hiệu hóa thuộc tính `initial` animation trên các widget OBS (Vote, Todo) khi dữ liệu cập nhật. Các widget giờ đây giữ nguyên vị trí và trạng thái hiện tại thay vì chạy lại hiệu ứng "xuất hiện" (fade-in/slide-in) mỗi khi có tin nhắn chat mới hoặc thay đổi nhỏ từ server.
-- **Logic Vote Chat (useVoteState):** Cải tiến việc xử lý từ khóa (Keyword A/B) linh hoạt hơn, đảm bảo phiếu bầu được ghi nhận chính xác vào bộ nhớ đệm và không bị mất mát khi streamer thay đổi từ khóa giữa chừng trên Dashboard.
+- **Cơ chế đồng bộ hóa trạng thái (State Sync Logic):** Tích hợp so sánh sâu (Deep Equality Check) và quản lý phiên bản qua `updatedAt`. OBS sẽ chỉ cập nhật dữ liệu khi nhận được phiên bản mới hơn từ server hoặc Dashboard, loại bỏ hoàn toàn hiện tượng nhấp nháy "undo/redo" reset trạng thái (ví dụ: vote bị nhảy về 0% hoặc task tự bỏ hoàn thành).
+- **Tối ưu hóa hiệu ứng Framer Motion:** Vô hiệu hóa `initial` animation khi cập nhật dữ liệu. Các widget giờ đây giữ nguyên vị trí và trạng thái thay vì chạy lại hiệu ứng "xuất hiện" mỗi khi có tin nhắn chat mới.
+- **Vòng quay may mắn (Lucky Wheel):** Chuyển sang hiệu ứng quay `easeOut` tiêu chuẩn. Vòng quay khởi động nhanh và hãm phanh mượt mà như thực tế, không còn tình trạng giật lắc hay "sóc" bất thường.
+- **Social Link Widget:** Thu nhỏ đáng kể kích thước font chữ, biểu tượng và chiều cao thanh marquee để giao diện tinh tế hơn, không chiếm dụng quá nhiều không gian trên luồng livestream.
 
 **Đã thêm (Added)**
-- **Sử dụng useMemo & useRef chuyên sâu:** Áp dụng `useMemo` cho các thành phần tính toán nặng (như Marquee links, Wheel users) và `useRef` để theo dõi `lastTrigger` của các sự kiện quay (Spin) và hiệu ứng hoa (Flower), đảm bảo mỗi lệnh chỉ được thực thi đúng một lần duy nhất dù component có re-render.
-- **Cố định định danh Component (Stable Identity):** Sử dụng các khóa (keys) và cấu trúc component ổn định để ngăn React re-mount toàn bộ widget không cần thiết, giúp Vòng quay (Wheel) và các thanh tiến trình chạy mượt mà, không bị giật lag khi có dữ liệu mới.
+- **Đồng bộ hóa tức thời (Instant Sync):** Sử dụng `BroadcastChannel` cho phép các thay đổi từ Dashboard (như tick/untick Todo, sửa link) xuất hiện ngay lập tức trên các cửa sổ OBS khác mà không cần đợi server polling 2 giây.
+- **Lớp hiệu ứng toàn cục (Global Effect Overlay):** Tích hợp `FlowerEffect` trực tiếp vào tất cả các widget route. Bây giờ streamer có thể vừa mở Todo List, vừa nhận hiệu ứng tung hoa/thả tim từ chat mà không cần mở nhiều layer OBS.
 
-**Cải tiến (Improved)**
-- **Hiệu ứng thanh tiến trình (Progress Bar):** Thêm cấu hình `spring` transition (stiffness: 100, damping: 20) cho các thanh phần trăm của Live Vote, giúp việc tăng/giảm tỷ lệ phần trăm diễn ra mượt mà và trực quan hơn thay vì thay đổi tức thì.
-- **Trạng thái Trống (Empty State) & Fallback:** Cập nhật dữ liệu mẫu (fallback) sinh động hơn cho tất cả các widget khi không có cấu hình từ URL hoặc server, đảm bảo OBS luôn hiển thị nội dung mẫu chuẩn thay vì màn hình trống.
+**Sửa lỗi (Fixed)**
+- **Lỗi hiển thị Layer Hiệu ứng trên OBS:** Sửa lỗi layer `obs-effect` chỉ chạy trên trình duyệt web nhưng trắng xóa trên OBS Browser Source bằng cách đảm bảo vị trí tuyệt đối và loại bỏ các thuộc tính CSS gây lỗi trong môi trường CEF của OBS (như `backdrop-blur`).
+- **Nhận diện Comment thông minh hơn:** Nâng cấp bộ parser lệnh chat cho Live Vote. Người xem giờ đây có thể vote bằng cách chat trực tiếp từ khóa (ví dụ: `A`, `B`), hoặc chat kèm dấu chấm than (`!A`, `!B`), không còn bắt buộc phải gõ đúng cú pháp dài `!vote A`.
+- **Kích hoạt hiệu ứng từ Chat:** Sửa lỗi server không cập nhật dấu thời gian khi nhận lệnh hiệu ứng từ chat, đảm bảo các hiệu ứng tung hoa/vỗ tay từ người xem được kích hoạt ngay lập tức.
 
 ---
 
