@@ -259,8 +259,22 @@ export function createApiApp(): express.Express {
         const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
 
         const command = parseChatCommand(cleanMessageText);
-        if (command && command.type === "vote") {
-          castVote(channelId, command.option, messageId, timestamp);
+        if (command) {
+          if (command.type === "vote") {
+            castVote(channelId, command.option, messageId, timestamp);
+          } else if (["tunghoa", "phaohoa", "tim", "votay"].includes(command.type)) {
+            // Update Sprint 7 cached state for instant effects
+            if (cachedSprint7State) {
+              cachedSprint7State.flowerTrigger = Date.now();
+              const typeMap: any = {
+                tunghoa: "TUNG_HOA",
+                phaohoa: "PHAO_HOA",
+                tim: "TIM",
+                votay: "VO_TAY",
+              };
+              cachedSprint7State.flowerType = typeMap[command.type];
+            }
+          }
         }
 
         return {

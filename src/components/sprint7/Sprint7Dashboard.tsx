@@ -254,7 +254,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   };
 
   const resetAll = () => {
-    localStorage.removeItem("sprint7_votes");
+    localStorage.removeItem("sprint7_votes_local");
     syncState(createSprint7WidgetState());
     fetch("/api/interactivity/votes", { method: "DELETE" }).catch(console.error);
     flash("🔄 Đã reset toàn bộ!");

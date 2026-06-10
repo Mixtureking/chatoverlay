@@ -607,7 +607,7 @@ export default function App() {
     
     const isSprint7Route = path.endsWith("/obs-vote") || path.endsWith("/obs-timer") || path.endsWith("/obs-wheel") || path.endsWith("/obs-link") || path.endsWith("/obs-todo") || path.endsWith("/obs-effect");
     
-    if ((path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam) && !isSprint7Route) {
+    if (path === "/overlay" || hasOverlayParam || hasDesktopOverlayParam || hasTransitionParam || !!obParam || isSprint7Route) {
       setIsOverlayRoute(true);
       if (hasDesktopOverlayParam) {
         setIsDesktopOverlay(true);
