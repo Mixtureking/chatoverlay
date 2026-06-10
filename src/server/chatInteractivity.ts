@@ -117,9 +117,18 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
   }
 
   // If a messageId is provided, check if we've already processed it
+  // This is the ONLY deduplication we want: one message = one vote.
   if (messageId) {
     if (processedMessageIds.has(messageId)) {
       return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
+    }
+    
+    // Track message ID to prevent double-counting on poll retries
+    processedMessageIds.add(messageId);
+    processedMessageIdQueue.push(messageId);
+    if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
+      const oldId = processedMessageIdQueue.shift();
+      if (oldId) processedMessageIds.delete(oldId);
     }
   }
 
@@ -128,44 +137,18 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
-  const normalizedUserId = userId.trim();
-  const previousVote = voteState.voters[normalizedUserId];
-
-  if (previousVote === option) {
-    if (messageId) {
-      if (!processedMessageIds.has(messageId)) {
-        processedMessageIds.add(messageId);
-        processedMessageIdQueue.push(messageId);
-        if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
-          const oldId = processedMessageIdQueue.shift();
-          if (oldId) processedMessageIds.delete(oldId);
-        }
-      }
-    }
-    return { accepted: false, reason: "duplicate_vote" as const, state: getVoteState() };
-  }
-
-  if (previousVote === "A") voteState.A = Math.max(0, voteState.A - 1);
-  if (previousVote === "B") voteState.B = Math.max(0, voteState.B - 1);
-
-  voteState.voters[normalizedUserId] = option;
+  // Cumulative counting: Every valid message counts as a vote
+  // We no longer subtract previous votes to prevent "jumping" fluctuations
   voteState[option] += 1;
   voteState.updatedAt = Date.now();
 
-  if (messageId) {
-    if (!processedMessageIds.has(messageId)) {
-      processedMessageIds.add(messageId);
-      processedMessageIdQueue.push(messageId);
-      if (processedMessageIdQueue.length > MAX_PROCESSED_IDS) {
-        const oldId = processedMessageIdQueue.shift();
-        if (oldId) processedMessageIds.delete(oldId);
-      }
-    }
-  }
+  // Optional: Track who voted for logs, but don't use it for counting logic
+  const normalizedUserId = userId.trim();
+  voteState.voters[normalizedUserId] = option;
 
   return {
     accepted: true,
-    reason: previousVote ? "updated_vote" : "new_vote",
+    reason: "new_vote",
     state: getVoteState(),
   };
 }
