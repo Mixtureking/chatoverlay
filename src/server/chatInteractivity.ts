@@ -1,35 +1,59 @@
 export type ChatCommand =
-  | { type: "roll"; sides: number }
-  | { type: "pick" }
-  | { type: "vote"; option: "A" | "B" }
-  | { type: "tunghoa" };
+  import fs from "fs";
+  import path from "path";
 
-export type VoteState = {
-  A: number;
-  B: number;
-  voters: Record<string, "A" | "B">;
-  updatedAt: number;
-  keywordA: string;
-  keywordB: string;
-  voteStartedAt: number;
-};
+  const VOTE_STATE_FILE = path.join(process.cwd(), "vote_state.json");
 
-const DEFAULT_VOTE_STATE: VoteState = {
-  A: 0,
-  B: 0,
-  voters: {},
-  updatedAt: Date.now(),
-  keywordA: "A",
-  keywordB: "B",
-  voteStartedAt: Date.now(),
-};
+  export type ChatCommand =
+    | { type: "roll"; sides: number }
+    | { type: "pick" }
+    | { type: "vote"; option: "A" | "B" };
 
-const voteState: VoteState = {
-  ...DEFAULT_VOTE_STATE,
-  voters: {},
-};
+  export type VoteState = {
+    A: number;
+    B: number;
+    voters: Record<string, "A" | "B">;
+    updatedAt: number;
+    keywordA: string;
+    keywordB: string;
+    voteStartedAt: number;
+  };
 
-const processedMessageIds = new Set<string>();
+  const DEFAULT_VOTE_STATE: VoteState = {
+    A: 0,
+    B: 0,
+    voters: {},
+    updatedAt: Date.now(),
+    keywordA: "A",
+    keywordB: "B",
+    voteStartedAt: Date.now(),
+  };
+
+  let voteState: VoteState = {
+    ...DEFAULT_VOTE_STATE,
+    voters: {},
+  };
+
+  // Try to load persisted state on startup
+  try {
+    if (fs.existsSync(VOTE_STATE_FILE)) {
+      const raw = fs.readFileSync(VOTE_STATE_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      voteState = { ...DEFAULT_VOTE_STATE, ...parsed };
+    }
+  } catch (err) {
+    // Silent fail if no file or bad format
+  }
+
+  function persistVoteState() {
+    try {
+      fs.writeFileSync(VOTE_STATE_FILE, JSON.stringify(voteState), "utf-8");
+    } catch (err) {
+      // Fail silently in read-only environments like Vercel
+    }
+  }
+
+  const processedMessageIds = new Set<string>();
 const processedMessageIdQueue: string[] = [];
 const MAX_PROCESSED_IDS = 5000;
 
@@ -94,6 +118,7 @@ export function resetVoteState() {
   voteState.updatedAt = Date.now();
   processedMessageIds.clear();
   processedMessageIdQueue.length = 0;
+  persistVoteState();
   return getVoteState();
 }
 
@@ -101,6 +126,7 @@ export function setVoteKeywords(keywordA: string, keywordB: string) {
   voteState.keywordA = (keywordA || "A").trim().toUpperCase();
   voteState.keywordB = (keywordB || "B").trim().toUpperCase();
   voteState.updatedAt = Date.now();
+  persistVoteState();
   return getVoteState();
 }
 
@@ -109,7 +135,7 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "missing_user" as const, state: getVoteState() };
   }
 
-  // Deduplicate by messageId
+  // Deduplicate by messageId - one message = one vote
   if (messageId) {
     if (processedMessageIds.has(messageId)) {
       return { accepted: false, reason: "duplicate_message" as const, state: getVoteState() };
@@ -126,23 +152,16 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
+  // CUMULATIVE: Every valid message counts as 1 vote.
+  // We don't subtract previous votes, and multiple comments from same user count.
+  voteState[option] += 1;
+  voteState.updatedAt = Date.now();
+
+  // Track voter in map for logs, but don't use it for counting logic
   const normalizedUserId = userId.trim();
-  
-  // Update voter map
   voteState.voters[normalizedUserId] = option;
 
-  // Derive totals from map to avoid cumulative errors/jumping
-  const counts = Object.values(voteState.voters).reduce(
-    (acc, val) => {
-      acc[val]++;
-      return acc;
-    },
-    { A: 0, B: 0 }
-  );
-
-  voteState.A = counts.A;
-  voteState.B = counts.B;
-  voteState.updatedAt = Date.now();
+  persistVoteState();
 
   return {
     accepted: true,
@@ -152,25 +171,11 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
 }
 
 export function setRawVoteState(newState: Partial<VoteState>) {
-  if (newState.voters) {
-    voteState.voters = { ...newState.voters };
-    // Always sync totals from map
-    const counts = Object.values(voteState.voters).reduce(
-      (acc, val) => {
-        acc[val]++;
-        return acc;
-      },
-      { A: 0, B: 0 }
-    );
-    voteState.A = counts.A;
-    voteState.B = counts.B;
-  } else {
-    if (typeof newState.A === "number") voteState.A = newState.A;
-    if (typeof newState.B === "number") voteState.B = newState.B;
-  }
-  
+  if (typeof newState.A === "number") voteState.A = newState.A;
+  if (typeof newState.B === "number") voteState.B = newState.B;
   if (newState.keywordA) voteState.keywordA = newState.keywordA;
   if (newState.keywordB) voteState.keywordB = newState.keywordB;
   if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
   voteState.updatedAt = Date.now();
+  persistVoteState();
 }

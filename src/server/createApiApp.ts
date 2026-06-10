@@ -201,6 +201,16 @@ export function createApiApp(): express.Express {
     }
   });
 
+  app.post(["/api/interactivity/votes/restore", "/interactivity/votes/restore"], (req, res) => {
+    try {
+      const { A, B } = req.body || {};
+      setRawVoteState({ A, B });
+      return res.json({ success: true, state: getVoteState() });
+    } catch (error: any) {
+      return res.status(500).json({ error: `Failed to restore votes: ${error?.message || error}` });
+    }
+  });
+
   // ─── API Route 2: Fetch Live Chat Messages and Stream Details ───
   app.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res): Promise<any> => {
     try {
@@ -258,9 +268,10 @@ export function createApiApp(): express.Express {
         const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
 
-        const cmd = parseChatCommand(cleanMessageText);
-        if (cmd && cmd.type === "vote") {
-          castVote(channelId, cmd.option, messageId, timestamp);
+        // Process votes on the backend for a unified source of truth
+        const command = parseChatCommand(cleanMessageText);
+        if (command && command.type === "vote") {
+          castVote(channelId, command.option, messageId, timestamp);
         }
 
         return {

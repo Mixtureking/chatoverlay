@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState, serializeSprint7FullState, parseSprint7FullState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
-type VoteState = { A: number; B: number; total: number; keywordA?: string; keywordB?: string };
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
 
 const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
@@ -22,6 +21,7 @@ const getRoute = (): WidgetRoute => {
 
 function FlowerEffect() {
   const [flowers, setFlowers] = useState<{ id: number; left: number; delay: number; duration: number; size: number }[]>([]);
+  const nextPageTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const trigger = () => {
@@ -38,13 +38,45 @@ function FlowerEffect() {
       }, 8000);
     };
 
+    // Listen for triggers from other tabs
     const channel = new BroadcastChannel("sprint7_flower_channel");
     channel.onmessage = (e) => {
-      if (e.data.type === "TUNG_HOA") {
-        trigger();
-      }
+      if (e.data.type === "TUNG_HOA") trigger();
     };
-    return () => channel.close();
+
+    // Autonomous polling to ensure it works even if only this layer is open
+    let alive = true;
+    const poll = async () => {
+      try {
+        const settingsRes = await fetch("/api/youtube/settings-sync");
+        const settingsData = await settingsRes.json();
+        const settings = settingsData?.settings;
+        if (settings?.activeLiveChatId && settings?.apiKey) {
+          let url = `/api/youtube/messages?liveChatId=${encodeURIComponent(settings.activeLiveChatId)}&apiKey=${encodeURIComponent(settings.apiKey)}`;
+          if (nextPageTokenRef.current) url += `&pageToken=${encodeURIComponent(nextPageTokenRef.current)}`;
+          const msgRes = await fetch(url);
+          const msgData = await msgRes.json();
+          if (!alive) return;
+          nextPageTokenRef.current = msgData?.nextPageToken || null;
+          if (Array.isArray(msgData?.messages)) {
+            const hasTunghoa = msgData.messages.some((m: any) => 
+              String(m.messageText || "").trim().toUpperCase().includes("!TUNGHOA")
+            );
+            if (hasTunghoa) {
+              trigger();
+              channel.postMessage({ type: "TUNG_HOA" });
+            }
+          }
+        }
+      } catch {}
+    };
+
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      channel.close();
+      clearInterval(timer);
+    };
   }, []);
 
   return (
@@ -77,52 +109,34 @@ function FlowerEffect() {
   );
 }
 
-function useVoteState() {
+interface ClientVoteState {
+  A: number;
+  B: number;
+  total: number;
+  voters: Record<string, "A" | "B">;
+}
+
+function useVoteState(widgetState: Sprint7WidgetState) {
   const [state, setState] = useState<VoteState>({ A: 0, B: 0, total: 0 });
-  const nextPageTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        // Poll settings to get YouTube credentials
-        const settingsRes = await fetch("/api/youtube/settings-sync");
-        const settingsData = await settingsRes.json();
-        const settings = settingsData?.settings;
-
-        if (settings?.activeLiveChatId && settings?.apiKey) {
-          // Poll messages to trigger vote processing on backend
-          let url = `/api/youtube/messages?liveChatId=${encodeURIComponent(settings.activeLiveChatId)}&apiKey=${encodeURIComponent(settings.apiKey)}`;
-          if (nextPageTokenRef.current) {
-            url += `&pageToken=${encodeURIComponent(nextPageTokenRef.current)}`;
-          }
-          const msgRes = await fetch(url);
-          const msgData = await msgRes.json();
-          if (msgData?.nextPageToken) {
-            nextPageTokenRef.current = msgData.nextPageToken;
-          }
-
-          // Check for !tunghoa command in incoming messages
-          if (Array.isArray(msgData?.messages)) {
-            const hasTunghoa = msgData.messages.some((m: any) => 
-              String(m.messageText || "").trim().toUpperCase().includes("!TUNGHOA")
-            );
-            if (hasTunghoa) {
-              const channel = new BroadcastChannel("sprint7_flower_channel");
-              channel.postMessage({ type: "TUNG_HOA" });
-              channel.close();
-            }
-          }
-        }
-
         const res = await fetch("/api/interactivity/votes");
         const data = await res.json();
         if (!alive) return;
         if (data?.state) {
-          setState(data.state);
+            setState({
+                A: data.state.A,
+                B: data.state.B,
+                total: data.state.total || (data.state.A + data.state.B),
+                keywordA: data.state.keywordA,
+                keywordB: data.state.keywordB,
+            });
         }
-      } catch (err) {
-        console.warn("Failed to load vote state:", err);
+      } catch {
+        if (alive) setState({ A: 0, B: 0, total: 0 });
       }
     };
     load();
@@ -239,7 +253,7 @@ const sampleComments = [
 ];
 
 function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
-  const vote = useVoteState();
+  const vote = useVoteState(widgetState);
   const obsChatFontStyle = { fontFamily: '"Segoe UI", Roboto, Arial, sans-serif' };
   const [roulette, setRoulette] = useState<string[]>(sampleComments);
   const [todoDrafts, setTodoDrafts] = useState<Record<string, string>>({});
@@ -417,6 +431,7 @@ function VoteWidget({ widgetState, syncState, isLight }: VoteWidgetProps) {
             <div className="mt-4 flex justify-end">
                 <button 
                   onClick={async () => {
+                    localStorage.removeItem("sprint7_votes");
                     await fetch("/api/interactivity/votes", { method: "DELETE" });
                     window.location.reload();
                   }} 
@@ -1158,8 +1173,8 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
     }, 2000);
     window.addEventListener("storage", sync);
     return () => {
-      clearInterval(interval);
       window.removeEventListener("storage", sync);
+      clearInterval(interval);
     };
   }, []);
 
@@ -1189,7 +1204,7 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
 }
 
 function ObsVoteWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
-  const vote = useVoteState();
+  const vote = useVoteState(widgetState);
   const keywordA = widgetState.voteKeywordA || "A";
   const keywordB = widgetState.voteKeywordB || "B";
 
@@ -1350,20 +1365,6 @@ export default function Sprint7Widgets() {
             (window as any).__SPRINT7_STATE__ = data.state;
           }
         }
-
-        // Auto-resync keywords to backend if they were lost (e.g. server restart)
-        // We only do this in dashboard mode to avoid multiple widgets fighting
-        if (state.voteKeywordA || state.voteKeywordB) {
-            const voteRes = await fetch("/api/interactivity/votes");
-            const voteData = await voteRes.json();
-            if (voteData?.state && (voteData.state.keywordA !== state.voteKeywordA || voteData.state.keywordB !== state.voteKeywordB)) {
-                fetch("/api/interactivity/vote-keywords", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ keywordA: state.voteKeywordA, keywordB: state.voteKeywordB }),
-                });
-            }
-        }
       } catch {}
     };
 
@@ -1401,4 +1402,3 @@ export default function Sprint7Widgets() {
     </div>
   );
 }
-
