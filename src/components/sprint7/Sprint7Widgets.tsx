@@ -1,18 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, type Sprint7WidgetState } from "./sprint7State";
+import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number; keywordA?: string; keywordB?: string };
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
-
-const sampleComments = [
-  "This clip is awesome!",
-  "You look amazing",
-  "Let's go!",
-  "Vote A",
-  "Cyberpunk vibes",
-  "Chat is heating up",
-];
 
 const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
 
@@ -30,10 +21,30 @@ const getRoute = (): WidgetRoute => {
 
 function useVoteState() {
   const [state, setState] = useState<VoteState>({ A: 0, B: 0, total: 0 });
+  const nextPageTokenRef = useRef<string | null>(null);
+
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
+        // Poll settings to get YouTube credentials
+        const settingsRes = await fetch("/api/youtube/settings-sync");
+        const settingsData = await settingsRes.json();
+        const settings = settingsData?.settings;
+
+        if (settings?.activeLiveChatId && settings?.apiKey) {
+          // Poll messages to trigger vote processing on backend
+          let url = `/api/youtube/messages?liveChatId=${encodeURIComponent(settings.activeLiveChatId)}&apiKey=${encodeURIComponent(settings.apiKey)}`;
+          if (nextPageTokenRef.current) {
+            url += `&pageToken=${encodeURIComponent(nextPageTokenRef.current)}`;
+          }
+          const msgRes = await fetch(url);
+          const msgData = await msgRes.json();
+          if (msgData?.nextPageToken) {
+            nextPageTokenRef.current = msgData.nextPageToken;
+          }
+        }
+
         const res = await fetch("/api/interactivity/votes");
         const data = await res.json();
         if (!alive) return;
@@ -43,7 +54,7 @@ function useVoteState() {
       }
     };
     load();
-    const timer = window.setInterval(load, 900);
+    const timer = window.setInterval(load, 3500);
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -1138,6 +1149,11 @@ function useThemeMode() {
   return themeMode;
 }
 
+function CustomCssInjector({ css }: { css?: string }) {
+  if (!css || !isLikelySafeCss(css)) return null;
+  return <style id="custom-css-injector" dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
 export default function Sprint7Widgets() {
   const route = getRoute();
   const themeMode = useThemeMode();
@@ -1210,6 +1226,7 @@ export default function Sprint7Widgets() {
 
   return (
     <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
+      <CustomCssInjector css={state.customCSS} />
       {route === "dashboard" ? (
         <Sprint7Dashboard state={state} syncState={syncState} />
       ) : route === "obs-timer" ? (
