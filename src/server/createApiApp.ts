@@ -258,6 +258,11 @@ export function createApiApp(): express.Express {
         const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
 
+        const command = parseChatCommand(cleanMessageText);
+        if (command && command.type === "vote") {
+          castVote(channelId, command.option, messageId, timestamp);
+        }
+
         return {
           id: messageId,
           authorName: sanitizeHtml(author.displayName || "Viewer"),

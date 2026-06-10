@@ -2,7 +2,10 @@ export type ChatCommand =
   | { type: "roll"; sides: number }
   | { type: "pick" }
   | { type: "vote"; option: "A" | "B" }
-  | { type: "tunghoa" };
+  | { type: "tunghoa" }
+  | { type: "phaohoa" }
+  | { type: "tim" }
+  | { type: "votay" };
 
 export type VoteState = {
   A: number;
@@ -36,16 +39,25 @@ const MAX_PROCESSED_IDS = 5000;
 export function parseChatCommand(messageText: string): ChatCommand | null {
   if (typeof messageText !== "string") return null;
 
-  const trimmed = messageText.trim().toUpperCase();
+  // Unescape common HTML entities that might come from sanitization
+  const unescaped = messageText
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+
+  const trimmed = unescaped.trim().toUpperCase();
   const kA = voteState.keywordA;
   const kB = voteState.keywordB;
 
   // Explicit command with !
   if (trimmed.startsWith("!")) {
-    // !tunghoa command
-    if (/^!TUNGHOA$/i.test(trimmed)) {
-      return { type: "tunghoa" };
-    }
+    // Effect commands
+    if (/^!TUNGHOA$/i.test(trimmed)) return { type: "tunghoa" };
+    if (/^!PHAOHOA$/i.test(trimmed)) return { type: "phaohoa" };
+    if (/^!TIM$/i.test(trimmed)) return { type: "tim" };
+    if (/^!VOTAY$/i.test(trimmed) || /^!VỖTAY$/i.test(trimmed)) return { type: "votay" };
 
     const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
     if (rollMatch) {

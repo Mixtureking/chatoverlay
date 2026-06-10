@@ -20,31 +20,39 @@ const getRoute = (): WidgetRoute => {
 };
 
 /**
- * FlowerEffect component that can trigger independently by polling chat.
+ * EmojiEffect component that can trigger independently by polling chat.
  */
 function FlowerEffect() {
-  const [flowers, setFlowers] = useState<{ id: number; left: number; delay: number; duration: number; size: number }[]>([]);
+  const [items, setItems] = useState<{ id: number; left: number; delay: number; duration: number; size: number; content: string }[]>([]);
   const nextPageTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const trigger = () => {
-      const newFlowers = Array.from({ length: 30 }).map((_, i) => ({
-        id: Date.now() + i,
+    const trigger = (type: string = "TUNG_HOA") => {
+      let emojis = ["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"];
+      if (type === "PHAO_HOA") emojis = ["🎆", "🎇", "✨", "🎊", "🎉"];
+      if (type === "TIM") emojis = ["❤️", "💖", "💗", "💓", "💘", "💝"];
+      if (type === "VO_TAY") emojis = ["👏", "🙌", "🎉", "✨"];
+
+      const newItems = Array.from({ length: 30 }).map((_, i) => ({
+        id: Date.now() + i + Math.random(),
         left: Math.random() * 100,
         delay: Math.random() * 2,
         duration: 3 + Math.random() * 3,
         size: 20 + Math.random() * 20,
+        content: emojis[Math.floor(Math.random() * emojis.length)],
       }));
-      setFlowers((prev) => [...prev, ...newFlowers]);
+      setItems((prev) => [...prev, ...newItems]);
       setTimeout(() => {
-        setFlowers((prev) => prev.filter((f) => !newFlowers.includes(f)));
+        setItems((prev) => prev.filter((f) => !newItems.includes(f)));
       }, 8000);
     };
 
     // Listen for triggers from other tabs (Dashboard or other layers)
     const channel = new BroadcastChannel("sprint7_flower_channel");
     channel.onmessage = (e) => {
-      if (e.data.type === "TUNG_HOA") trigger();
+      if (["TUNG_HOA", "PHAO_HOA", "TIM", "VO_TAY"].includes(e.data.type)) {
+        trigger(e.data.type);
+      }
     };
 
     // Autonomous polling to ensure it works even if ONLY this layer is open in OBS
@@ -62,13 +70,20 @@ function FlowerEffect() {
           if (!alive) return;
           nextPageTokenRef.current = msgData?.nextPageToken || null;
           if (Array.isArray(msgData?.messages)) {
-            const hasTunghoa = msgData.messages.some((m: any) => 
-              String(m.messageText || "").trim().toUpperCase().includes("!TUNGHOA")
-            );
-            if (hasTunghoa) {
-              trigger();
-              channel.postMessage({ type: "TUNG_HOA" }); // Notify other tabs
-            }
+            msgData.messages.forEach((m: any) => {
+              const text = String(m.messageText || "").trim().toUpperCase();
+              
+              let triggeredType = "";
+              if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
+              else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
+              else if (text.includes("!TIM")) triggeredType = "TIM";
+              else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
+
+              if (triggeredType) {
+                trigger(triggeredType);
+                channel.postMessage({ type: triggeredType }); // Notify other tabs
+              }
+            });
           }
         }
       } catch {}
@@ -84,7 +99,7 @@ function FlowerEffect() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
-      {flowers.map((f) => (
+      {items.map((f) => (
         <div
           key={f.id}
           className="absolute text-2xl animate-fall"
@@ -96,7 +111,7 @@ function FlowerEffect() {
             fontSize: `${f.size}px`,
           }}
         >
-          {["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"][f.id % 6]}
+          {f.content}
         </div>
       ))}
       <style>{`
@@ -172,7 +187,11 @@ function useVoteState(widgetState: Sprint7WidgetState) {
             const kB = (widgetState?.voteKeywordB || settings.voteKeywordB || "B").trim().toUpperCase();
 
             msgData.messages.forEach((m: any) => {
-              const text = String(m.messageText || "").trim().toUpperCase();
+              let text = String(m.messageText || "").trim().toUpperCase();
+              
+              // Handle escaped quotes from sanitization
+              text = text.replace(/&QUOT;/g, '"').replace(/&#039;/g, "'");
+
               const userId = String(m.authorChannelId || m.authorName || m.id || "").trim();
               
               // Only count the FIRST vote from each user
@@ -185,10 +204,16 @@ function useVoteState(widgetState: Sprint7WidgetState) {
                 }
               }
 
-              // Also check for !tunghoa here to bridge with FlowerEffect if needed
-              if (text.includes("!TUNGHOA")) {
+              // Effect triggers
+              let triggeredType = "";
+              if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
+              else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
+              else if (text.includes("!TIM")) triggeredType = "TIM";
+              else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
+
+              if (triggeredType) {
                 const channel = new BroadcastChannel("sprint7_flower_channel");
-                channel.postMessage({ type: "TUNG_HOA" });
+                channel.postMessage({ type: triggeredType });
                 channel.close();
               }
             });
