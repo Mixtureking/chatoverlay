@@ -11,7 +11,7 @@
 
 import express from "express";
 import dns from "dns";
-import { castVote, getVoteState, parseChatCommand, resetVoteState, setVoteKeywords } from "./chatInteractivity.ts";
+import { castVote, getVoteState, parseChatCommand, resetVoteState, setVoteKeywords, setRawVoteState } from "./chatInteractivity.ts";
 
 // Ensure DNS resolution works correctly in sandboxed environments
 dns.setDefaultResultOrder && dns.setDefaultResultOrder("ipv4first");
@@ -358,7 +358,6 @@ export function createApiApp(): express.Express {
 
   // ─── Server-side Sprint 7 state cache ───
   let cachedSprint7State: any = null;
-
   app.post(["/api/sprint7/state-sync", "/sprint7/state-sync", "*/sprint7/state-sync"], (req, res) => {
     try {
       const { state } = req.body || {};
@@ -366,6 +365,10 @@ export function createApiApp(): express.Express {
         cachedSprint7State = state;
         if (state.voteKeywordA && state.voteKeywordB) {
           setVoteKeywords(state.voteKeywordA, state.voteKeywordB);
+        }
+        // Persist vote state if provided in the sync payload
+        if (state.voteState) {
+          setRawVoteState(state.voteState);
         }
         return res.json({ success: true, state: cachedSprint7State });
       }

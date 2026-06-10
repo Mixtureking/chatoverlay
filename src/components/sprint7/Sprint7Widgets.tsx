@@ -3,7 +3,7 @@ import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
 type VoteState = { A: number; B: number; total: number; keywordA?: string; keywordB?: string };
-type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
+type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
 
 const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
 
@@ -16,6 +16,7 @@ const getRoute = (): WidgetRoute => {
   if (path.includes("obs-vote")) return "obs-vote";
   if (path.includes("obs-chat")) return "obs-vote"; // Legacy support
   if (path.includes("obs-todo")) return "obs-todo";
+  if (path.includes("obs-effect")) return "obs-effect";
   return "dashboard";
 };
 
@@ -1299,21 +1300,28 @@ export default function Sprint7Widgets() {
     savePersistedSprint7WidgetState(next);
     setState(next);
 
-    // Sync to current origin's backend cache
-    fetch("/api/sprint7/state-sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: next }),
-    }).catch(() => {});
+    // Get current vote state to include in sync
+    fetch("/api/interactivity/votes")
+      .then(r => r.json())
+      .then(voteData => {
+        const payload = { state: { ...next, voteState: voteData?.state } };
+        // Sync to current origin's backend cache
+        fetch("/api/sprint7/state-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
 
-    // Sync a copy to localhost:3000 if running on Vercel
-    if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
-      fetch("http://localhost:3000/api/sprint7/state-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state: next }),
-      }).catch(() => {});
-    }
+        // Sync a copy to localhost:3000 if running on Vercel
+        if (!window.location.origin.includes("localhost") && !window.location.origin.includes("127.0.0.1")) {
+          fetch("http://localhost:3000/api/sprint7/state-sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -1374,9 +1382,13 @@ export default function Sprint7Widgets() {
   return (
     <div className={`w-full h-full ${isLight ? "theme-light" : ""}`} style={obsFontStyle}>
       <CustomCssInjector css={state.customCSS} />
-      <FlowerEffect />
-      {route === "dashboard" ? (
-        <Sprint7Dashboard state={state} syncState={syncState} />
+      {route === "obs-effect" ? (
+        <FlowerEffect />
+      ) : route === "dashboard" ? (
+        <>
+          <FlowerEffect />
+          <Sprint7Dashboard state={state} syncState={syncState} />
+        </>
       ) : route === "obs-timer" ? (
         <TimerWidget widgetState={state} />
       ) : route === "obs-wheel" ? (

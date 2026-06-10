@@ -128,21 +128,17 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     return { accepted: false, reason: "old_message" as const, state: getVoteState() };
   }
 
-  // One user = One vote logic
   const normalizedUserId = userId.trim();
+  
+  // "First-vote-counts" logic to prevent jumping/fluctuation
+  if (voteState.voters[normalizedUserId]) {
+    return { accepted: false, reason: "already_voted" as const, state: getVoteState() };
+  }
+
   voteState.voters[normalizedUserId] = option;
 
-  // Recalculate totals from voters map to ensure consistency
-  const counts = Object.values(voteState.voters).reduce(
-    (acc, val) => {
-      acc[val]++;
-      return acc;
-    },
-    { A: 0, B: 0 }
-  );
-
-  voteState.A = counts.A;
-  voteState.B = counts.B;
+  // Update totals
+  voteState[option] += 1;
   voteState.updatedAt = Date.now();
 
   return {
@@ -150,4 +146,14 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
     reason: "new_vote",
     state: getVoteState(),
   };
+}
+
+export function setRawVoteState(newState: Partial<VoteState>) {
+  if (typeof newState.A === "number") voteState.A = newState.A;
+  if (typeof newState.B === "number") voteState.B = newState.B;
+  if (newState.voters) voteState.voters = { ...newState.voters };
+  if (newState.keywordA) voteState.keywordA = newState.keywordA;
+  if (newState.keywordB) voteState.keywordB = newState.keywordB;
+  if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
+  voteState.updatedAt = Date.now();
 }
