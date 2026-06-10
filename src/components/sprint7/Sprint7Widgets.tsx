@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 
-type VoteState = { A: number; B: number; total: number };
+type VoteState = { A: number; B: number; total: number; keywordA?: string; keywordB?: string };
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "dashboard";
 
 const sampleComments = [
@@ -1142,8 +1142,10 @@ export default function Sprint7Widgets() {
   const route = getRoute();
   const themeMode = useThemeMode();
   const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
+  const lastManualSyncRef = useRef<number>(0);
 
   const syncState = (next: Sprint7WidgetState) => {
+    lastManualSyncRef.current = Date.now();
     (window as any).__SPRINT7_STATE__ = next;
     savePersistedSprint7WidgetState(next);
     setState(next);
@@ -1166,8 +1168,23 @@ export default function Sprint7Widgets() {
   };
 
   useEffect(() => {
+    // Sync initial state from localStorage to server on mount
+    if (route === "dashboard") {
+      const initialState = getSprint7State();
+      fetch("/api/sprint7/state-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: initialState }),
+      }).catch(() => {});
+    }
+  }, [route]);
+
+  useEffect(() => {
     // Poll server state for dashboard to stay in sync with remote changes
     const pollAllState = async () => {
+      // Ignore polling if we just synced manually (within last 3 seconds)
+      if (Date.now() - lastManualSyncRef.current < 3000) return;
+
       try {
         const res = await fetch("/api/sprint7/state-sync");
         const data = await res.json();

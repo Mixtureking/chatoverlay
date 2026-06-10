@@ -50,6 +50,20 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
     }
   }, [state.timerDoneText]);
 
+  useEffect(() => {
+    const nextA = state.voteKeywordA || "A";
+    if (nextA !== voteKeywordA) {
+      setVoteKeywordA(nextA);
+    }
+  }, [state.voteKeywordA]);
+
+  useEffect(() => {
+    const nextB = state.voteKeywordB || "B";
+    if (nextB !== voteKeywordB) {
+      setVoteKeywordB(nextB);
+    }
+  }, [state.voteKeywordB]);
+
   const flash = (msg: string) => {
     setSavedMsg(msg);
     setTimeout(() => setSavedMsg(null), 2500);
@@ -224,6 +238,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
   const resetAll = () => {
     syncState(createSprint7WidgetState());
+    fetch("/api/interactivity/votes", { method: "DELETE" }).catch(console.error);
     flash("🔄 Đã reset toàn bộ!");
   };
 
