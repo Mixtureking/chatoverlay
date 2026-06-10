@@ -278,9 +278,9 @@ function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7
 
   return (
     <div className="w-screen h-screen grid place-items-center bg-transparent text-slate-100 overflow-hidden" style={obsFontStyle}>
-      <div className="text-center animate-in fade-in zoom-in duration-500">
+      <div className="text-center">
         <div className="text-[12vw] font-black tracking-tighter tabular-nums drop-shadow-[0_0_30px_rgba(34,211,238,0.4)]">
-          {done ? <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>{doneText}</motion.div> : `${mins}:${secs}`}
+          {done ? <motion.div initial={false} animate={{ scale: 1, opacity: 1 }}>{doneText}</motion.div> : `${mins}:${secs}`}
         </div>
         <div className="text-cyan-400 uppercase tracking-[1em] mt-4 font-bold text-[2vw] opacity-70">{done ? "Timer Ended" : "Coming Soon"}</div>
       </div>
@@ -379,7 +379,7 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   const links = Object.entries(widgetState.socialLinks || {});
   if (links.length === 0) return null;
   // Duplicate for seamless marquee
-  const items = [...links, ...links, ...links, ...links];
+  const items = useMemo(() => [...links, ...links, ...links, ...links], [links]);
 
   return (
     <div className="fixed bottom-0 left-0 w-full bg-black/60 backdrop-blur-md py-6 border-t border-white/10 overflow-hidden" style={obsFontStyle}>
@@ -404,11 +404,11 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
 function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   return (
     <div className="w-screen h-screen p-12 bg-transparent" style={obsFontStyle}>
-      <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md ml-auto bg-slate-900/80 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-2xl">
+      <motion.div initial={false} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md ml-auto bg-slate-900/80 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-2xl">
         <h2 className="text-2xl font-black uppercase tracking-[0.3em] mb-8 text-white flex items-center gap-4"><span className="w-2 h-8 bg-emerald-500 rounded-full" />Mission</h2>
         <div className="space-y-4">
           {widgetState.todoList.map((t, i) => (
-            <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40" : "bg-white/5 border-white/5"}`}>
+            <motion.div key={t.id} initial={false} animate={{ opacity: 1, y: 0 }} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40" : "bg-white/5 border-white/5"}`}>
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${t.completed ? "bg-emerald-500 border-emerald-500" : "border-white/20"}`}>{t.completed && <div className="w-2 h-2 bg-white rounded-full" />}</div>
               <span className={`font-bold text-lg ${t.completed ? "line-through text-slate-400" : "text-white"}`}>{t.text}</span>
             </motion.div>
@@ -420,16 +420,27 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
 }
 
 export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] }) {
-  const route = getRoute();
-  const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
+  const route = useMemo(() => getRoute(), []);
+  const [state, setState] = useState<Sprint7WidgetState>(() => getSprint7State());
   const lastManualSyncRef = useRef<number>(0);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const syncStateFromServer = async () => {
-    if (Date.now() - lastManualSyncRef.current < 2000) return;
+    // If we just saved locally, don't overwrite with server state for 4 seconds
+    if (Date.now() - lastManualSyncRef.current < 4000) return;
     try {
       const res = await fetch("/api/sprint7/state-sync");
       const data = await res.json();
-      if (data?.state) setState(data.state);
+      if (data?.state) {
+        // Deep compare (simple JSON stringify) to avoid unnecessary re-renders
+        if (JSON.stringify(data.state) !== JSON.stringify(stateRef.current)) {
+          setState(data.state);
+        }
+      }
     } catch {}
   };
 
@@ -442,7 +453,9 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       const persisted = loadPersistedSprint7WidgetState();
-      if (persisted) setState(persisted);
+      if (persisted && JSON.stringify(persisted) !== JSON.stringify(stateRef.current)) {
+        setState(persisted);
+      }
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
@@ -485,7 +498,7 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
   const keywordB = widgetState.voteKeywordB || "B";
   return (
     <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
-      <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="w-full max-w-4xl bg-black/60 backdrop-blur-2xl border border-white/10 p-8 rounded-[40px] shadow-2xl">
+      <motion.div initial={false} animate={{ y: 0, opacity: 1 }} className="w-full max-w-4xl bg-black/60 backdrop-blur-2xl border border-white/10 p-8 rounded-[40px] shadow-2xl">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-white text-3xl font-black uppercase tracking-[0.2em] flex items-center gap-4"><span className="w-3 h-8 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />Live Vote</h2>
           <div className="bg-white/10 px-6 py-2 rounded-full border border-white/5"><span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Total: {vote.total}</span></div>
@@ -496,14 +509,28 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
               <div className="flex flex-col"><span className="text-cyan-400 text-xs font-black uppercase tracking-widest mb-1">Option A</span><span className="text-white text-6xl font-black tracking-tight">{keywordA}</span></div>
               <div className="flex flex-col items-end"><span className="text-cyan-400 text-4xl font-black tabular-nums">{vote.aPct}%</span><span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.A} votes</span></div>
             </div>
-            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${vote.aPct}%` }} className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" /></div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <motion.div 
+                initial={false} 
+                animate={{ width: `${vote.aPct}%` }} 
+                transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" 
+              />
+            </div>
           </div>
           <div className="space-y-4">
             <div className="flex items-end justify-between">
               <div className="flex flex-col"><span className="text-fuchsia-400 text-xs font-black uppercase tracking-widest mb-1">Option B</span><span className="text-white text-6xl font-black tracking-tight">{keywordB}</span></div>
               <div className="flex flex-col items-end"><span className="text-fuchsia-400 text-4xl font-black tabular-nums">{vote.bPct}%</span><span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.B} votes</span></div>
             </div>
-            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${vote.bPct}%` }} className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full" /></div>
+            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <motion.div 
+                initial={false} 
+                animate={{ width: `${vote.bPct}%` }} 
+                transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full" 
+              />
+            </div>
           </div>
         </div>
         <div className="mt-8 pt-6 border-t border-white/5 text-center"><p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">Type <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span> in chat</p></div>

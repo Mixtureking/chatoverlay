@@ -4,7 +4,23 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
-## [1.0.7] - 2026-06-09
+## [1.0.8] - 2026-06-10
+
+### [Ngày 10/06/2026] - Ổn định hóa Widget & Tối ưu hóa Đồng bộ hóa Toàn diện
+**Thay đổi (Changed)**
+- **Cơ chế đồng bộ hóa trạng thái (State Sync Logic):** Tích hợp so sánh sâu (Deep Equality Check) và ngưỡng chặn đồng bộ ngược 4 giây sau khi lưu thủ công. Điều này ngăn chặn việc dữ liệu cũ từ server ghi đè lên các thay đổi vừa thực hiện tại Dashboard, loại bỏ hoàn toàn hiện tượng nhấp nháy reset trạng thái (ví dụ: vote từ 100% về 0% hoặc task tự bỏ hoàn thành).
+- **Tối ưu hóa hiệu ứng Framer Motion:** Vô hiệu hóa thuộc tính `initial` animation trên các widget OBS (Vote, Todo) khi dữ liệu cập nhật. Các widget giờ đây giữ nguyên vị trí và trạng thái hiện tại thay vì chạy lại hiệu ứng "xuất hiện" (fade-in/slide-in) mỗi khi có tin nhắn chat mới hoặc thay đổi nhỏ từ server.
+- **Logic Vote Chat (useVoteState):** Cải tiến việc xử lý từ khóa (Keyword A/B) linh hoạt hơn, đảm bảo phiếu bầu được ghi nhận chính xác vào bộ nhớ đệm và không bị mất mát khi streamer thay đổi từ khóa giữa chừng trên Dashboard.
+
+**Đã thêm (Added)**
+- **Sử dụng useMemo & useRef chuyên sâu:** Áp dụng `useMemo` cho các thành phần tính toán nặng (như Marquee links, Wheel users) và `useRef` để theo dõi `lastTrigger` của các sự kiện quay (Spin) và hiệu ứng hoa (Flower), đảm bảo mỗi lệnh chỉ được thực thi đúng một lần duy nhất dù component có re-render.
+- **Cố định định danh Component (Stable Identity):** Sử dụng các khóa (keys) và cấu trúc component ổn định để ngăn React re-mount toàn bộ widget không cần thiết, giúp Vòng quay (Wheel) và các thanh tiến trình chạy mượt mà, không bị giật lag khi có dữ liệu mới.
+
+**Cải tiến (Improved)**
+- **Hiệu ứng thanh tiến trình (Progress Bar):** Thêm cấu hình `spring` transition (stiffness: 100, damping: 20) cho các thanh phần trăm của Live Vote, giúp việc tăng/giảm tỷ lệ phần trăm diễn ra mượt mà và trực quan hơn thay vì thay đổi tức thì.
+- **Trạng thái Trống (Empty State) & Fallback:** Cập nhật dữ liệu mẫu (fallback) sinh động hơn cho tất cả các widget khi không có cấu hình từ URL hoặc server, đảm bảo OBS luôn hiển thị nội dung mẫu chuẩn thay vì màn hình trống.
+
+---
 
 ### 🚀 Tính năng nổi bật & Nâng cấp (Features & Enhancements)
 - **Đồng bộ mặc định link localhost cho OBS Browser Source**: Tất cả liên kết OBS Browser Source khi sao chép từ Dashboard (Live Chat, Screen Transition, Lucky Wheel, Timer, Social Links) đều tự động dùng tiền tố `http://localhost:3000` làm mặc định nếu Dashboard đang chạy ở môi trường ngoài (như Vercel), giúp OBS truy cập chính xác và chia sẻ dữ liệu `localStorage` trên máy local của streamer.
