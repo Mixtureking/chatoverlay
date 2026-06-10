@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { createSprint7WidgetState, loadPersistedSprint7WidgetState, parseSprint7StateFromBase64, savePersistedSprint7WidgetState, isLikelySafeCss, type Sprint7WidgetState } from "./sprint7State";
 import { Sprint7Dashboard } from "./Sprint7Dashboard";
 import { ChatMessage } from "../../types";
@@ -22,7 +23,7 @@ function unescapeHtml(text: string): string {
 
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
 
-const obsFontStyle = { fontFamily: '"Segoe UI", Arial, sans-serif' };
+const obsFontStyle = { fontFamily: '"Inter", "Segoe UI", Arial, sans-serif' };
 
 const getRoute = (): WidgetRoute => {
   if (typeof window === "undefined") return "dashboard";
@@ -40,10 +41,11 @@ const getRoute = (): WidgetRoute => {
 /**
  * EmojiEffect component that can trigger independently or via props.
  */
-function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
+function FlowerEffect({ state, messages }: { state?: Sprint7WidgetState, messages?: ChatMessage[] }) {
   const [items, setItems] = useState<{ id: number; left: number; delay: number; duration: number; size: number; content: string }[]>([]);
   const nextPageTokenRef = useRef<string | null>(null);
   const processedMessageIds = useRef<Set<string>>(new Set());
+  const lastFlowerTriggerRef = useRef<number>(state?.flowerTrigger || 0);
 
   const trigger = (type: string = "TUNG_HOA") => {
     let emojis = ["🌸", "🌹", "🌺", "🌻", "🌼", "🌷"];
@@ -65,7 +67,7 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
     }, 8000);
   };
 
-  // 1. Listen for triggers from other tabs
+  // 1. Listen for triggers from BroadcastChannel
   useEffect(() => {
     const channel = new BroadcastChannel("sprint7_flower_channel");
     channel.onmessage = (e) => {
@@ -76,7 +78,15 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
     return () => channel.close();
   }, []);
 
-  // 2. Process messages from props
+  // 2. Sync from state trigger (Polling sync)
+  useEffect(() => {
+    if (state?.flowerTrigger && state.flowerTrigger > lastFlowerTriggerRef.current) {
+      trigger(state.flowerType || "TUNG_HOA");
+      lastFlowerTriggerRef.current = state.flowerTrigger;
+    }
+  }, [state?.flowerTrigger, state?.flowerType]);
+
+  // 3. Process messages from props
   useEffect(() => {
     if (!messages || messages.length === 0) return;
     
@@ -86,16 +96,15 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
 
       const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
       let triggeredType = "";
-      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HOA";
+      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HO_A";
       else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
       else if (text.includes("!TIM")) triggeredType = "TIM";
       else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
 
+      if (triggeredType === "TUNG_HO_A") triggeredType = "TUNG_HOA";
+
       if (triggeredType) {
         trigger(triggeredType);
-        const channel = new BroadcastChannel("sprint7_flower_channel");
-        channel.postMessage({ type: triggeredType });
-        channel.close();
       }
     });
 
@@ -105,7 +114,7 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
     }
   }, [messages]);
 
-  // 3. Autonomous polling (fallback)
+  // 4. Autonomous polling (fallback for YouTube)
   useEffect(() => {
     if (messages) return;
 
@@ -124,6 +133,9 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
           nextPageTokenRef.current = msgData?.nextPageToken || null;
           if (Array.isArray(msgData?.messages)) {
             msgData.messages.forEach((m: any) => {
+              if (processedMessageIds.current.has(m.id)) return;
+              processedMessageIds.current.add(m.id);
+
               const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
               
               let triggeredType = "";
@@ -134,9 +146,6 @@ function FlowerEffect({ messages }: { messages?: ChatMessage[] }) {
 
               if (triggeredType) {
                 trigger(triggeredType);
-                const channel = new BroadcastChannel("sprint7_flower_channel");
-                channel.postMessage({ type: triggeredType });
-                channel.close();
               }
             });
           }
@@ -189,134 +198,24 @@ interface ClientVoteState {
 }
 
 /**
- * Hook to manage vote state entirely on the client-side for absolute stability on Vercel.
+ * Hook to manage vote state, prioritizing server-side sync for OBS.
  */
 function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
-  const [state, setState] = useState<ClientVoteState>(() => {
+  const [state, setState] = useState<ClientVoteState>({ A: 0, B: 0, total: 0, voters: {} });
+
+  const fetchServerVotes = async () => {
     try {
-      const saved = localStorage.getItem("sprint7_votes");
-      return saved ? JSON.parse(saved) : { A: 0, B: 0, total: 0, voters: {} };
-    } catch {
-      return { A: 0, B: 0, total: 0, voters: {} };
-    }
-  });
-
-  const nextPageTokenRef = useRef<string | null>(null);
-  const processedMessageIds = useRef<Set<string>>(new Set());
-
-  const processIncomingMessages = (incoming: any[], kA: string, kB: string) => {
-    const savedRaw = localStorage.getItem("sprint7_votes");
-    let current: ClientVoteState;
-    try {
-      current = savedRaw ? JSON.parse(savedRaw) : { A: 0, B: 0, total: 0, voters: {} };
-    } catch {
-      current = { A: 0, B: 0, total: 0, voters: {} };
-    }
-    
-    let updated = false;
-
-    incoming.forEach((m: any) => {
-      if (processedMessageIds.current.has(m.id)) return;
-      processedMessageIds.current.add(m.id);
-
-      let text = unescapeHtml(m.messageText || "").trim().toUpperCase();
-      const userId = String(m.authorChannelId || m.authorName || m.id || "").trim();
-      
-      // Only count the FIRST vote from each user
-      if (userId && !current.voters[userId]) {
-        const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
-        if (voteMatch) {
-          const val = voteMatch[1].trim().toUpperCase();
-          if (val === kA) { current.voters[userId] = "A"; current.A++; updated = true; }
-          else if (val === kB) { current.voters[userId] = "B"; current.B++; updated = true; }
-        }
-      }
-
-      // Effect triggers
-      let triggeredType = "";
-      if (text.includes("!TUNGHOA")) triggeredType = "TUNG_HO_A"; // Avoid recursion if triggered by same poll
-      else if (text.includes("!PHAOHOA")) triggeredType = "PHAO_HOA";
-      else if (text.includes("!TIM")) triggeredType = "TIM";
-      else if (text.includes("!VOTAY") || text.includes("!VỖTAY")) triggeredType = "VO_TAY";
-
-      // Special case: if it's TUNGHOA, use the standard type
-      if (triggeredType === "TUNG_HO_A") triggeredType = "TUNG_HOA";
-
-      if (triggeredType) {
-        const channel = new BroadcastChannel("sprint7_flower_channel");
-        channel.postMessage({ type: triggeredType });
-        channel.close();
-      }
-    });
-
-    if (updated) {
-      current.total = current.A + current.B;
-      localStorage.setItem("sprint7_votes", JSON.stringify(current));
-      setState(current);
-    }
-
-    if (processedMessageIds.current.size > 1000) {
-      const allIds = Array.from(processedMessageIds.current);
-      processedMessageIds.current = new Set(allIds.slice(allIds.length - 500));
-    }
+      const res = await fetch("/api/interactivity/votes");
+      const data = await res.json();
+      if (data?.state) setState(data.state);
+    } catch {}
   };
 
-  // 1. Sync state across tabs
   useEffect(() => {
-    const syncFromLocal = () => {
-      try {
-        const saved = localStorage.getItem("sprint7_votes");
-        if (saved) setState(JSON.parse(saved));
-      } catch {}
-    };
-    window.addEventListener("storage", (e) => {
-      if (e.key === "sprint7_votes") syncFromLocal();
-    });
-    return () => window.removeEventListener("storage", syncFromLocal);
+    fetchServerVotes();
+    const timer = setInterval(fetchServerVotes, 2000);
+    return () => clearInterval(timer);
   }, []);
-
-  // 2. Process messages from props
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    const kA = (widgetState?.voteKeywordA || "A").trim().toUpperCase();
-    const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
-    processIncomingMessages(messages, kA, kB);
-  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
-
-  // 3. Autonomous polling (fallback)
-  useEffect(() => {
-    if (messages) return;
-
-    let alive = true;
-    const poll = async () => {
-      try {
-        const settingsRes = await fetch("/api/youtube/settings-sync");
-        const settingsData = await settingsRes.json();
-        const settings = settingsData?.settings;
-
-        if (settings?.activeLiveChatId && settings?.apiKey) {
-          let url = `/api/youtube/messages?liveChatId=${encodeURIComponent(settings.activeLiveChatId)}&apiKey=${encodeURIComponent(settings.apiKey)}`;
-          if (nextPageTokenRef.current) url += `&pageToken=${encodeURIComponent(nextPageTokenRef.current)}`;
-          const msgRes = await fetch(url);
-          const msgData = await msgRes.json();
-          if (!alive) return;
-          nextPageTokenRef.current = msgData?.nextPageToken || null;
-
-          if (Array.isArray(msgData?.messages)) {
-            const kA = (widgetState?.voteKeywordA || settings.voteKeywordA || "A").trim().toUpperCase();
-            const kB = (widgetState?.voteKeywordB || settings.voteKeywordB || "B").trim().toUpperCase();
-            processIncomingMessages(msgData.messages, kA, kB);
-          }
-        }
-      } catch {}
-    };
-
-    const timer = setInterval(poll, 4000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
 
   const aPct = state.total > 0 ? Math.round((state.A / state.total) * 100) : 0;
   const bPct = state.total > 0 ? 100 - aPct : 0;
@@ -363,46 +262,20 @@ function getSprint7State(): Sprint7WidgetState {
 /* ─────────── Widget Sub-components ─────────── */
 
 function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
-  const widgetState = useMemo(() => initialWidgetState || getSprint7State(), [initialWidgetState]);
-  const [seconds, setSeconds] = useState(widgetState.timerSeconds ?? 5 * 60);
-  const [doneText, setDoneText] = useState(widgetState.timerDoneText || "Time is up");
+  const [seconds, setSeconds] = useState(initialWidgetState.timerSeconds ?? 300);
+  const [doneText, setDoneText] = useState(initialWidgetState.timerDoneText || "Time is up");
   const [isRunning, setIsRunning] = useState(true);
-  const lastTriggerRef = useRef<number>(widgetState.timerTrigger || 0);
+  const lastTriggerRef = useRef<number>(initialWidgetState.timerTrigger || 0);
 
   useEffect(() => {
-    const applyState = (next: Partial<Sprint7WidgetState>) => {
-      const trigger = next.timerTrigger ?? 0;
-      if (trigger > lastTriggerRef.current) {
-        if (typeof next.timerSeconds === "number" && next.timerSeconds >= 0) {
-          setSeconds(next.timerSeconds);
-          setIsRunning(true);
-        }
-        lastTriggerRef.current = trigger;
-      }
-      if (typeof next.timerDoneText === "string" && next.timerDoneText.trim()) setDoneText(next.timerDoneText);
-    };
-
-    const channel = new BroadcastChannel("sprint7_timer_channel");
-    channel.onmessage = (e) => {
-      if (e.data.type === "UPDATE_TIMER") {
-        applyState({ timerSeconds: e.data.seconds, timerDoneText: e.data.doneText, timerTrigger: e.data.trigger });
-      }
-    };
-
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/sprint7/state-sync");
-        const data = await res.json();
-        if (data?.state) applyState(data.state);
-      } catch {}
-    };
-    const interval = setInterval(poll, 1500);
-
-    return () => {
-      channel.close();
-      clearInterval(interval);
-    };
-  }, []);
+    const trigger = initialWidgetState.timerTrigger ?? 0;
+    if (trigger > lastTriggerRef.current) {
+      setSeconds(initialWidgetState.timerSeconds ?? 300);
+      setDoneText(initialWidgetState.timerDoneText || "Time is up");
+      setIsRunning(true);
+      lastTriggerRef.current = trigger;
+    }
+  }, [initialWidgetState.timerTrigger, initialWidgetState.timerSeconds, initialWidgetState.timerDoneText]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -424,52 +297,162 @@ function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7
 
   return (
     <div className="w-screen h-screen grid place-items-center bg-transparent text-slate-100 overflow-hidden" style={obsFontStyle}>
-      <div className="text-center animate-in fade-in duration-300">
-        <div className="text-[10vw] font-black tracking-[0.2em]">{done ? doneText : `${mins}:${secs}`}</div>
-        <div className="text-cyan-400 uppercase tracking-[0.5em] mt-4 font-bold">{done ? "Timer Ended" : "Timer"}</div>
+      <div className="text-center animate-in fade-in zoom-in duration-500">
+        <div className="text-[12vw] font-black tracking-tighter tabular-nums drop-shadow-[0_0_30px_rgba(34,211,238,0.4)]">
+          {done ? (
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>{doneText}</motion.div>
+          ) : (
+            `${mins}:${secs}`
+          )}
+        </div>
+        <div className="text-cyan-400 uppercase tracking-[1em] mt-4 font-bold text-[2vw] opacity-70">
+          {done ? "Timer Ended" : "Coming Soon"}
+        </div>
       </div>
     </div>
   );
 }
 
-function WheelWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7WidgetState }) {
-  const widgetState = useMemo(() => initialWidgetState || getSprint7State(), [initialWidgetState]);
-  const [users, setUsers] = useState<string[]>(widgetState.wheelUsers || []);
-  const [angle, setAngle] = useState(0);
-  const isSpinningRef = useRef(false);
+function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }) {
+  const users = useMemo(() => state.wheelUsers || ["Player"], [state.wheelUsers]);
+  const [rotation, setRotation] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
+  const lastSpinTriggerRef = useRef<number>(state.spinTrigger || 0);
+
+  const startSpin = () => {
+    if (isSpinning) return;
+    setIsSpinning(true);
+    setWinner(null);
+    
+    // Calculate final rotation: at least 5 full turns + random offset
+    const extraDegrees = Math.floor(Math.random() * 360);
+    const newRotation = rotation + 1800 + extraDegrees;
+    setRotation(newRotation);
+
+    setTimeout(() => {
+      setIsSpinning(false);
+      // Determine winner based on rotation
+      const actualDegrees = newRotation % 360;
+      const segmentAngle = 360 / users.length;
+      // Index 0 is at top (270 degrees in SVG coordinate if starting from right)
+      const winnerIndex = Math.floor((360 - (actualDegrees % 360)) / segmentAngle) % users.length;
+      setWinner(users[winnerIndex]);
+    }, 6000);
+  };
 
   useEffect(() => {
-    const channel = new BroadcastChannel("sprint7_wheel_state");
-    channel.onmessage = (e) => {
-      if (e.data.type === "UPDATE_WHEEL") setUsers(e.data.users);
-    };
-    
-    const spinChannel = new BroadcastChannel("sprint7_wheel_channel");
-    spinChannel.onmessage = (e) => {
-      if (e.data.type === "SPIN" && !isSpinningRef.current) {
-        // Simple logic for spin animation (simulated)
-        isSpinningRef.current = true;
-        setWinner(null);
-        const targetAngle = angle + 1800 + Math.random() * 360;
-        setAngle(targetAngle);
-        setTimeout(() => {
-          isSpinningRef.current = false;
-          setWinner("Winner!"); 
-        }, 6000);
-      }
-    };
+    const trigger = state.spinTrigger ?? 0;
+    if (trigger > lastSpinTriggerRef.current) {
+      startSpin();
+      lastSpinTriggerRef.current = trigger;
+    }
+  }, [state.spinTrigger]);
 
-    return () => {
-      channel.close();
-      spinChannel.close();
-    };
-  }, [angle]);
+  // SVG parameters
+  const size = 600;
+  const radius = 280;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const segmentAngle = 360 / users.length;
 
   return (
     <div className="w-screen h-screen grid place-items-center bg-transparent overflow-hidden" style={obsFontStyle}>
-      <div className="text-center text-white font-bold">Wheel Widget Active (Users: {users.length})</div>
-      {winner && <div className="fixed inset-0 grid place-items-center bg-black/40 text-4xl text-white">{winner}</div>}
+      <div className="relative">
+        {/* Arrow Pointer */}
+        <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 z-20 drop-shadow-lg">
+          <div className="w-12 h-16 bg-white clip-arrow" style={{ clipPath: "polygon(50% 100%, 0 0, 100% 0)" }} />
+        </div>
+
+        {/* The Wheel */}
+        <motion.div
+          animate={{ rotate: rotation }}
+          transition={{ duration: 6, ease: [0.2, 0, 0.1, 1] }}
+          className="relative drop-shadow-2xl"
+          style={{ width: size, height: size }}
+        >
+          <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible">
+            <defs>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="5" />
+                <feOffset dx="0" dy="5" result="offsetblur" />
+                <feMerge>
+                  <feMergeNode />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            
+            <circle cx={centerX} cy={centerY} r={radius + 10} fill="#1e293b" />
+            
+            {users.map((user, i) => {
+              const startAngle = i * segmentAngle;
+              const endAngle = (i + 1) * segmentAngle;
+              
+              const x1 = centerX + radius * Math.cos((Math.PI * (startAngle - 90)) / 180);
+              const y1 = centerY + radius * Math.sin((Math.PI * (startAngle - 90)) / 180);
+              const x2 = centerX + radius * Math.cos((Math.PI * (endAngle - 90)) / 180);
+              const y2 = centerY + radius * Math.sin((Math.PI * (endAngle - 90)) / 180);
+              
+              const largeArc = segmentAngle > 180 ? 1 : 0;
+              const pathData = `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+              
+              const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f59e0b", "#10b981", "#06b6d4"];
+              const color = colors[i % colors.length];
+
+              return (
+                <g key={i}>
+                  <path d={pathData} fill={color} stroke="#1e293b" strokeWidth="2" />
+                  <g transform={`rotate(${startAngle + segmentAngle / 2} ${centerX} ${centerY})`}>
+                    <text
+                      x={centerX}
+                      y={centerY - radius * 0.7}
+                      fill="white"
+                      fontSize={Math.max(12, 24 - users.length)}
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.5))" }}
+                    >
+                      {user}
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
+
+            {/* Center Circle with Doro */}
+            <circle cx={centerX} cy={centerY} r="60" fill="white" stroke="#1e293b" strokeWidth="6" />
+            <g id="center">
+              <image
+                href="/doro.png"
+                x={centerX - 45}
+                y={centerY - 45}
+                width="90"
+                height="90"
+                transform={`rotate(${-rotation} ${centerX} ${centerY})`}
+                style={{ transition: "transform 6s cubic-bezier(0.2, 0, 0.1, 1)" }}
+              />
+            </g>
+          </svg>
+        </motion.div>
+
+        {/* Winner Announcement */}
+        <AnimatePresence>
+          {winner && !isSpinning && (
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none"
+            >
+              <div className="bg-white/10 backdrop-blur-2xl border-2 border-white/20 p-12 rounded-[50px] shadow-[0_0_100px_rgba(236,72,153,0.5)] text-center">
+                <div className="text-pink-400 uppercase tracking-[0.5em] font-black text-xl mb-4">WINNER</div>
+                <div className="text-white text-7xl font-black drop-shadow-lg">{winner}</div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -478,22 +461,58 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   const links = Object.entries(widgetState.socialLinks || {});
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-transparent" style={obsFontStyle}>
-      <div className="bg-black/60 p-4 rounded-xl text-white">Social Links Active: {links.length}</div>
+      <div className="flex flex-col items-center gap-6">
+        {links.map(([key, value], i) => (
+          <motion.div
+            key={key}
+            initial={{ x: -100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: i * 0.1 }}
+            className="flex items-center gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-xl"
+          >
+             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-black text-white text-xs uppercase">
+               {key[0]}
+             </div>
+             <div className="flex flex-col">
+               <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{key}</span>
+               <span className="text-white font-bold">{new URL(value).hostname.replace("www.", "")}</span>
+             </div>
+          </motion.div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   return (
-    <div className="w-screen h-screen p-8 bg-transparent" style={obsFontStyle}>
-      <div className="bg-black/60 p-6 rounded-2xl border-l-4 border-emerald-500 text-white">
-        <h2 className="text-xl font-black uppercase mb-4">Todo List</h2>
-        <div className="space-y-2">
-          {widgetState.todoList.map(t => (
-            <div key={t.id} className={t.completed ? "opacity-40 line-through" : ""}>{t.text}</div>
+    <div className="w-screen h-screen p-12 bg-transparent" style={obsFontStyle}>
+      <motion.div 
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="w-full max-w-md ml-auto bg-slate-900/80 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-2xl"
+      >
+        <h2 className="text-2xl font-black uppercase tracking-[0.3em] mb-8 text-white flex items-center gap-4">
+          <span className="w-2 h-8 bg-emerald-500 rounded-full" />
+          Mission
+        </h2>
+        <div className="space-y-4">
+          {widgetState.todoList.map((t, i) => (
+            <motion.div 
+              key={t.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40" : "bg-white/5 border-white/5"}`}
+            >
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${t.completed ? "bg-emerald-500 border-emerald-500" : "border-white/20"}`}>
+                {t.completed && <div className="w-2 h-2 bg-white rounded-full" />}
+              </div>
+              <span className={`font-bold text-lg ${t.completed ? "line-through text-slate-400" : "text-white"}`}>{t.text}</span>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -503,35 +522,29 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   const [state, setState] = useState<Sprint7WidgetState>(getSprint7State());
   const lastManualSyncRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (messages && messages.length > 0) {
-      console.log(`[Sprint7Widgets] Received ${messages.length} messages from parent.`);
-    }
-  }, [messages]);
-
-  const syncState = (next: Sprint7WidgetState) => {
-    lastManualSyncRef.current = Date.now();
-    (window as any).__SPRINT7_STATE__ = next;
-    savePersistedSprint7WidgetState(next);
-    setState(next);
-    fetch("/api/sprint7/state-sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: next }),
-    }).catch(() => {});
+  const syncStateFromServer = async () => {
+    if (Date.now() - lastManualSyncRef.current < 2000) return;
+    try {
+      const res = await fetch("/api/sprint7/state-sync");
+      const data = await res.json();
+      if (data?.state) setState(data.state);
+    } catch {}
   };
 
   useEffect(() => {
-    const poll = async () => {
-      if (Date.now() - lastManualSyncRef.current < 3000) return;
-      try {
-        const res = await fetch("/api/sprint7/state-sync");
-        const data = await res.json();
-        if (data?.state) setState(data.state);
-      } catch {}
-    };
-    const interval = setInterval(poll, 2000);
+    syncStateFromServer();
+    const interval = setInterval(syncStateFromServer, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel("sprint7_wheel_state");
+    channel.onmessage = (e) => {
+      if (e.data.type === "UPDATE_WHEEL") {
+        setState(prev => ({ ...prev, wheelUsers: e.data.users }));
+      }
+    };
+    return () => channel.close();
   }, []);
 
   const vote = useVoteState(state, messages);
@@ -539,11 +552,20 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative" style={obsFontStyle}>
       <CustomCssInjector css={state.customCSS} />
-      <FlowerEffect messages={messages} />
+      <FlowerEffect state={state} messages={messages} />
       {route === "obs-effect" ? (
-        null // FlowerEffect is already rendered globally in this container
+        null 
       ) : route === "dashboard" ? (
-        <Sprint7Dashboard state={state} syncState={syncState} />
+        <Sprint7Dashboard state={state} syncState={(next) => {
+          lastManualSyncRef.current = Date.now();
+          setState(next);
+          savePersistedSprint7WidgetState(next);
+          fetch("/api/sprint7/state-sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: next }),
+          }).catch(() => {});
+        }} />
       ) : route === "obs-timer" ? (
         <TimerWidget widgetState={state} />
       ) : route === "obs-wheel" ? (
@@ -567,59 +589,71 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
 
   return (
     <div className="w-screen h-screen bg-transparent p-12 flex items-end justify-center" style={obsFontStyle}>
-      <div className="w-full max-w-4xl bg-black/60 backdrop-blur-xl border border-white/10 p-8 rounded-[40px] shadow-2xl animate-in slide-in-from-bottom-12 duration-700">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-white text-3xl font-black uppercase tracking-[0.2em] flex items-center gap-4">
-            <span className="w-3 h-8 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />
+      <motion.div 
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="w-full max-w-4xl bg-black/80 backdrop-blur-3xl border border-white/10 p-10 rounded-[50px] shadow-2xl"
+      >
+        <div className="flex items-center justify-between mb-10">
+          <h2 className="text-white text-4xl font-black uppercase tracking-[0.2em] flex items-center gap-4">
+            <span className="w-3 h-10 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />
             Live Vote
           </h2>
-          <div className="bg-white/10 px-6 py-2 rounded-full border border-white/5">
-            <span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Total: {vote.total}</span>
+          <div className="bg-white/10 px-8 py-3 rounded-full border border-white/10">
+            <span className="text-slate-300 font-bold text-xl uppercase tracking-widest">Total: {vote.total}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-12">
+        <div className="grid grid-cols-2 gap-16">
           {/* Option A */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
-                <span className="text-cyan-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
-                <span className="text-white text-6xl font-black tracking-tight">{keywordA}</span>
+                <span className="text-cyan-400 text-xs font-black uppercase tracking-widest mb-2">Option A</span>
+                <span className="text-white text-7xl font-black tracking-tighter">{keywordA}</span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-cyan-400 text-4xl font-black">{vote.aPct}%</span>
+                <span className="text-cyan-400 text-5xl font-black tabular-nums">{vote.aPct}%</span>
                 <span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.A} votes</span>
               </div>
             </div>
-            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-              <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-1000 ease-out" style={{ width: `${vote.aPct}%` }} />
+            <div className="h-8 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${vote.aPct}%` }}
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-[0_0_20px_rgba(6,182,212,0.5)]" 
+              />
             </div>
           </div>
 
           {/* Option B */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-end justify-between">
               <div className="flex flex-col">
-                <span className="text-fuchsia-400 text-sm font-black uppercase tracking-widest mb-1">Keyword</span>
-                <span className="text-white text-6xl font-black tracking-tight">{keywordB}</span>
+                <span className="text-fuchsia-400 text-xs font-black uppercase tracking-widest mb-2">Option B</span>
+                <span className="text-white text-7xl font-black tracking-tighter">{keywordB}</span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-fuchsia-400 text-4xl font-black">{vote.bPct}%</span>
+                <span className="text-fuchsia-400 text-5xl font-black tabular-nums">{vote.bPct}%</span>
                 <span className="text-slate-400 text-sm font-bold uppercase tracking-widest">{vote.B} votes</span>
               </div>
             </div>
-            <div className="h-6 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 transition-all duration-1000 ease-out" style={{ width: `${vote.bPct}%` }} />
+            <div className="h-8 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${vote.bPct}%` }}
+                className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 rounded-full shadow-[0_0_20px_rgba(236,72,153,0.5)]" 
+              />
             </div>
           </div>
         </div>
         
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.4em] animate-pulse">
-            Type <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span> in chat to vote
+        <div className="mt-12 pt-8 border-t border-white/5 text-center">
+          <p className="text-slate-400 font-bold text-sm uppercase tracking-[0.5em] animate-pulse">
+            Type <span className="text-white">!vote {keywordA}</span> or <span className="text-white">!vote {keywordB}</span> in chat
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

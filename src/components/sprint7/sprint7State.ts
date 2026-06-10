@@ -13,6 +13,8 @@ export interface Sprint7WidgetState {
   timerTrigger?: number;
   wheelUsers?: string[];
   spinTrigger?: number;
+  flowerTrigger?: number;
+  flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
 }
@@ -26,6 +28,8 @@ export interface Sprint7FullState {
   timerTrigger?: number;
   wheelUsers?: string[];
   spinTrigger?: number;
+  flowerTrigger?: number;
+  flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
 }
@@ -48,6 +52,8 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
     timerTrigger: typeof input?.timerTrigger === "number" ? input.timerTrigger : 0,
     wheelUsers: Array.isArray(input?.wheelUsers) && input.wheelUsers.length > 0 ? input.wheelUsers.filter((item) => typeof item === "string" && item.trim()) : ["Doro", "An", "Binh", "Chi", "Dung", "Em"],
     spinTrigger: typeof input?.spinTrigger === "number" ? input.spinTrigger : 0,
+    flowerTrigger: typeof input?.flowerTrigger === "number" ? input.flowerTrigger : 0,
+    flowerType: typeof input?.flowerType === "string" ? input.flowerType : "TUNG_HOA",
     voteKeywordA: typeof input?.voteKeywordA === "string" ? input.voteKeywordA : "A",
     voteKeywordB: typeof input?.voteKeywordB === "string" ? input.voteKeywordB : "B",
   };
@@ -98,6 +104,8 @@ export function createSprint7FullState(input?: Partial<Sprint7FullState>): Sprin
     timerTrigger: widgetState.timerTrigger,
     wheelUsers: widgetState.wheelUsers,
     spinTrigger: widgetState.spinTrigger,
+    flowerTrigger: widgetState.flowerTrigger,
+    flowerType: widgetState.flowerType,
     voteKeywordA: widgetState.voteKeywordA,
     voteKeywordB: widgetState.voteKeywordB,
   };

@@ -126,15 +126,32 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
 
   // ---- Spin wheel ----
   const handleSpinWheel = () => {
+    const trigger = Date.now();
     const channel = new BroadcastChannel("sprint7_wheel_channel");
-    channel.postMessage({ type: "SPIN" });
+    channel.postMessage({ type: "SPIN", trigger });
     channel.close();
+
     syncState({
       ...state,
-      spinTrigger: Date.now(),
+      spinTrigger: trigger,
     });
     flash("🎡 Đã gửi lệnh quay!");
   };
+
+  const handleFlower = (type: string) => {
+    const trigger = Date.now();
+    const channel = new BroadcastChannel("sprint7_flower_channel");
+    channel.postMessage({ type });
+    channel.close();
+
+    syncState({
+      ...state,
+      flowerTrigger: trigger,
+      flowerType: type,
+    });
+    flash("✨ Đã gửi hiệu ứng!");
+  };
+
 
   // ---- Save all settings ----
   const handleSaveAll = () => {
@@ -338,6 +355,14 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               desc="Layer dành riêng cho hiệu ứng (Tung hoa !tunghoa)."
               route="obs-effect"
               gradient="bg-gradient-to-r from-rose-400 to-pink-500"
+              extra={
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  <button onClick={() => handleFlower("TUNG_HOA")} className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 p-2 rounded-lg" title="🌸 Tung hoa">🌸</button>
+                  <button onClick={() => handleFlower("PHAO_HOA")} className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 p-2 rounded-lg" title="🎆 Pháo hoa">🎆</button>
+                  <button onClick={() => handleFlower("TIM")} className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 p-2 rounded-lg" title="❤️ Tim">❤️</button>
+                  <button onClick={() => handleFlower("VO_TAY")} className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 p-2 rounded-lg" title="👏 Vỗ tay">👏</button>
+                </div>
+              }
             />
             <ObsLinkCard
               emoji="✅"
