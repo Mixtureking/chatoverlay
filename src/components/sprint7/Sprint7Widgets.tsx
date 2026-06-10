@@ -56,7 +56,6 @@ const getRoute = (): WidgetRoute => {
  */
 function FlowerEffect({ state, messages }: { state?: Sprint7WidgetState, messages?: ChatMessage[] }) {
   const [items, setItems] = useState<{ id: number; left: number; delay: number; duration: number; size: number; content: string }[]>([]);
-  const nextPageTokenRef = useRef<string | null>(null);
   const processedMessageIds = useRef<Set<string>>(new Set());
   const lastFlowerTriggerRef = useRef<number>(state?.flowerTrigger || 0);
 
@@ -128,27 +127,28 @@ function FlowerEffect({ state, messages }: { state?: Sprint7WidgetState, message
   );
 }
 
-interface ClientVoteState {
-  A: number;
-  B: number;
-  total: number;
-  voters: Record<string, "A" | "B">;
-}
-
 /**
- * Hook to manage vote state.
+ * Hook to manage vote state with versioning.
  */
 function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
-  const [state, setState] = useState<ClientVoteState>({ A: 0, B: 0, total: 0, voters: {} });
+  const [state, setState] = useState<any>({ A: 0, B: 0, total: 0, voters: {}, updatedAt: 0 });
   const processedIds = useRef(new Set<string>());
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const fetchServerVotes = async () => {
     try {
       const res = await fetch("/api/interactivity/votes");
       const data = await res.json();
       if (data?.state) {
-        setState(data.state);
-        localStorage.setItem("sprint7_votes_local", JSON.stringify(data.state));
+        const incoming = data.state;
+        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+          setState(incoming);
+          localStorage.setItem("sprint7_votes_local", JSON.stringify(incoming));
+        }
       }
     } catch {}
   };
@@ -165,7 +165,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
     const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
 
     let updated = false;
-    const newState = { ...state, voters: { ...state.voters } };
+    const newState = { ...stateRef.current, voters: { ...stateRef.current.voters } };
 
     messages.forEach(m => {
       if (processedIds.current.has(m.id)) return;
@@ -192,6 +192,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
       newState.A = counts.A;
       newState.B = counts.B;
       newState.total = counts.A + counts.B;
+      newState.updatedAt = Date.now(); 
       setState(newState);
       localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
     }
@@ -200,7 +201,12 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "sprint7_votes_local" && e.newValue) {
-        try { setState(JSON.parse(e.newValue)); } catch {}
+        try { 
+          const incoming = JSON.parse(e.newValue);
+          if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+            setState(incoming);
+          }
+        } catch {}
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -224,6 +230,7 @@ function getFallbackState(): Sprint7WidgetState {
     timerSeconds: 5 * 60,
     timerDoneText: "Thời gian đã kết thúc",
     wheelUsers: ["Doro", "An", "Bình", "Chi", "Dung", "Em"],
+    updatedAt: Date.now()
   };
 }
 
@@ -289,40 +296,25 @@ function TimerWidget({ widgetState: initialWidgetState }: { widgetState: Sprint7
 }
 
 function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }) {
-  // Use a ref to lock users during spin to prevent jerky re-renders
-  const [activeUsers, setActiveUsers] = useState<string[]>(state.wheelUsers || ["Player"]);
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
   const lastSpinTriggerRef = useRef<number>(state.spinTrigger || 0);
-
-  // Sync users only when NOT spinning
-  useEffect(() => {
-    if (!isSpinning) {
-      setActiveUsers(state.wheelUsers || ["Player"]);
-    }
-  }, [state.wheelUsers, isSpinning]);
+  const users = useMemo(() => state.wheelUsers || ["Player"], [state.wheelUsers]);
 
   const startSpin = () => {
     if (isSpinning) return;
     setIsSpinning(true);
     setWinner(null);
-    
-    // Calculate final rotation
     const extraDegrees = Math.floor(Math.random() * 360);
-    const spinCircles = 5 + Math.floor(Math.random() * 3);
-    const newRotation = rotation + (spinCircles * 360) + extraDegrees;
-    
+    const newRotation = rotation + (5 * 360) + extraDegrees;
     setRotation(newRotation);
-
     setTimeout(() => {
       setIsSpinning(false);
       const actualDegrees = newRotation % 360;
-      const segmentAngle = 360 / activeUsers.length;
-      // The needle is at the top (270deg in polar, but 0deg in our rotation)
-      // We need to find which segment is at the top after rotation
-      const winnerIndex = Math.floor((360 - (actualDegrees % 360)) / segmentAngle) % activeUsers.length;
-      setWinner(activeUsers[winnerIndex]);
+      const segmentAngle = 360 / users.length;
+      const winnerIndex = Math.floor((360 - (actualDegrees % 360)) / segmentAngle) % users.length;
+      setWinner(users[winnerIndex]);
     }, 6000);
   };
 
@@ -338,7 +330,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
   const radius = 280;
   const centerX = size / 2;
   const centerY = size / 2;
-  const segmentAngle = 360 / activeUsers.length;
+  const segmentAngle = 360 / users.length;
 
   return (
     <div className="w-screen h-screen grid place-items-center bg-transparent overflow-hidden" style={obsFontStyle}>
@@ -350,7 +342,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
           <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible">
             <motion.g animate={{ rotate: rotation }} transition={{ duration: 6, ease: [0.15, 0, 0.1, 1] }} style={{ originX: `${centerX}px`, originY: `${centerY}px` }}>
               <circle cx={centerX} cy={centerY} r={radius + 8} fill="#0f172a" />
-              {activeUsers.map((user, i) => {
+              {users.map((user, i) => {
                 const startAngle = i * segmentAngle;
                 const endAngle = (i + 1) * segmentAngle;
                 const x1 = centerX + radius * Math.cos((Math.PI * (startAngle - 90)) / 180);
@@ -362,10 +354,10 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
                 const colors = ["#4f46e5", "#7c3aed", "#c026d3", "#db2777", "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0891b2"];
                 const color = colors[i % colors.length];
                 return (
-                  <g key={`${i}-${activeUsers.length}`}>
+                  <g key={`${i}-${users.length}`}>
                     <path d={pathData} fill={color} stroke="#0f172a" strokeWidth="2" />
                     <g transform={`rotate(${startAngle + segmentAngle / 2} ${centerX} ${centerY})`}>
-                      <text x={centerX} y={centerY - radius * 0.75} fill="white" fontSize={Math.max(10, 24 - Math.floor(activeUsers.length / 2))} fontWeight="900" textAnchor="middle" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.8))", textTransform: "uppercase", letterSpacing: "1px" }}>{user}</text>
+                      <text x={centerX} y={centerY - radius * 0.75} fill="white" fontSize={Math.max(10, 24 - Math.floor(users.length / 2))} fontWeight="900" textAnchor="middle" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.8))", textTransform: "uppercase", letterSpacing: "1px" }}>{user}</text>
                     </g>
                   </g>
                 );
@@ -443,7 +435,6 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
 export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] }) {
   const route = useMemo(() => getRoute(), []);
   const [state, setState] = useState<Sprint7WidgetState>(() => getSprint7State());
-  const lastManualSyncRef = useRef<number>(0);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -451,25 +442,25 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   }, [state]);
 
   const syncStateFromServer = async () => {
-    if (Date.now() - lastManualSyncRef.current < 4000) return;
     try {
       const res = await fetch("/api/sprint7/state-sync");
       const data = await res.json();
       if (data?.state) {
-        if (JSON.stringify(data.state) !== JSON.stringify(stateRef.current)) {
-          setState(data.state);
+        const incoming = data.state as Sprint7WidgetState;
+        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+          setState(incoming);
         }
       }
     } catch {}
   };
 
-  // BroadcastChannel for instant local sync
   useEffect(() => {
     const channel = new BroadcastChannel("sprint7_global_sync");
     channel.onmessage = (e) => {
       if (e.data?.type === "STATE_UPDATE" && e.data.state) {
-        if (JSON.stringify(e.data.state) !== JSON.stringify(stateRef.current)) {
-          setState(e.data.state);
+        const incoming = e.data.state as Sprint7WidgetState;
+        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
+          setState(incoming);
         }
       }
     };
@@ -485,7 +476,7 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       const persisted = loadPersistedSprint7WidgetState();
-      if (persisted && JSON.stringify(persisted) !== JSON.stringify(stateRef.current)) {
+      if (persisted && (persisted.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
         setState(persisted);
       }
     };
@@ -496,20 +487,18 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   const vote = useVoteState(state, messages);
 
   const handleSyncState = (next: Sprint7WidgetState) => {
-    lastManualSyncRef.current = Date.now();
-    setState(next);
-    savePersistedSprint7WidgetState(next);
+    const stamped = { ...next, updatedAt: Date.now() };
+    setState(stamped);
+    savePersistedSprint7WidgetState(stamped);
     
-    // Broadcast locally instantly
     const channel = new BroadcastChannel("sprint7_global_sync");
-    channel.postMessage({ type: "STATE_UPDATE", state: next });
+    channel.postMessage({ type: "STATE_UPDATE", state: stamped });
     channel.close();
 
-    // Sync to server
     fetch("/api/sprint7/state-sync", { 
       method: "POST", 
       headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ state: next }) 
+      body: JSON.stringify({ state: stamped }) 
     }).catch(() => {});
   };
 
