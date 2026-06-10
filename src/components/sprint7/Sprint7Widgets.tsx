@@ -409,18 +409,18 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   const items = useMemo(() => [...links, ...links, ...links, ...links], [links]);
 
   return (
-    <div className="fixed bottom-0 left-0 w-full bg-slate-950/80 backdrop-blur-2xl py-8 border-t border-white/5 overflow-hidden" style={obsFontStyle}>
+    <div className="fixed bottom-0 left-0 w-full bg-slate-950/90 py-4 border-t border-white/5 overflow-hidden" style={obsFontStyle}>
       <div className="marquee-track flex items-center">
         {items.map(([key, value], i) => (
-          <div key={`${key}-${i}`} className="flex items-center gap-6 px-16 shrink-0">
-             <div className="w-12 h-12 rounded-[18px] bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center font-black text-white text-sm uppercase shadow-xl shadow-violet-500/30">
+          <div key={`${key}-${i}`} className="flex items-center gap-3 px-8 shrink-0">
+             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white text-[10px] uppercase shadow-lg">
                {key[0]}
              </div>
              <div className="flex flex-col">
-               <span className="text-[11px] text-violet-400 font-black uppercase tracking-[0.3em] mb-1">{key}</span>
-               <span className="text-white font-black text-2xl tracking-tight">{getHostname(value)}</span>
+               <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider leading-none mb-0.5">{key}</span>
+               <span className="text-white font-bold text-sm tracking-tight leading-none">{getHostname(value)}</span>
              </div>
-             <span className="text-white/10 ml-16 text-4xl font-light">/</span>
+             <span className="text-white/10 ml-8 text-xl">•</span>
           </div>
         ))}
       </div>
@@ -534,7 +534,6 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative" style={obsFontStyle}>
       <CustomCssInjector css={state.customCSS} />
-      <FlowerEffect state={state} messages={messages} />
       {route === "dashboard" ? (
         <Sprint7Dashboard state={state} syncState={handleSyncState} />
       ) : route === "obs-timer" ? (
@@ -548,10 +547,14 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
       ) : route === "obs-vote" ? (
         <ObsVoteWidget widgetState={state} vote={vote} />
       ) : route === "obs-effect" ? (
-        null
+        <div className="fixed inset-0 w-screen h-screen bg-transparent pointer-events-none">
+          <FlowerEffect state={state} messages={messages} />
+        </div>
       ) : (
         <div className="p-8 text-white">Route not found: {route}</div>
       )}
+      {/* Include FlowerEffect as a global overlay for other widgets too, but hidden if on dedicated effect page to avoid double */}
+      {route !== "obs-effect" && <FlowerEffect state={state} messages={messages} />}
     </div>
   );
 }
