@@ -2800,16 +2800,6 @@ export default function App() {
     }
   }, []);
 
-  const sprint7Route = typeof window !== "undefined"
-    ? (window.location.pathname.endsWith("/obs-vote") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link") || window.location.pathname.endsWith("/obs-todo") || window.location.pathname.endsWith("/obs-effect"))
-      ? window.location.pathname.split("/").pop()
-      : null
-    : null;
-
-  if (sprint7Route) {
-    return <Sprint7Widgets messages={messages} />;
-  }
-
   return (
     <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased ${settings.themeMode === 'light' ? 'theme-light' : ''}`}>
       {/* 🔴 Active Flash Indicator Toast */}

@@ -172,7 +172,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
       processedIds.current.add(m.id);
 
       const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
-      const userId = String(m.authorChannelId || m.authorName || m.id).trim();
+      const userId = String(m.authorName || m.id).trim();
 
       if (userId && !newState.voters[userId]) {
         const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
@@ -185,7 +185,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
     });
 
     if (updated) {
-      const counts = Object.values(newState.voters).reduce((acc, v) => {
+      const counts = (Object.values(newState.voters) as Array<"A" | "B">).reduce((acc, v) => {
         acc[v]++;
         return acc;
       }, { A: 0, B: 0 });
