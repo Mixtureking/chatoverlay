@@ -1883,7 +1883,18 @@ export default function App() {
     }
   };
 
-  // 7. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
+  // 7. RENDER SPRINT 7 WIDGETS (WHEEL, TIMER, VOTE, etc.)
+  const sprint7Route = typeof window !== "undefined"
+    ? (window.location.pathname.endsWith("/obs-vote") || window.location.pathname.endsWith("/obs-timer") || window.location.pathname.endsWith("/obs-wheel") || window.location.pathname.endsWith("/obs-link") || window.location.pathname.endsWith("/obs-todo") || window.location.pathname.endsWith("/obs-effect"))
+      ? window.location.pathname.split("/").pop()
+      : null
+    : null;
+
+  if (sprint7Route) {
+    return <Sprint7Widgets messages={messages} />;
+  }
+
+  // 8. RENDER ABSOLUTE OVERLAY FRAME FOR OBS STUDIO & DESKTOP GAME OVERLAY
   if (isOverlayRoute && (!isDesktopOverlay || !isEmbeddedDashboardOpen)) {
     if (isDesktopOverlay) {
       const shouldHideControls = isMouseDownOnHandle;

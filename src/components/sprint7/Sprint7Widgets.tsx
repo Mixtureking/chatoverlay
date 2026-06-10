@@ -21,6 +21,19 @@ function unescapeHtml(text: string): string {
     .replace(/&GT;/g, ">");
 }
 
+/**
+ * Robustly get hostname from a URL string.
+ */
+function getHostname(url: string): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+}
+
 type WidgetRoute = "obs-vote" | "obs-timer" | "obs-wheel" | "obs-link" | "obs-todo" | "obs-effect" | "dashboard";
 
 const obsFontStyle = { fontFamily: '"Inter", "Segoe UI", Arial, sans-serif' };
@@ -126,15 +139,7 @@ interface ClientVoteState {
  * Hook to manage vote state.
  */
 function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
-  const [state, setState] = useState<ClientVoteState>(() => {
-    try {
-      const saved = localStorage.getItem("sprint7_votes_local");
-      return saved ? JSON.parse(saved) : { A: 0, B: 0, total: 0, voters: {} };
-    } catch {
-      return { A: 0, B: 0, total: 0, voters: {} };
-    }
-  });
-
+  const [state, setState] = useState<ClientVoteState>({ A: 0, B: 0, total: 0, voters: {} });
   const processedIds = useRef(new Set<string>());
 
   const fetchServerVotes = async () => {
@@ -189,20 +194,13 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
       newState.total = counts.A + counts.B;
       setState(newState);
       localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
-      
-      // Sync to server too
-      fetch("/api/interactivity/votes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: "system", option: "A", state: newState }), // Pseudo-update
-      }).catch(() => {});
     }
   }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "sprint7_votes_local" && e.newValue) {
-        setState(JSON.parse(e.newValue));
+        try { setState(JSON.parse(e.newValue)); } catch {}
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -380,6 +378,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
 function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
   const links = Object.entries(widgetState.socialLinks || {});
   if (links.length === 0) return null;
+  // Duplicate for seamless marquee
   const items = [...links, ...links, ...links, ...links];
 
   return (
@@ -392,7 +391,7 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
              </div>
              <div className="flex flex-col">
                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-0.5">{key}</span>
-               <span className="text-white font-bold text-lg tracking-tight">{new URL(value).hostname.replace("www.", "")}</span>
+               <span className="text-white font-bold text-lg tracking-tight">{getHostname(value)}</span>
              </div>
              <span className="text-white/20 ml-12 text-2xl">•</span>
           </div>
