@@ -361,7 +361,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
         <div className="relative drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]" style={{ width: size, height: size }}>
           <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible">
             <motion.g animate={{ rotate: rotation }} transition={{ duration: 6, ease: "easeOut" }} style={{ originX: `${centerX}px`, originY: `${centerY}px` }}>
-              <circle cx={centerX} cy={centerY} r={radius + 8} fill="#0f172a" />
+              <circle cx={centerX} cy={centerY} r={radius + 8} className="fill-slate-900" />
               {users.map((user, i) => {
                 const startAngle = i * segmentAngle;
                 const endAngle = (i + 1) * segmentAngle;
@@ -375,7 +375,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
                 const color = colors[i % colors.length];
                 return (
                   <g key={`${i}-${users.length}`}>
-                    <path d={pathData} fill={color} stroke="#0f172a" strokeWidth="2" />
+                    <path d={pathData} fill={color} className="stroke-slate-900" strokeWidth="2" />
                     <g transform={`rotate(${startAngle + segmentAngle / 2} ${centerX} ${centerY})`}>
                       <text x={centerX} y={centerY - radius * 0.75} fill="white" fontSize={Math.max(10, 24 - Math.floor(users.length / 2))} fontWeight="900" textAnchor="middle" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.8))", textTransform: "uppercase", letterSpacing: "1px" }}>{user}</text>
                     </g>
@@ -383,7 +383,7 @@ function WheelWidget({ widgetState: state }: { widgetState: Sprint7WidgetState }
                 );
               })}
             </motion.g>
-            <circle cx={centerX} cy={centerY} r="65" fill="#1e293b" stroke="white" strokeWidth="4" />
+            <circle cx={centerX} cy={centerY} r="65" className="fill-slate-800 stroke-slate-100" strokeWidth="4" />
             <circle cx={centerX} cy={centerY} r="58" fill="white" />
             <image href="/doro.png" x={centerX - 42} y={centerY - 42} width="84" height="84" />
           </svg>
@@ -418,9 +418,9 @@ function LinkWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
              </div>
              <div className="flex flex-col">
                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider leading-none mb-0.5">{key}</span>
-               <span className="text-white font-bold text-sm tracking-tight leading-none">{getHostname(value)}</span>
+               <span className="text-slate-100 font-bold text-sm tracking-tight leading-none">{getHostname(value)}</span>
              </div>
-             <span className="text-white/10 ml-8 text-xl">•</span>
+             <span className="text-slate-100/10 ml-8 text-xl">•</span>
           </div>
         ))}
       </div>
@@ -433,13 +433,13 @@ function ObsTodoWidget({ widgetState }: { widgetState: Sprint7WidgetState }) {
     <div className="w-screen h-screen p-16 bg-transparent flex items-start justify-end" style={obsFontStyle}>
       <motion.div initial={false} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md bg-slate-950/80 backdrop-blur-3xl p-10 rounded-[50px] border border-white/10 shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
         <div className="flex items-center justify-between mb-10">
-          <h2 className="text-3xl font-black uppercase tracking-[0.4em] text-white flex items-center gap-5"><span className="w-3 h-10 bg-emerald-500 rounded-full" />Focus</h2>
+          <h2 className="text-3xl font-black uppercase tracking-[0.4em] text-slate-100 flex items-center gap-5"><span className="w-3 h-10 bg-emerald-500 rounded-full" />Focus</h2>
           <span className="bg-emerald-500/20 text-emerald-400 text-xs font-black px-4 py-1.5 rounded-full border border-emerald-500/30 uppercase tracking-widest">{widgetState.todoList.filter(t=>t.completed).length}/{widgetState.todoList.length}</span>
         </div>
         <div className="space-y-5">
           {widgetState.todoList.map((t) => (
-            <motion.div key={t.id} initial={false} animate={{ opacity: 1, scale: 1 }} className={`flex items-center gap-5 p-5 rounded-[24px] border transition-all duration-300 ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40 grayscale" : "bg-white/5 border-white/5 hover:border-white/20"}`}>
-              <div className={`w-7 h-7 rounded-xl border-3 flex items-center justify-center transition-all ${t.completed ? "bg-emerald-500 border-emerald-500" : "border-white/20"}`}>
+            <motion.div key={t.id} initial={false} animate={{ opacity: 1, scale: 1 }} className={`flex items-center gap-5 p-5 rounded-[24px] border transition-all duration-300 ${t.completed ? "bg-emerald-500/10 border-emerald-500/20 opacity-40 grayscale" : "bg-slate-900/50 border-white/5 hover:border-white/20"}`}>
+              <div className={`w-7 h-7 rounded-xl border-3 flex items-center justify-center transition-all ${t.completed ? "bg-emerald-500 border-emerald-500" : "border-slate-100/20"}`}>
                 {t.completed && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-3 h-3 bg-white rounded-md" />}
               </div>
               <span className={`font-bold text-xl tracking-tight ${t.completed ? "line-through text-slate-500" : "text-slate-100"}`}>{t.text}</span>
@@ -456,6 +456,17 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   const route = useMemo(() => getRoute(), []);
   const [state, setState] = useState<Sprint7WidgetState>(() => getSprint7State());
   const stateRef = useRef(state);
+
+  const themeMode = useMemo(() => {
+    if (typeof window === "undefined") return "dark";
+    const params = new URLSearchParams(window.location.search);
+    const ob = params.get("sp7");
+    if (ob) {
+      const decoded = parseSprint7StateFromBase64(ob);
+      if (decoded?.customCSS?.includes("theme-light") || (decoded as any)?.themeMode === "light") return "light";
+    }
+    return params.get("themeMode") || "dark";
+  }, []);
 
   useEffect(() => {
     stateRef.current = state;
@@ -532,10 +543,10 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
   };
 
   return (
-    <div className="w-full h-full bg-transparent overflow-hidden relative" style={obsFontStyle}>
+    <div className={`w-full h-full bg-transparent overflow-hidden relative ${themeMode === 'light' ? 'theme-light' : ''}`} style={obsFontStyle}>
       <CustomCssInjector css={state.customCSS} />
       {route === "dashboard" ? (
-        <Sprint7Dashboard state={state} syncState={handleSyncState} />
+        <Sprint7Dashboard state={state} syncState={handleSyncState} themeMode={themeMode} />
       ) : route === "obs-timer" ? (
         <TimerWidget widgetState={state} />
       ) : route === "obs-wheel" ? (
@@ -553,8 +564,6 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
       ) : (
         <div className="p-8 text-white">Route not found: {route}</div>
       )}
-      {/* Include FlowerEffect as a global overlay for other widgets too, but hidden if on dedicated effect page to avoid double */}
-      {route !== "obs-effect" && <FlowerEffect state={state} messages={messages} />}
     </div>
   );
 }
@@ -562,25 +571,41 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
 function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState, vote: any }) {
   const keywordA = widgetState.voteKeywordA || "A";
   const keywordB = widgetState.voteKeywordB || "B";
+  const [showWinner, setShowWinner] = useState(false);
+  const lastEndTriggerRef = useRef(widgetState.voteEndTrigger || 0);
+
+  useEffect(() => {
+    const trigger = widgetState.voteEndTrigger || 0;
+    if (trigger > lastEndTriggerRef.current) {
+      setShowWinner(true);
+      lastEndTriggerRef.current = trigger;
+      const timer = setTimeout(() => setShowWinner(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [widgetState.voteEndTrigger]);
+
+  const winner = widgetState.voteWinner;
+  const winnerName = winner === "A" ? keywordA : winner === "B" ? keywordB : "DRAW";
+
   return (
-    <div className="w-screen h-screen bg-transparent p-16 flex items-end justify-center" style={obsFontStyle}>
+    <div className="w-screen h-screen bg-transparent p-16 flex items-end justify-center relative" style={obsFontStyle}>
       <motion.div initial={false} animate={{ y: 0, opacity: 1 }} className="w-full max-w-5xl bg-slate-950/80 backdrop-blur-3xl border border-white/10 p-12 rounded-[60px] shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-6">
              <div className="w-4 h-12 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full" />
-             <h2 className="text-white text-5xl font-black uppercase tracking-[0.2em]">Live Vote</h2>
+             <h2 className="text-slate-100 text-5xl font-black uppercase tracking-[0.2em]">Live Vote</h2>
           </div>
-          <div className="bg-white/5 px-8 py-3 rounded-3xl border border-white/10 shadow-inner">
-             <span className="text-slate-400 font-black text-xl uppercase tracking-widest">Total: <span className="text-white">{vote.total}</span></span>
+          <div className="bg-white/5 dark:bg-white/5 light:bg-slate-200/50 px-8 py-3 rounded-3xl border border-white/10 shadow-inner">
+             <span className="text-slate-400 font-black text-xl uppercase tracking-widest">Total: <span className="text-slate-100">{vote.total}</span></span>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-20">
           <div className="space-y-6">
             <div className="flex items-end justify-between px-2">
-              <div className="flex flex-col"><span className="text-cyan-400 text-sm font-black uppercase tracking-[0.3em] mb-2">Option Alpha</span><span className="text-white text-7xl font-black tracking-tighter">{keywordA}</span></div>
+              <div className="flex flex-col"><span className="text-cyan-400 text-sm font-black uppercase tracking-[0.3em] mb-2">Option Alpha</span><span className="text-slate-100 text-7xl font-black tracking-tighter">{keywordA}</span></div>
               <div className="flex flex-col items-end"><span className="text-cyan-400 text-6xl font-black tabular-nums">{vote.aPct}%</span><span className="text-slate-500 text-sm font-black uppercase tracking-widest">{vote.A} members</span></div>
             </div>
-            <div className="h-10 w-full bg-white/5 rounded-[20px] overflow-hidden border border-white/5 shadow-inner p-1.5">
+            <div className="h-10 w-full bg-slate-900/50 rounded-[20px] overflow-hidden border border-white/5 shadow-inner p-1.5">
               <motion.div 
                 initial={false} 
                 animate={{ width: `${vote.aPct}%` }} 
@@ -591,10 +616,10 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
           </div>
           <div className="space-y-6">
             <div className="flex items-end justify-between px-2">
-              <div className="flex flex-col"><span className="text-fuchsia-400 text-sm font-black uppercase tracking-[0.3em] mb-2">Option Beta</span><span className="text-white text-7xl font-black tracking-tighter">{keywordB}</span></div>
+              <div className="flex flex-col"><span className="text-fuchsia-400 text-sm font-black uppercase tracking-[0.3em] mb-2">Option Beta</span><span className="text-slate-100 text-7xl font-black tracking-tighter">{keywordB}</span></div>
               <div className="flex flex-col items-end"><span className="text-fuchsia-400 text-6xl font-black tabular-nums">{vote.bPct}%</span><span className="text-slate-500 text-sm font-black uppercase tracking-widest">{vote.B} members</span></div>
             </div>
-            <div className="h-10 w-full bg-white/5 rounded-[20px] overflow-hidden border border-white/5 shadow-inner p-1.5">
+            <div className="h-10 w-full bg-slate-900/50 rounded-[20px] overflow-hidden border border-white/5 shadow-inner p-1.5">
               <motion.div 
                 initial={false} 
                 animate={{ width: `${vote.bPct}%` }} 
@@ -605,12 +630,34 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-white/5 text-center">
-           <p className="text-slate-500 font-black text-sm uppercase tracking-[0.6em] animate-pulse">Join by typing <span className="text-white">{keywordA}</span> hoặc <span className="text-white">{keywordB}</span></p>
+           <p className="text-slate-500 font-black text-sm uppercase tracking-[0.6em] animate-pulse">Join by typing <span className="text-slate-100">{keywordA}</span> hoặc <span className="text-slate-100">{keywordB}</span></p>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {showWinner && (
+          <motion.div 
+            key={`winner-${lastEndTriggerRef.current}`}
+            initial={{ scale: 0.5, opacity: 0, y: 50 }} 
+            animate={{ scale: 1, opacity: 1, y: 0 }} 
+            exit={{ scale: 0.8, opacity: 0, y: -20 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-slate-900/95 backdrop-blur-3xl border-8 border-white/10 p-24 rounded-[80px] shadow-[0_0_200px_rgba(34,211,238,0.4)] text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-fuchsia-500/10" />
+              <div className="relative z-10">
+                <div className="text-cyan-400 uppercase tracking-[1em] font-black text-3xl mb-8 animate-bounce">Voting Result</div>
+                <div className="text-slate-100 text-[12rem] font-black drop-shadow-[0_20px_20px_rgba(0,0,0,0.5)] leading-none mb-4">{winnerName}</div>
+                <div className="text-slate-400 text-4xl font-bold uppercase tracking-[0.4em]">{winner === "DRAW" ? "No clear winner" : "is the winner!"}</div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
 
 function CustomCssInjector({ css }: { css?: string }) {
   if (!css || !isLikelySafeCss(css)) return null;

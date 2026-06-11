@@ -21,13 +21,15 @@ var processedMessageIdQueue = [];
 var MAX_PROCESSED_IDS = 5e3;
 function parseChatCommand(messageText) {
   if (typeof messageText !== "string") return null;
-  const trimmed = messageText.trim().toUpperCase();
+  const unescaped = messageText.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  const trimmed = unescaped.trim().toUpperCase();
   const kA = voteState.keywordA;
   const kB = voteState.keywordB;
   if (trimmed.startsWith("!")) {
-    if (/^!TUNGHOA$/i.test(trimmed)) {
-      return { type: "tunghoa" };
-    }
+    if (/^!TUNGHOA$/i.test(trimmed)) return { type: "tunghoa" };
+    if (/^!PHAOHOA$/i.test(trimmed)) return { type: "phaohoa" };
+    if (/^!TIM$/i.test(trimmed)) return { type: "tim" };
+    if (/^!VOTAY$/i.test(trimmed) || /^!VỖTAY$/i.test(trimmed)) return { type: "votay" };
     const rollMatch = trimmed.match(/^!ROLL\s+(\d{1,4})$/i);
     if (rollMatch) {
       const sides = Number.parseInt(rollMatch[1], 10);
@@ -45,6 +47,12 @@ function parseChatCommand(messageText) {
       if (val === kA) return { type: "vote", option: "A" };
       if (val === kB) return { type: "vote", option: "B" };
     }
+    const commandOnly = trimmed.substring(1);
+    if (commandOnly === kA) return { type: "vote", option: "A" };
+    if (commandOnly === kB) return { type: "vote", option: "B" };
+  } else {
+    if (trimmed === kA) return { type: "vote", option: "A" };
+    if (trimmed === kB) return { type: "vote", option: "B" };
   }
   return null;
 }
@@ -111,27 +119,6 @@ function castVote(userId, option, messageId, timestamp) {
     reason: "new_vote",
     state: getVoteState()
   };
-}
-function setRawVoteState(newState) {
-  if (newState.voters) {
-    voteState.voters = { ...newState.voters };
-    const counts = Object.values(voteState.voters).reduce(
-      (acc, val) => {
-        acc[val]++;
-        return acc;
-      },
-      { A: 0, B: 0 }
-    );
-    voteState.A = counts.A;
-    voteState.B = counts.B;
-  } else {
-    if (typeof newState.A === "number") voteState.A = newState.A;
-    if (typeof newState.B === "number") voteState.B = newState.B;
-  }
-  if (newState.keywordA) voteState.keywordA = newState.keywordA;
-  if (newState.keywordB) voteState.keywordB = newState.keywordB;
-  if (newState.voteStartedAt) voteState.voteStartedAt = newState.voteStartedAt;
-  voteState.updatedAt = Date.now();
 }
 
 // src/server/createApiApp.ts
@@ -278,15 +265,6 @@ Stack trace: ${error?.stack}`);
       return res.status(500).json({ error: `Failed to set vote keywords: ${error?.message || error}` });
     }
   });
-  app2.post(["/api/interactivity/votes/restore", "/interactivity/votes/restore"], (req, res) => {
-    try {
-      const { A, B } = req.body || {};
-      setRawVoteState({ A, B });
-      return res.json({ success: true, state: getVoteState() });
-    } catch (error) {
-      return res.status(500).json({ error: `Failed to restore votes: ${error?.message || error}` });
-    }
-  });
   app2.get(["/api/youtube/messages", "/youtube/messages", "/messages", "*/messages"], async (req, res) => {
     try {
       const { liveChatId, apiKey, pageToken } = req.query || {};
@@ -347,8 +325,22 @@ Stack trace: ${error?.stack}`);
         const messageId = item.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : Date.now();
         const command = parseChatCommand(cleanMessageText);
-        if (command && command.type === "vote") {
-          castVote(channelId, command.option, messageId, timestamp);
+        if (command) {
+          if (command.type === "vote") {
+            castVote(channelId, command.option, messageId, timestamp);
+          } else if (["tunghoa", "phaohoa", "tim", "votay"].includes(command.type)) {
+            if (cachedSprint7State) {
+              cachedSprint7State.flowerTrigger = Date.now();
+              cachedSprint7State.updatedAt = Date.now();
+              const typeMap = {
+                tunghoa: "TUNG_HOA",
+                phaohoa: "PHAO_HOA",
+                tim: "TIM",
+                votay: "VO_TAY"
+              };
+              cachedSprint7State.flowerType = typeMap[command.type];
+            }
+          }
         }
         return {
           id: messageId,

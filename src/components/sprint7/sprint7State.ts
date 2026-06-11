@@ -17,6 +17,8 @@ export interface Sprint7WidgetState {
   flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
+  voteEndTrigger?: number;
+  voteWinner?: "A" | "B" | "DRAW" | null;
   updatedAt?: number;
 }
 
@@ -33,6 +35,8 @@ export interface Sprint7FullState {
   flowerType?: string;
   voteKeywordA?: string;
   voteKeywordB?: string;
+  voteEndTrigger?: number;
+  voteWinner?: "A" | "B" | "DRAW" | null;
   updatedAt?: number;
 }
 
@@ -58,6 +62,8 @@ export function createSprint7WidgetState(input?: Partial<Sprint7WidgetState>): S
     flowerType: typeof input?.flowerType === "string" ? input.flowerType : "TUNG_HOA",
     voteKeywordA: typeof input?.voteKeywordA === "string" ? input.voteKeywordA : "A",
     voteKeywordB: typeof input?.voteKeywordB === "string" ? input.voteKeywordB : "B",
+    voteEndTrigger: typeof input?.voteEndTrigger === "number" ? input.voteEndTrigger : 0,
+    voteWinner: (input?.voteWinner === "A" || input?.voteWinner === "B" || input?.voteWinner === "DRAW") ? input.voteWinner : null,
     updatedAt: typeof input?.updatedAt === "number" ? input.updatedAt : Date.now(),
   };
 }
@@ -111,8 +117,11 @@ export function createSprint7FullState(input?: Partial<Sprint7FullState>): Sprin
     flowerType: widgetState.flowerType,
     voteKeywordA: widgetState.voteKeywordA,
     voteKeywordB: widgetState.voteKeywordB,
+    voteEndTrigger: widgetState.voteEndTrigger,
+    voteWinner: widgetState.voteWinner,
   };
 }
+
 
 export function serializeSprint7FullState(state: Sprint7FullState): string {
   return JSON.stringify(createSprint7FullState(state), null, 2);
