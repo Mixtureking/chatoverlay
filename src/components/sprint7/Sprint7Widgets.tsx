@@ -199,19 +199,17 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
         }
       }
     });
-if (updated) {
-  const counts = (Object.values(newState.voters) as Array<"A" | "B">).reduce((acc, v) => {
-    acc[v]++;
-    return acc;
-  }, { A: 0, B: 0 });
-  newState.A = counts.A;
-  newState.B = counts.B;
-  newState.total = counts.A + counts.B;
-  newState.updatedAt = Date.now(); 
-  setState(newState);
-  localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
-}
 
+    if (updated) {
+      const counts = (Object.values(newState.voters) as Array<"A" | "B">).reduce((acc, v) => {
+        acc[v]++;
+        return acc;
+      }, { A: 0, B: 0 });
+      newState.A = counts.A;
+      newState.B = counts.B;
+      newState.total = counts.A + counts.B;
+      newState.updatedAt = Date.now(); 
+      setState(newState);
       localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
     }
   }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
