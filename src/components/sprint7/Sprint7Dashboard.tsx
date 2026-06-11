@@ -5,14 +5,15 @@ import { createSprint7WidgetState, serializeSprint7StateToBase64, type Sprint7Wi
 interface Sprint7DashboardProps {
   state: Sprint7WidgetState;
   syncState: (next: Sprint7WidgetState) => void;
+  themeMode?: string;
 }
 
 /* ─────────── Shared style tokens ─────────── */
-const glassCard = "relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 backdrop-blur-sm shadow-xl";
+const glassCard = "relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-slate-900/80 via-slate-900/60 to-slate-950/80 backdrop-blur-sm shadow-xl dark:border-white/[0.06] light:border-black/[0.06]";
 const inputCls = "bg-slate-950/70 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-[13px] text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50 transition-all duration-200";
 const sectionTitle = "text-[11px] font-semibold uppercase tracking-[0.15em] flex items-center gap-2";
 
-export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
+export function Sprint7Dashboard({ state, syncState, themeMode }: Sprint7DashboardProps) {
   const rootUrl = window.location.origin.replace("127.0.0.1", "localhost");
 
   // ---- Local draft states ----
@@ -314,7 +315,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
   );
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-[#0a0a12] text-slate-100" style={{ fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif' }}>
+    <div className="w-full h-full overflow-y-auto bg-slate-950 text-slate-100" style={{ fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif' }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-16">
 
         {/* ═══════════ HEADER ═══════════ */}
@@ -325,7 +326,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Tính năng tương tác Stream</h2>
+              <h2 className="text-xl font-bold text-slate-50 tracking-tight">Tính năng tương tác Stream</h2>
               <p className="text-sm text-slate-400 mt-0.5">Quản lý widget tương tác OBS — Wheel, Timer, Todo & Social Links</p>
             </div>
           </div>
@@ -402,7 +403,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
         <div className={glassCard}>
           <div className="h-[2px] w-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
           <div className="p-5 sm:p-6">
-            <h3 className="font-bold text-white mb-6 flex items-center gap-2.5 text-sm">
+            <h3 className="font-bold text-slate-100 mb-6 flex items-center gap-2.5 text-sm">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-md shadow-violet-500/20">
                 <Save className="w-3.5 h-3.5 text-white" />
               </div>
@@ -414,7 +415,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               {/* ──── Timer & Wheel ──── */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Timer */}
-                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <div className="bg-slate-900/40 rounded-xl border border-white/[0.04] p-4 space-y-3">
                   <h4 className={`${sectionTitle} text-cyan-400`}>
                     <Clock className="w-3.5 h-3.5" /> Bộ đếm ngược
                   </h4>
@@ -446,7 +447,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                 </div>
 
                 {/* Wheel Users */}
-                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <div className="bg-slate-900/40 rounded-xl border border-white/[0.04] p-4 space-y-3">
                   <h4 className={`${sectionTitle} text-violet-400`}>
                     <Users className="w-3.5 h-3.5" /> Người chơi Wheel
                   </h4>
@@ -468,7 +469,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                 </div>
 
                 {/* Vote Keywords */}
-                <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+                <div className="bg-slate-900/40 rounded-xl border border-white/[0.04] p-4 space-y-3">
                   <h4 className={`${sectionTitle} text-blue-400`}>
                     <MessageSquare className="w-3.5 h-3.5" /> Từ khóa bầu chọn (Live Vote)
                   </h4>
@@ -523,7 +524,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               </div>
 
               {/* ──── Todo List ──── */}
-              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+              <div className="bg-slate-900/40 rounded-xl border border-white/[0.04] p-4 space-y-3">
                 <h4 className={`${sectionTitle} text-emerald-400`}>
                   <ListTodo className="w-3.5 h-3.5" /> Danh sách nhiệm vụ
                 </h4>
@@ -548,7 +549,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                 {state.todoList.length > 0 && (
                   <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
                     {state.todoList.map((todo) => (
-                      <div key={todo.id} className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 transition-all duration-200 ${todo.completed ? "bg-emerald-500/[0.06] border border-emerald-500/10" : "bg-slate-950/50 border border-white/[0.04] hover:border-white/[0.08]"}`}>
+                      <div key={todo.id} className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 transition-all duration-200 ${todo.completed ? "bg-emerald-500/[0.06] border border-emerald-500/10" : "bg-slate-900/50 border border-white/[0.04] hover:border-white/[0.08]"}`}>
                         <button onClick={() => toggleTodo(todo.id)} className="shrink-0">
                           {todo.completed ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -575,7 +576,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
               </div>
 
               {/* ──── Social Links ──── */}
-              <div className="bg-black/20 rounded-xl border border-white/[0.04] p-4 space-y-3">
+              <div className="bg-slate-900/40 rounded-xl border border-white/[0.04] p-4 space-y-3">
                 <h4 className={`${sectionTitle} text-amber-400`}>
                   <Link2 className="w-3.5 h-3.5" /> Liên kết mạng xã hội
                 </h4>
@@ -589,7 +590,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                 {Object.keys(state.socialLinks).length > 0 && (
                   <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                     {Object.entries(state.socialLinks).map(([key, value]) => (
-                      <div key={key} className="flex items-center gap-2.5 bg-slate-950/50 border border-white/[0.04] hover:border-white/[0.08] rounded-xl px-3.5 py-2 transition-all duration-200 group">
+                      <div key={key} className="flex items-center gap-2.5 bg-slate-900/50 border border-white/[0.04] hover:border-white/[0.08] rounded-xl px-3.5 py-2 transition-all duration-200 group">
                         <span className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wider min-w-[64px] shrink-0">{key}</span>
                         <input
                           className="flex-1 bg-transparent text-[13px] text-slate-300 outline-none"
@@ -635,7 +636,7 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       {savedMsg && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-[slideUp_0.3s_ease-out]">
           <div className="bg-slate-900/95 border border-white/[0.1] backdrop-blur-lg rounded-2xl px-5 py-3 shadow-2xl shadow-black/40">
-            <p className="text-sm text-white font-medium">{savedMsg}</p>
+            <p className="text-sm text-slate-100 font-medium">{savedMsg}</p>
           </div>
         </div>
       )}
