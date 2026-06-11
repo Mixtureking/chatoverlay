@@ -564,8 +564,6 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
       ) : (
         <div className="p-8 text-white">Route not found: {route}</div>
       )}
-      {/* Include FlowerEffect as a global overlay for other widgets too, but hidden if on dedicated effect page to avoid double */}
-      {route !== "obs-effect" && <FlowerEffect state={state} messages={messages} />}
     </div>
   );
 }
@@ -639,10 +637,11 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
       <AnimatePresence>
         {showWinner && (
           <motion.div 
+            key={`winner-${lastEndTriggerRef.current}`}
             initial={{ scale: 0.5, opacity: 0, y: 50 }} 
             animate={{ scale: 1, opacity: 1, y: 0 }} 
             exit={{ scale: 0.8, opacity: 0, y: -20 }}
-            className="absolute inset-0 z-[110] flex items-center justify-center pointer-events-none"
+            className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none"
           >
             <div className="bg-slate-900/95 backdrop-blur-3xl border-8 border-white/10 p-24 rounded-[80px] shadow-[0_0_200px_rgba(34,211,238,0.4)] text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-fuchsia-500/10" />
