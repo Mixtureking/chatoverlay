@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Timer, CircleDot, MessageSquare, Link2, ListTodo, CheckCircle2, Clock, Users, ExternalLink, Sparkles } from "lucide-react";
+import { Copy, Dices, Save, Plus, Trash2, RotateCcw, Timer, CircleDot, MessageSquare, Link2, ListTodo, CheckCircle2, Clock, Users, ExternalLink, Sparkles, Trophy } from "lucide-react";
 import { createSprint7WidgetState, serializeSprint7StateToBase64, type Sprint7WidgetState } from "./sprint7State";
 
 interface Sprint7DashboardProps {
@@ -103,6 +103,30 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
       }).catch(console.error);
     }
     syncState(next);
+  };
+
+  const handleEndVote = async () => {
+    try {
+      const res = await fetch("/api/interactivity/votes");
+      const data = await res.json();
+      if (data?.state) {
+        const { A, B } = data.state;
+        let winner: "A" | "B" | "DRAW" = "DRAW";
+        if (A > B) winner = "A";
+        else if (B > A) winner = "B";
+
+        const trigger = Date.now();
+        syncState({
+          ...state,
+          voteEndTrigger: trigger,
+          voteWinner: winner,
+        });
+        flash(`🏆 Kết thúc vote! Winner: ${winner === "DRAW" ? "Hòa" : winner}`);
+      }
+    } catch (err) {
+      console.error("Failed to end vote:", err);
+      flash("❌ Lỗi khi kết thúc vote");
+    }
   };
 
   // ---- Copy OBS link ----
@@ -473,6 +497,24 @@ export function Sprint7Dashboard({ state, syncState }: Sprint7DashboardProps) {
                         placeholder="B"
                       />
                     </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleEndVote}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/20"
+                    >
+                      <Trophy className="w-3.5 h-3.5" /> Kết thúc Vote
+                    </button>
+                    <button
+                      onClick={() => {
+                        fetch("/api/interactivity/votes", { method: "DELETE" }).catch(console.error);
+                        flash("🔄 Đã reset điểm vote!");
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-colors"
+                      title="Reset điểm vote"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <p className="text-[10px] text-slate-500 italic">
                     Người xem chat đúng từ khóa này (ví dụ: "{voteKeywordA}") để tăng điểm vote.

@@ -562,8 +562,24 @@ export default function Sprint7Widgets({ messages }: { messages?: ChatMessage[] 
 function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState, vote: any }) {
   const keywordA = widgetState.voteKeywordA || "A";
   const keywordB = widgetState.voteKeywordB || "B";
+  const [showWinner, setShowWinner] = useState(false);
+  const lastEndTriggerRef = useRef(widgetState.voteEndTrigger || 0);
+
+  useEffect(() => {
+    const trigger = widgetState.voteEndTrigger || 0;
+    if (trigger > lastEndTriggerRef.current) {
+      setShowWinner(true);
+      lastEndTriggerRef.current = trigger;
+      const timer = setTimeout(() => setShowWinner(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [widgetState.voteEndTrigger]);
+
+  const winner = widgetState.voteWinner;
+  const winnerName = winner === "A" ? keywordA : winner === "B" ? keywordB : "DRAW";
+
   return (
-    <div className="w-screen h-screen bg-transparent p-16 flex items-end justify-center" style={obsFontStyle}>
+    <div className="w-screen h-screen bg-transparent p-16 flex items-end justify-center relative" style={obsFontStyle}>
       <motion.div initial={false} animate={{ y: 0, opacity: 1 }} className="w-full max-w-5xl bg-slate-950/80 backdrop-blur-3xl border border-white/10 p-12 rounded-[60px] shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-6">
@@ -608,9 +624,30 @@ function ObsVoteWidget({ widgetState, vote }: { widgetState: Sprint7WidgetState,
            <p className="text-slate-500 font-black text-sm uppercase tracking-[0.6em] animate-pulse">Join by typing <span className="text-white">{keywordA}</span> hoặc <span className="text-white">{keywordB}</span></p>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {showWinner && (
+          <motion.div 
+            initial={{ scale: 0.5, opacity: 0, y: 50 }} 
+            animate={{ scale: 1, opacity: 1, y: 0 }} 
+            exit={{ scale: 0.8, opacity: 0, y: -20 }}
+            className="absolute inset-0 z-[110] flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-slate-900/95 backdrop-blur-3xl border-8 border-white/10 p-24 rounded-[80px] shadow-[0_0_200px_rgba(34,211,238,0.4)] text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-fuchsia-500/10" />
+              <div className="relative z-10">
+                <div className="text-cyan-400 uppercase tracking-[1em] font-black text-3xl mb-8 animate-bounce">Voting Result</div>
+                <div className="text-white text-[12rem] font-black drop-shadow-[0_20px_20px_rgba(0,0,0,0.5)] leading-none mb-4">{winnerName}</div>
+                <div className="text-slate-400 text-4xl font-bold uppercase tracking-[0.4em]">{winner === "DRAW" ? "No clear winner" : "is the winner!"}</div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
 
 function CustomCssInjector({ css }: { css?: string }) {
   if (!css || !isLikelySafeCss(css)) return null;
