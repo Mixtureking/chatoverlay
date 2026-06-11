@@ -4,7 +4,27 @@ Tất cả các thay đổi đáng chú ý đối với dự án này sẽ đư�
 
 ---
 
+## [1.0.9] - 2026-06-11
+
+### [Ngày 11/06/2026] - Hoàn thiện Hệ thống Bầu chọn & Tối ưu hóa Giao diện Đa chế độ
+**Đã thêm (Added)**
+- **Tính năng "Kết thúc Vote" (End Vote Feature):** Thêm nút 🏆 **Kết thúc Vote** vào Dashboard. Khi nhấn, hệ thống sẽ tự động tính toán người chiến thắng dựa trên số phiếu thực tế và gửi tín hiệu hiển thị kết quả lên toàn bộ các layer OBS đang mở.
+- **Thông báo người thắng cuộc cực đại (Winner Overlay):** Thiết kế bảng thông báo kết quả bầu chọn siêu lớn, hiện đại với hiệu ứng Glassmorphism và animation sống động, xuất hiện trong 10 giây khi streamer kết thúc bầu chọn.
+- **Hỗ trợ chế độ Sáng (Light Mode Support):** Toàn bộ các widget Sprint 7 (Vote, Timer, Wheel, Todo, Social Links) hiện đã hỗ trợ đầy đủ chế độ Light Mode. Màu nền, khung viền và màu chữ sẽ tự động điều chỉnh linh hoạt để đảm bảo tính thẩm mỹ và độ tương phản cao khi streamer thay đổi giao diện.
+
+**Thay đổi (Changed)**
+- **Thu hẹp phạm vi Hiệu ứng Hoa rơi (Scoped Effects):** Các hiệu ứng `!tunghoa`, `!phaohoa`, `!tim`, `!votay` từ người xem hiện chỉ xuất hiện trên trang chuyên biệt `obs-effect`. Điều này giúp giữ cho các trang như Live Vote hay Todo List luôn sạch sẽ, không bị che khuất nội dung bởi hoa rơi.
+- **Đồng bộ hóa phiếu bầu chính xác:** Cập nhật Dashboard để ưu tiên lấy dữ liệu bầu chọn trực tiếp từ `localStorage`, đảm bảo kết quả thông báo luôn khớp 100% với số liệu hiển thị trên stream tại thời điểm nhấn nút kết thúc.
+
+**Sửa lỗi (Fixed)**
+- **Lỗi đứng Build/Deploy:** Sửa lỗi cú pháp (dư dấu ngoặc và lặp code) trong file `Sprint7Widgets.tsx` gây treo quy trình đóng gói ứng dụng.
+- **Lỗi thông báo Hòa (Draw Fix):** Khắc phục lỗi hệ thống luôn báo kết quả "Hòa" dù có chênh lệch phiếu bầu bằng cách cải thiện cơ chế truy xuất trạng thái bầu chọn thời gian thực.
+- **Lớp hiển thị thông báo:** Nâng cấp `z-index` và cơ chế `fixed positioning` cho bảng thông báo người thắng cuộc, đảm bảo nó luôn hiển thị trên cùng và không bị các thành phần khác đè lên.
+
+---
+
 ## [1.0.8] - 2026-06-10
+
 
 ### [Ngày 10/06/2026] - Ổn định hóa Widget & Hoàn thiện Tương tác OBS Toàn diện
 **Thay đổi (Changed)**
