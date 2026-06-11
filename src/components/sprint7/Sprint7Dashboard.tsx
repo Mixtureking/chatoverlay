@@ -108,22 +108,38 @@ export function Sprint7Dashboard({ state, syncState, themeMode }: Sprint7Dashboa
 
   const handleEndVote = async () => {
     try {
-      const res = await fetch("/api/interactivity/votes");
-      const data = await res.json();
-      if (data?.state) {
-        const { A, B } = data.state;
-        let winner: "A" | "B" | "DRAW" = "DRAW";
-        if (A > B) winner = "A";
-        else if (B > A) winner = "B";
-
-        const trigger = Date.now();
-        syncState({
-          ...state,
-          voteEndTrigger: trigger,
-          voteWinner: winner,
-        });
-        flash(`🏆 Kết thúc vote! Winner: ${winner === "DRAW" ? "Hòa" : winner}`);
+      // Use locally stored vote state if available for better accuracy in this context
+      const localRaw = localStorage.getItem("sprint7_votes_local");
+      let A = 0;
+      let B = 0;
+      
+      if (localRaw) {
+        const local = JSON.parse(localRaw);
+        A = local.A || 0;
+        B = local.B || 0;
+      } else {
+        // Fallback to API if local is missing
+        const res = await fetch("/api/interactivity/votes");
+        const data = await res.json();
+        if (data?.state) {
+          A = data.state.A || 0;
+          B = data.state.B || 0;
+        }
       }
+
+      let winner: "A" | "B" | "DRAW" = "DRAW";
+      if (A > B) winner = "A";
+      else if (B > A) winner = "B";
+
+      const trigger = Date.now();
+      syncState({
+        ...state,
+        voteEndTrigger: trigger,
+        voteWinner: winner,
+      });
+      
+      const winnerName = winner === "A" ? (state.voteKeywordA || "A") : winner === "B" ? (state.voteKeywordB || "B") : "Hòa";
+      flash(`🏆 Kết thúc vote! Winner: ${winnerName} (${A} vs ${B})`);
     } catch (err) {
       console.error("Failed to end vote:", err);
       flash("❌ Lỗi khi kết thúc vote");
