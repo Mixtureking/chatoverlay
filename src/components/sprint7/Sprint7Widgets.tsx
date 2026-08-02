@@ -128,39 +128,77 @@ function FlowerEffect({ state, messages }: { state?: Sprint7WidgetState, message
 }
 
 /**
- * Hook to manage vote state with versioning.
+ * Hook to manage vote state.
+ * Counts votes directly from messages (client-side) so it works reliably
+ * on serverless platforms like Vercel where in-memory state is not persistent.
  */
 function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[]) {
   const [state, setState] = useState<any>({ A: 0, B: 0, total: 0, voters: {}, updatedAt: 0 });
   const processedIds = useRef(new Set<string>());
   const stateRef = useRef(state);
+  const localCountRef = useRef({ A: 0, B: 0 });
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  const fetchServerVotes = async () => {
-    try {
-      const res = await fetch("/api/interactivity/votes");
-      const data = await res.json();
-      if (data?.state) {
-        const incoming = data.state;
-        if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
-          setState(incoming);
-          localStorage.setItem("sprint7_votes_local", JSON.stringify(incoming));
-        }
-      }
-    } catch {}
-  };
-
+  // Count votes from messages directly (reliable, no server dependency)
   useEffect(() => {
-    fetchServerVotes();
-    const timer = setInterval(fetchServerVotes, 2000);
-    return () => clearInterval(timer);
-  }, []);
+    if (!messages || messages.length === 0) return;
+    const kA = (widgetState?.voteKeywordA || "A").trim().toUpperCase();
+    const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
 
-  // Vote counting is handled entirely by the server.
-  // The frontend only fetches and displays server state via fetchServerVotes above.
+    let updated = false;
+    let countA = localCountRef.current.A;
+    let countB = localCountRef.current.B;
+    const newVoters = { ...stateRef.current.voters };
+
+    messages.forEach(m => {
+      if (processedIds.current.has(m.id)) return;
+      processedIds.current.add(m.id);
+
+      const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
+      const userId = String(m.authorName || m.id).trim();
+      if (!userId) return;
+
+      let voteOption: "A" | "B" | null = null;
+
+      const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
+      if (voteMatch) {
+        const val = voteMatch[1].trim().toUpperCase();
+        if (val === kA) voteOption = "A";
+        else if (val === kB) voteOption = "B";
+      } else if (text.startsWith("!")) {
+        const cmd = text.substring(1).trim();
+        if (cmd === kA) voteOption = "A";
+        else if (cmd === kB) voteOption = "B";
+      } else if (text === kA) {
+        voteOption = "A";
+      } else if (text === kB) {
+        voteOption = "B";
+      }
+
+      if (voteOption) {
+        newVoters[userId] = voteOption;
+        if (voteOption === "A") countA++;
+        else countB++;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      localCountRef.current = { A: countA, B: countB };
+      const newState = {
+        A: countA,
+        B: countB,
+        total: countA + countB,
+        voters: newVoters,
+        updatedAt: Date.now(),
+      };
+      setState(newState);
+      localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
+    }
+  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -169,6 +207,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
           const incoming = JSON.parse(e.newValue);
           if ((incoming.updatedAt || 0) > (stateRef.current.updatedAt || 0)) {
             setState(incoming);
+            localCountRef.current = { A: incoming.A || 0, B: incoming.B || 0 };
           }
         } catch {}
       }
