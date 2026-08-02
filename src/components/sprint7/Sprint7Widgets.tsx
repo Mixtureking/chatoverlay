@@ -174,7 +174,7 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
       const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
       const userId = String(m.authorName || m.id).trim();
 
-      if (userId && !newState.voters[userId]) {
+      if (userId) {
         // Lenient parsing: !VOTE keyword, !keyword, or just keyword
         let voteOption: "A" | "B" | null = null;
         
@@ -195,19 +195,15 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
 
         if (voteOption) {
           newState.voters[userId] = voteOption;
+          if (voteOption === "A") newState.A = (newState.A || 0) + 1;
+          if (voteOption === "B") newState.B = (newState.B || 0) + 1;
+          newState.total = (newState.A || 0) + (newState.B || 0);
           updated = true;
         }
       }
     });
 
     if (updated) {
-      const counts = (Object.values(newState.voters) as Array<"A" | "B">).reduce((acc, v) => {
-        acc[v]++;
-        return acc;
-      }, { A: 0, B: 0 });
-      newState.A = counts.A;
-      newState.B = counts.B;
-      newState.total = counts.A + counts.B;
       newState.updatedAt = Date.now(); 
       setState(newState);
       localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
