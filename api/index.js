@@ -104,15 +104,12 @@ function castVote(userId, option, messageId, timestamp) {
   }
   const normalizedUserId = userId.trim();
   voteState.voters[normalizedUserId] = option;
-  const counts = Object.values(voteState.voters).reduce(
-    (acc, val) => {
-      acc[val]++;
-      return acc;
-    },
-    { A: 0, B: 0 }
-  );
-  voteState.A = counts.A;
-  voteState.B = counts.B;
+  // Increment total votes directly (allow multiple votes per user)
+  if (option === "A") {
+    voteState.A++;
+  } else if (option === "B") {
+    voteState.B++;
+  }
   voteState.updatedAt = Date.now();
   return {
     accepted: true,

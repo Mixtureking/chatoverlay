@@ -159,56 +159,8 @@ function useVoteState(widgetState: Sprint7WidgetState, messages?: ChatMessage[])
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    const kA = (widgetState?.voteKeywordA || "A").trim().toUpperCase();
-    const kB = (widgetState?.voteKeywordB || "B").trim().toUpperCase();
-
-    let updated = false;
-    const newState = { ...stateRef.current, voters: { ...stateRef.current.voters } };
-
-    messages.forEach(m => {
-      if (processedIds.current.has(m.id)) return;
-      processedIds.current.add(m.id);
-
-      const text = unescapeHtml(m.messageText || "").trim().toUpperCase();
-      const userId = String(m.authorName || m.id).trim();
-
-      if (userId) {
-        // Lenient parsing: !VOTE keyword, !keyword, or just keyword
-        let voteOption: "A" | "B" | null = null;
-        
-        const voteMatch = text.match(/^!VOTE\s+"?([^"]+)"?$/i);
-        if (voteMatch) {
-          const val = voteMatch[1].trim().toUpperCase();
-          if (val === kA) voteOption = "A";
-          else if (val === kB) voteOption = "B";
-        } else if (text.startsWith("!")) {
-          const cmd = text.substring(1).trim();
-          if (cmd === kA) voteOption = "A";
-          else if (cmd === kB) voteOption = "B";
-        } else if (text === kA) {
-          voteOption = "A";
-        } else if (text === kB) {
-          voteOption = "B";
-        }
-
-        if (voteOption) {
-          newState.voters[userId] = voteOption;
-          if (voteOption === "A") newState.A = (newState.A || 0) + 1;
-          if (voteOption === "B") newState.B = (newState.B || 0) + 1;
-          newState.total = (newState.A || 0) + (newState.B || 0);
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      newState.updatedAt = Date.now(); 
-      setState(newState);
-      localStorage.setItem("sprint7_votes_local", JSON.stringify(newState));
-    }
-  }, [messages, widgetState?.voteKeywordA, widgetState?.voteKeywordB]);
+  // Vote counting is handled entirely by the server.
+  // The frontend only fetches and displays server state via fetchServerVotes above.
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
