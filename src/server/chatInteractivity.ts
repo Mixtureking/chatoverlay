@@ -149,17 +149,13 @@ export function castVote(userId: string, option: "A" | "B", messageId?: string, 
   const normalizedUserId = userId.trim();
   voteState.voters[normalizedUserId] = option;
 
-  // Derive totals from map
-  const counts = Object.values(voteState.voters).reduce(
-    (acc, val) => {
-      acc[val]++;
-      return acc;
-    },
-    { A: 0, B: 0 }
-  );
+  // Increment total votes for each option directly (allow multiple votes per user)
+  if (option === "A") {
+    voteState.A++;
+  } else if (option === "B") {
+    voteState.B++;
+  }
 
-  voteState.A = counts.A;
-  voteState.B = counts.B;
   voteState.updatedAt = Date.now();
 
   return {
